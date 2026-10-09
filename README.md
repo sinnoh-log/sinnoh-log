@@ -96,11 +96,19 @@ In this folder run `python3 -m http.server 8000` and open <http://localhost:8000
 
 When you get a new version of these files:
 
-1. In your GitHub repository, choose **Add file → Upload files** and drag in the new files over the old ones (including the `vendor` folder if it is included). **Do not** replace your own `firebase-config.js` unless you re-enter your settings in the new one.
+1. In your GitHub repository, choose **Add file → Upload files** and drag in the new files over the old ones (including the `vendor` folder if it is included; this release adds `vendor/fonts`). **Do not** replace your own `firebase-config.js` unless you re-enter your settings in the new one.
 2. If `firestore.rules` changed, open Firebase console → **Firestore → Rules**, paste in the new contents, and click **Publish**. Do this before players use the new version. This update changed the rules so that players can delete their own trainer sheet. Until you publish them, a player's "Delete this trainer" is refused and the page says so. The GM can always delete.
 3. GitHub Pages takes a minute or two to update. Each person should refresh the page once (hold Shift while clicking reload if they still see the old version).
 
 Nothing in your database changes when you update the files.
+
+## How it looks
+
+- **Pokémon cards** are tinted with their type colours (a Fire and Fighting Pokémon shades from orange to red) and show a Pokémon-game sprite chosen from the species name. "Alolan Raichu" or "Shiny Lucario" still find the right species. If a Pokémon has an uploaded picture, that is shown instead. If the species is not recognised, or the sprite cannot load, the card shows the first letter of its name.
+- **Where sprites come from.** The pictures are loaded when someone opens the page, from the public PokeAPI sprite collection on GitHub (`raw.githubusercontent.com/PokeAPI/sprites`). They are not stored in your repository or your database. If you ever open the site in a place that blocks that address, the letter tiles appear instead and nothing else is affected.
+- **Badge case.** The eight Sinnoh badges sit in a case on the trainer sheet. Dull slots are not earned yet. Tap one to light it up. Only the trainer's owner and the GM can change a case. A full case glows gold.
+- **Day and Night.** Use the sun or moon button at the top, or **Account → Appearance**. Auto follows the device. The choice is remembered on that device only.
+- **Fonts** (Pixelify Sans, Nunito and VT323) are included in `vendor/fonts`, so the site does not call Google Fonts. They are free to use under the SIL Open Font License; the licence files are in the same folder.
 
 ## Deleting trainers and Pokémon
 
@@ -140,5 +148,5 @@ Nothing in your database changes when you update the files.
 | `backend.js` | Sign-in screen and the connection to Firebase. |
 | `firebase-config.js` | Your project's settings. The one file you edit. |
 | `firestore.rules` | The access rules you paste into Firebase. |
-| `vendor/` | Google's Firebase browser library, unmodified, so the site does not depend on an outside CDN. |
+| `vendor/` | Google's Firebase browser library, unmodified, plus the three fonts in `vendor/fonts`, so the site does not depend on an outside CDN. |
 | `.nojekyll` | Tells GitHub Pages to serve the files as they are. Harmless if it did not upload. |

@@ -65,7 +65,7 @@ function frame(title,kids){
   card.textContent='';
   var meta=CFG.title||'Sinnoh Trainer Log';
   card.appendChild(el('div',{class:'g-brand'},[
-    el('span',{class:'logo lcd','aria-hidden':'true',text:'LOG'}),
+    el('span',{class:'logo','aria-hidden':'true'},[el('i',{text:'LOG'})]),
     el('div',null,[el('b',{text:meta}),el('small',{text:'Players and Game Master sign in here'})])
   ]));
   card.appendChild(el('h1',{id:'gate-h',text:title}));

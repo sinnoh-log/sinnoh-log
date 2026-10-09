@@ -90,9 +90,32 @@ const S={
   trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},
   awards:{},timeline:{},pins:{},banner:{},places:{},gmPl:{},placeId:null,members:{},invite:null,mapChunks:{},mapSrc:'',room:null,peers:[],avatars:{},
   pick:null,names:{},save:{cls:'',text:'Saved'},rolls:[],_tsig:'',
-  ui:{open:{},adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},
+  ui:{open:{},adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},pop:null,
     award:{uids:{},type:'Gym Badge',badge:'coal',title:'',note:'',levelUp:true}}
 };
+
+/* ---------- look: type colours, species list, sprites ---------- */
+const TYPE_HEX={normal:'#A8A878',fire:'#F08030',water:'#6890F0',electric:'#F8D030',grass:'#78C850',ice:'#98D8D8',fighting:'#C03028',poison:'#A040A0',ground:'#E0C068',flying:'#A890F0',psychic:'#F85888',bug:'#A8B820',rock:'#B8A038',ghost:'#705898',dragon:'#7038F8',dark:'#705848',steel:'#B8B8D0',fairy:'#EE99AC'};
+const DEXN="Bulbasaur|Ivysaur|Venusaur|Charmander|Charmeleon|Charizard|Squirtle|Wartortle|Blastoise|Caterpie|Metapod|Butterfree|Weedle|Kakuna|Beedrill|Pidgey|Pidgeotto|Pidgeot|Rattata|Raticate|Spearow|Fearow|Ekans|Arbok|Pikachu|Raichu|Sandshrew|Sandslash|Nidoran♀|Nidorina|Nidoqueen|Nidoran♂|Nidorino|Nidoking|Clefairy|Clefable|Vulpix|Ninetales|Jigglypuff|Wigglytuff|Zubat|Golbat|Oddish|Gloom|Vileplume|Paras|Parasect|Venonat|Venomoth|Diglett|Dugtrio|Meowth|Persian|Psyduck|Golduck|Mankey|Primeape|Growlithe|Arcanine|Poliwag|Poliwhirl|Poliwrath|Abra|Kadabra|Alakazam|Machop|Machoke|Machamp|Bellsprout|Weepinbell|Victreebel|Tentacool|Tentacruel|Geodude|Graveler|Golem|Ponyta|Rapidash|Slowpoke|Slowbro|Magnemite|Magneton|Farfetch'd|Doduo|Dodrio|Seel|Dewgong|Grimer|Muk|Shellder|Cloyster|Gastly|Haunter|Gengar|Onix|Drowzee|Hypno|Krabby|Kingler|Voltorb|Electrode|Exeggcute|Exeggutor|Cubone|Marowak|Hitmonlee|Hitmonchan|Lickitung|Koffing|Weezing|Rhyhorn|Rhydon|Chansey|Tangela|Kangaskhan|Horsea|Seadra|Goldeen|Seaking|Staryu|Starmie|Mr. Mime|Scyther|Jynx|Electabuzz|Magmar|Pinsir|Tauros|Magikarp|Gyarados|Lapras|Ditto|Eevee|Vaporeon|Jolteon|Flareon|Porygon|Omanyte|Omastar|Kabuto|Kabutops|Aerodactyl|Snorlax|Articuno|Zapdos|Moltres|Dratini|Dragonair|Dragonite|Mewtwo|Mew|Chikorita|Bayleef|Meganium|Cyndaquil|Quilava|Typhlosion|Totodile|Croconaw|Feraligatr|Sentret|Furret|Hoothoot|Noctowl|Ledyba|Ledian|Spinarak|Ariados|Crobat|Chinchou|Lanturn|Pichu|Cleffa|Igglybuff|Togepi|Togetic|Natu|Xatu|Mareep|Flaaffy|Ampharos|Bellossom|Marill|Azumarill|Sudowoodo|Politoed|Hoppip|Skiploom|Jumpluff|Aipom|Sunkern|Sunflora|Yanma|Wooper|Quagsire|Espeon|Umbreon|Murkrow|Slowking|Misdreavus|Unown|Wobbuffet|Girafarig|Pineco|Forretress|Dunsparce|Gligar|Steelix|Snubbull|Granbull|Qwilfish|Scizor|Shuckle|Heracross|Sneasel|Teddiursa|Ursaring|Slugma|Magcargo|Swinub|Piloswine|Corsola|Remoraid|Octillery|Delibird|Mantine|Skarmory|Houndour|Houndoom|Kingdra|Phanpy|Donphan|Porygon2|Stantler|Smeargle|Tyrogue|Hitmontop|Smoochum|Elekid|Magby|Miltank|Blissey|Raikou|Entei|Suicune|Larvitar|Pupitar|Tyranitar|Lugia|Ho-Oh|Celebi|Treecko|Grovyle|Sceptile|Torchic|Combusken|Blaziken|Mudkip|Marshtomp|Swampert|Poochyena|Mightyena|Zigzagoon|Linoone|Wurmple|Silcoon|Beautifly|Cascoon|Dustox|Lotad|Lombre|Ludicolo|Seedot|Nuzleaf|Shiftry|Taillow|Swellow|Wingull|Pelipper|Ralts|Kirlia|Gardevoir|Surskit|Masquerain|Shroomish|Breloom|Slakoth|Vigoroth|Slaking|Nincada|Ninjask|Shedinja|Whismur|Loudred|Exploud|Makuhita|Hariyama|Azurill|Nosepass|Skitty|Delcatty|Sableye|Mawile|Aron|Lairon|Aggron|Meditite|Medicham|Electrike|Manectric|Plusle|Minun|Volbeat|Illumise|Roselia|Gulpin|Swalot|Carvanha|Sharpedo|Wailmer|Wailord|Numel|Camerupt|Torkoal|Spoink|Grumpig|Spinda|Trapinch|Vibrava|Flygon|Cacnea|Cacturne|Swablu|Altaria|Zangoose|Seviper|Lunatone|Solrock|Barboach|Whiscash|Corphish|Crawdaunt|Baltoy|Claydol|Lileep|Cradily|Anorith|Armaldo|Feebas|Milotic|Castform|Kecleon|Shuppet|Banette|Duskull|Dusclops|Tropius|Chimecho|Absol|Wynaut|Snorunt|Glalie|Spheal|Sealeo|Walrein|Clamperl|Huntail|Gorebyss|Relicanth|Luvdisc|Bagon|Shelgon|Salamence|Beldum|Metang|Metagross|Regirock|Regice|Registeel|Latias|Latios|Kyogre|Groudon|Rayquaza|Jirachi|Deoxys|Turtwig|Grotle|Torterra|Chimchar|Monferno|Infernape|Piplup|Prinplup|Empoleon|Starly|Staravia|Staraptor|Bidoof|Bibarel|Kricketot|Kricketune|Shinx|Luxio|Luxray|Budew|Roserade|Cranidos|Rampardos|Shieldon|Bastiodon|Burmy|Wormadam|Mothim|Combee|Vespiquen|Pachirisu|Buizel|Floatzel|Cherubi|Cherrim|Shellos|Gastrodon|Ambipom|Drifloon|Drifblim|Buneary|Lopunny|Mismagius|Honchkrow|Glameow|Purugly|Chingling|Stunky|Skuntank|Bronzor|Bronzong|Bonsly|Mime Jr.|Happiny|Chatot|Spiritomb|Gible|Gabite|Garchomp|Munchlax|Riolu|Lucario|Hippopotas|Hippowdon|Skorupi|Drapion|Croagunk|Toxicroak|Carnivine|Finneon|Lumineon|Mantyke|Snover|Abomasnow|Weavile|Magnezone|Lickilicky|Rhyperior|Tangrowth|Electivire|Magmortar|Togekiss|Yanmega|Leafeon|Glaceon|Gliscor|Mamoswine|Porygon-Z|Gallade|Probopass|Dusknoir|Froslass|Rotom|Uxie|Mesprit|Azelf|Dialga|Palkia|Heatran|Regigigas|Giratina|Cresselia|Phione|Manaphy|Darkrai|Shaymin|Arceus|Victini|Snivy|Servine|Serperior|Tepig|Pignite|Emboar|Oshawott|Dewott|Samurott|Patrat|Watchog|Lillipup|Herdier|Stoutland|Purrloin|Liepard|Pansage|Simisage|Pansear|Simisear|Panpour|Simipour|Munna|Musharna|Pidove|Tranquill|Unfezant|Blitzle|Zebstrika|Roggenrola|Boldore|Gigalith|Woobat|Swoobat|Drilbur|Excadrill|Audino|Timburr|Gurdurr|Conkeldurr|Tympole|Palpitoad|Seismitoad|Throh|Sawk|Sewaddle|Swadloon|Leavanny|Venipede|Whirlipede|Scolipede|Cottonee|Whimsicott|Petilil|Lilligant|Basculin|Sandile|Krokorok|Krookodile|Darumaka|Darmanitan|Maractus|Dwebble|Crustle|Scraggy|Scrafty|Sigilyph|Yamask|Cofagrigus|Tirtouga|Carracosta|Archen|Archeops|Trubbish|Garbodor|Zorua|Zoroark|Minccino|Cinccino|Gothita|Gothorita|Gothitelle|Solosis|Duosion|Reuniclus|Ducklett|Swanna|Vanillite|Vanillish|Vanilluxe|Deerling|Sawsbuck|Emolga|Karrablast|Escavalier|Foongus|Amoonguss|Frillish|Jellicent|Alomomola|Joltik|Galvantula|Ferroseed|Ferrothorn|Klink|Klang|Klinklang|Tynamo|Eelektrik|Eelektross|Elgyem|Beheeyem|Litwick|Lampent|Chandelure|Axew|Fraxure|Haxorus|Cubchoo|Beartic|Cryogonal|Shelmet|Accelgor|Stunfisk|Mienfoo|Mienshao|Druddigon|Golett|Golurk|Pawniard|Bisharp|Bouffalant|Rufflet|Braviary|Vullaby|Mandibuzz|Heatmor|Durant|Deino|Zweilous|Hydreigon|Larvesta|Volcarona|Cobalion|Terrakion|Virizion|Tornadus|Thundurus|Reshiram|Zekrom|Landorus|Kyurem|Keldeo|Meloetta|Genesect|Chespin|Quilladin|Chesnaught|Fennekin|Braixen|Delphox|Froakie|Frogadier|Greninja|Bunnelby|Diggersby|Fletchling|Fletchinder|Talonflame|Scatterbug|Spewpa|Vivillon|Litleo|Pyroar|Flabébé|Floette|Florges|Skiddo|Gogoat|Pancham|Pangoro|Furfrou|Espurr|Meowstic|Honedge|Doublade|Aegislash|Spritzee|Aromatisse|Swirlix|Slurpuff|Inkay|Malamar|Binacle|Barbaracle|Skrelp|Dragalge|Clauncher|Clawitzer|Helioptile|Heliolisk|Tyrunt|Tyrantrum|Amaura|Aurorus|Sylveon|Hawlucha|Dedenne|Carbink|Goomy|Sliggoo|Goodra|Klefki|Phantump|Trevenant|Pumpkaboo|Gourgeist|Bergmite|Avalugg|Noibat|Noivern|Xerneas|Yveltal|Zygarde|Diancie|Hoopa|Volcanion|Rowlet|Dartrix|Decidueye|Litten|Torracat|Incineroar|Popplio|Brionne|Primarina|Pikipek|Trumbeak|Toucannon|Yungoos|Gumshoos|Grubbin|Charjabug|Vikavolt|Crabrawler|Crabominable|Oricorio|Cutiefly|Ribombee|Rockruff|Lycanroc|Wishiwashi|Mareanie|Toxapex|Mudbray|Mudsdale|Dewpider|Araquanid|Fomantis|Lurantis|Morelull|Shiinotic|Salandit|Salazzle|Stufful|Bewear|Bounsweet|Steenee|Tsareena|Comfey|Oranguru|Passimian|Wimpod|Golisopod|Sandygast|Palossand|Pyukumuku|Type: Null|Silvally|Minior|Komala|Turtonator|Togedemaru|Mimikyu|Bruxish|Drampa|Dhelmise|Jangmo-o|Hakamo-o|Kommo-o|Tapu Koko|Tapu Lele|Tapu Bulu|Tapu Fini|Cosmog|Cosmoem|Solgaleo|Lunala|Nihilego|Buzzwole|Pheromosa|Xurkitree|Celesteela|Kartana|Guzzlord|Necrozma|Magearna|Marshadow|Poipole|Naganadel|Stakataka|Blacephalon|Zeraora|Meltan|Melmetal|Grookey|Thwackey|Rillaboom|Scorbunny|Raboot|Cinderace|Sobble|Drizzile|Inteleon|Skwovet|Greedent|Rookidee|Corvisquire|Corviknight|Blipbug|Dottler|Orbeetle|Nickit|Thievul|Gossifleur|Eldegoss|Wooloo|Dubwool|Chewtle|Drednaw|Yamper|Boltund|Rolycoly|Carkol|Coalossal|Applin|Flapple|Appletun|Silicobra|Sandaconda|Cramorant|Arrokuda|Barraskewda|Toxel|Toxtricity|Sizzlipede|Centiskorch|Clobbopus|Grapploct|Sinistea|Polteageist|Hatenna|Hattrem|Hatterene|Impidimp|Morgrem|Grimmsnarl|Obstagoon|Perrserker|Cursola|Sirfetch'd|Mr. Rime|Runerigus|Milcery|Alcremie|Falinks|Pincurchin|Snom|Frosmoth|Stonjourner|Eiscue|Indeedee|Morpeko|Cufant|Copperajah|Dracozolt|Arctozolt|Dracovish|Arctovish|Duraludon|Dreepy|Drakloak|Dragapult|Zacian|Zamazenta|Eternatus|Kubfu|Urshifu|Zarude|Regieleki|Regidrago|Glastrier|Spectrier|Calyrex|Wyrdeer|Kleavor|Ursaluna|Basculegion|Sneasler|Overqwil|Enamorus|Sprigatito|Floragato|Meowscarada|Fuecoco|Crocalor|Skeledirge|Quaxly|Quaxwell|Quaquaval|Lechonk|Oinkologne|Tarountula|Spidops|Nymble|Lokix|Pawmi|Pawmo|Pawmot|Tandemaus|Maushold|Fidough|Dachsbun|Smoliv|Dolliv|Arboliva|Squawkabilly|Nacli|Naclstack|Garganacl|Charcadet|Armarouge|Ceruledge|Tadbulb|Bellibolt|Wattrel|Kilowattrel|Maschiff|Mabosstiff|Shroodle|Grafaiai|Bramblin|Brambleghast|Toedscool|Toedscruel|Klawf|Capsakid|Scovillain|Rellor|Rabsca|Flittle|Espathra|Tinkatink|Tinkatuff|Tinkaton|Wiglett|Wugtrio|Bombirdier|Finizen|Palafin|Varoom|Revavroom|Cyclizar|Orthworm|Glimmet|Glimmora|Greavard|Houndstone|Flamigo|Cetoddle|Cetitan|Veluza|Dondozo|Tatsugiri|Annihilape|Clodsire|Farigiraf|Dudunsparce|Kingambit|Great Tusk|Scream Tail|Brute Bonnet|Flutter Mane|Slither Wing|Sandy Shocks|Iron Treads|Iron Bundle|Iron Hands|Iron Jugulis|Iron Moth|Iron Thorns|Frigibax|Arctibax|Baxcalibur|Gimmighoul|Gholdengo|Wo-Chien|Chien-Pao|Ting-Lu|Chi-Yu|Roaring Moon|Iron Valiant|Koraidon|Miraidon|Walking Wake|Iron Leaves|Dipplin|Poltchageist|Sinistcha|Okidogi|Munkidori|Fezandipiti|Ogerpon|Archaludon|Hydrapple|Gouging Fire|Raging Bolt|Iron Boulder|Iron Crown|Terapagos|Pecharunt";
+const dexKey=s=>String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/♀/g,'f').replace(/♂/g,'m').replace(/[^a-z0-9]/g,'');
+const DEXMAP=(()=>{const m=new Map();DEXN.split('|').forEach((n,i)=>m.set(dexKey(n),i+1));return m;})();
+/* "Pikachu", "alolan raichu" and "Shiny Lucario" all find a species; anything else gets no sprite */
+function dexId(sp){
+  const full=dexKey(sp);
+  if(!full)return 0;
+  if(DEXMAP.has(full))return DEXMAP.get(full);
+  const words=String(sp).split(/[^A-Za-z0-9À-ɏ]+/).filter(Boolean);
+  for(let i=words.length-1;i>=0;i--){const k=dexKey(words[i]);if(DEXMAP.has(k))return DEXMAP.get(k);}
+  return 0;
+}
+const SPR_BASE='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
+const SPR_BAD=new Set();
+function spriteSrcs(id){
+  const l=[];
+  if(id>0&&id<=493)l.push(SPR_BASE+'versions/generation-iv/platinum/'+id+'.png');
+  if(id>0)l.push(SPR_BASE+id+'.png');
+  return l.filter(u=>!SPR_BAD.has(u));
+}
 
 /* ---------- place data: markers and routes traced from the Sinnoh map (2048 x 1763 px); text from the world notes, player-safe ---------- */
 const MAP_W=2048,MAP_H=1763;
@@ -512,6 +535,48 @@ function pimg(d,name,cls){
   if(s)return h`<img class="pimg ${cls||''}" src="${s}" alt="${name||''}">`;
   return h`<div class="pimg ${cls||''} ini" aria-hidden="true">${(String(name||'?').trim().charAt(0)||'?').toUpperCase()}</div>`;
 }
+/* a Pokémon's picture: the player's own upload, else the Platinum-era sprite for its species, else its first letter */
+function monPic(m){
+  const own=imgSrc(m.img);
+  if(own)return h`<img class="pimg" src="${own}" alt="${mName(m)}">`;
+  const letter=(String(mName(m)||'?').trim().charAt(0)||'?').toUpperCase();
+  const srcs=spriteSrcs(dexId(m.species));
+  if(!srcs.length)return h`<span class="sp-ini" aria-hidden="true">${letter}</span>`;
+  return h`<img class="sp" src="${srcs[0]}" data-fb="${srcs[1]||''}" data-ini="${letter}" alt="${mName(m)}" width="80" height="80" decoding="async">`;
+}
+function monIcon(m){
+  const srcs=spriteSrcs(dexId(m.species));
+  return srcs.length?h`<img class="sp mi" src="${srcs[0]}" data-fb="${srcs[1]||''}" alt="" width="40" height="40" decoding="async">`:h`<span class="mi-ph" aria-hidden="true"></span>`;
+}
+document.addEventListener('error',e=>{
+  const i=e.target;
+  if(!i||i.tagName!=='IMG'||!i.classList.contains('sp'))return;
+  SPR_BAD.add(i.getAttribute('src'));
+  const fb=i.getAttribute('data-fb');
+  if(fb&&!SPR_BAD.has(fb)){i.setAttribute('data-fb','');i.src=fb;return;}
+  if(i.classList.contains('mi')){const p=document.createElement('span');p.className='mi-ph';p.setAttribute('aria-hidden','true');i.replaceWith(p);return;}
+  const s=document.createElement('span');
+  s.className='sp-ini';s.setAttribute('aria-hidden','true');s.textContent=i.getAttribute('data-ini')||'?';
+  i.replaceWith(s);
+},true);
+const typeVars=m=>{
+  const ts=((m&&m.types)||[]).map(x=>String(x||'').toLowerCase()).filter(x=>TYPE_HEX[x]);
+  return ts.length?raw('style="--t1:'+TYPE_HEX[ts[0]]+';--t2:'+TYPE_HEX[ts[1]||ts[0]]+'"'):'';
+};
+/* theme: "auto" follows the device; Day and Night are remembered on this device */
+const themeEff=()=>{
+  const a=document.documentElement.getAttribute('data-theme');
+  if(a==='dark'||a==='light')return a;
+  try{return matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){return 'light';}
+};
+const themePref=()=>{const v=lsGet('stl.theme');return v==='dark'||v==='light'?v:'auto';};
+function applyTheme(v){
+  const r=document.documentElement;
+  if(v==='dark'||v==='light')r.setAttribute('data-theme',v);else r.removeAttribute('data-theme');
+}
+function setTheme(v){lsSet('stl.theme',v==='auto'?'':v);applyTheme(v);render();}
+const ICON_SUN=raw('<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2" fill="currentColor" stroke="none"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg>');
+const ICON_MOON=raw('<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1z"/></svg>');
 function imgPicker(sc,id,path,doc,w,h2,cap,ro){
   if(ro)return '';
   const has=!!getIn(doc,path);
@@ -542,8 +607,8 @@ function trainerCard(uid){
       <p class="sub">${[t.cls,t.adv].filter(Boolean).join(' · ')||'Class not chosen'} · Level ${num(t.level)||1}</p>
       <p class="sub">Played by ${nm(uid)}</p></div>
     <div class="hpline">${hpBar(t.hp)}<span class="mono">${num(t.hp&&t.hp.cur)}/${num(t.hp&&t.hp.max)}</span></div>
-    <div class="row sp"><span class="dots" role="img" aria-label="${badgeCount(t)} of 8 badges">${BADGES.map(b=>h`<span class="dot ${bg[b[0]]?'on':''}" title="${b[1]} Badge"></span>`)}</span><span class="mono sub">${badgeCount(t)}/8</span></div>
-    <ul class="team">${mons.length?mons.map(m=>h`<li><b>${mName(m)}</b>${typeChips(m)}</li>`):h`<li class="sub">No Pokémon on hand</li>`}</ul>
+    <div class="row sp"><span class="dots" role="img" aria-label="${badgeCount(t)} of 8 badges">${BADGES.map(b=>h`<span class="dot ${bg[b[0]]?'on':''}" ${raw('style="--bc:'+BADGE_COL[b[0]]+'"')} title="${b[1]} Badge"></span>`)}</span><span class="mono sub">${badgeCount(t)}/8</span></div>
+    <ul class="team">${mons.length?mons.map(m=>h`<li>${monIcon(m)}<b>${mName(m)}</b>${typeChips(m)}</li>`):h`<li class="sub">No Pokémon on hand</li>`}</ul>
     <footer><button class="btn sm" data-act="view" data-uid="${uid}" data-tab="trainer">Sheet</button><button class="btn sm" data-act="view" data-uid="${uid}" data-tab="pokemon">Pokémon</button></footer>
   </article>`;
 }
@@ -642,13 +707,41 @@ function skillsPanel(uid,t,ro){
     <div class="seg" role="group" aria-label="Roll mode">${[['normal','Normal'],['adv','Advantage'],['dis','Disadvantage']].map(([v,l])=>h`<button data-act="adv" data-v="${v}" aria-pressed="${String(S.ui.adv===v)}">${l}</button>`)}</div></div>
     ${groups}</section>`;
 }
+const BADGE_COL={coal:'#E0742B',forest:'#3FA34D',cobble:'#6C8DB8',fen:'#1FA3B5',relic:'#9A68D8',mine:'#8A94A8',icicle:'#6CCBEF',beacon:'#F0BC2A'};
+/* simple original emblems, one per badge; drawn in the coin's own colour scheme by CSS */
+const BADGE_GLYPH=(()=>{
+  const pt=(r,a)=>(16+r*Math.cos(a)).toFixed(2)+','+(16+r*Math.sin(a)).toFixed(2);
+  const star=(n,ro,ri)=>{const p=[];for(let i=0;i<n*2;i++)p.push(pt(i%2?ri:ro,Math.PI*i/n-Math.PI/2));return p.join(' ');};
+  const gear=(()=>{const p=[];for(let i=0;i<8;i++){const b=i*Math.PI/4;[[-.23,10],[-.15,13.2],[.15,13.2],[.23,10]].forEach(q=>p.push(pt(q[1],b+q[0])));}return p.join(' ');})();
+  const arm='M16 3.5v25M12.5 7.5L16 11l3.5-3.5M12.5 24.5L16 21l3.5 3.5';
+  const dark='rgba(10,16,40,.38)';
+  return{
+    coal:'<path d="M16 3.5l9.5 5 3 9.5-5.5 8.5-9.5 2.5-8-6-.5-9.5z"/><path d="M16 3.5L14 14l-8.5 3.5M14 14l9.5 4M14 14l1.5 12.5" fill="none" stroke="'+dark+'" stroke-width="1.4" stroke-linejoin="round"/>',
+    forest:'<path d="M4.5 27.5C4 13 13 4.5 27.5 4.5 28 19 19 28 4.5 27.5z"/><path d="M6.5 25.5L21 11" fill="none" stroke="'+dark+'" stroke-width="1.6" stroke-linecap="round"/>',
+    cobble:'<circle cx="10.5" cy="20.5" r="6.2"/><circle cx="22" cy="21.5" r="5.2"/><circle cx="16" cy="10" r="5.8"/>',
+    fen:'<path d="M16 3.5c5 7 10.5 12 10.5 17.2a10.5 10.5 0 0 1-21 0C5.5 15.5 11 10.5 16 3.5z"/><path d="M10.5 21a5.5 5.5 0 0 0 4.5 5" fill="none" stroke="'+dark+'" stroke-width="2" stroke-linecap="round"/>',
+    relic:'<path d="M16 3l12 13-12 13L4 16z"/><circle cx="16" cy="16" r="4.2" fill="rgba(10,16,40,.4)"/><circle cx="16" cy="16" r="1.6"/>',
+    mine:'<polygon points="'+gear+'"/><circle cx="16" cy="16" r="3.8" fill="rgba(10,16,40,.4)"/>',
+    icicle:'<g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="'+arm+'"/><path transform="rotate(60 16 16)" d="'+arm+'"/><path transform="rotate(120 16 16)" d="'+arm+'"/></g>',
+    beacon:'<polygon points="'+star(8,13.5,6)+'"/><circle cx="16" cy="16" r="3.2" fill="rgba(10,16,40,.35)"/>'
+  };
+})();
+const badgeGlyph=k=>raw('<svg class="gl" viewBox="0 0 32 32" aria-hidden="true" fill="currentColor">'+(BADGE_GLYPH[k]||'')+'</svg>');
+function badgeCase(uid,t,ro){
+  const bg=t.badges||{};
+  const n=badgeCount(t);
+  const pop=S.ui.pop;
+  return h`<div class="case ${n===8?'full':''}" role="group" aria-label="Badge case, ${n} of 8 earned">
+    ${BADGES.map(([k,nameB,leader])=>h`<button class="slot ${bg[k]?'on':''}${bg[k]&&pop&&pop.uid===uid&&pop.key===k?' pop':''}" ${raw('style="--bc:'+BADGE_COL[k]+'"')} data-act="badge" data-key="${k}" data-uid="${uid}" aria-pressed="${String(!!bg[k])}" title="${nameB} Badge, from ${leader}" ${dis(ro)}><span class="medal">${badgeGlyph(k)}</span><span class="bn">${nameB}</span><small>${leader}</small></button>`)}
+  </div>`;
+}
 function honorsPanel(uid,t,ro){
   const bg=t.badges||{};
   const hs=t.honors||[];
   const aw=entriesOf(S.awards).filter(a=>a.uid===uid).sort((a,b)=>num(b.createdAt)-num(a.createdAt));
   return h`<section class="panel"><div class="ph"><h2>Honors</h2><span class="mono sub">${badgeCount(t)}/8 Sinnoh badges</span></div>
     ${aw.length?h`<div class="list"><span class="fl">Awarded by the GM</span>${aw.map(a=>h`<div class="award"><div class="row sp"><b>${a.title}</b><span class="pill gm">${a.type}</span></div>${a.note?h`<p class="sub prewrap">${a.note}</p>`:''}<span class="sub">${dt(a.createdAt)}${a.session?' · Session '+a.session:''}${a.levelUp?' · +1 level':''}</span></div>`)}</div>`:''}
-    <div class="badges">${BADGES.map(([k,nameB,leader])=>h`<button class="badge ${bg[k]?'on':''}" data-act="badge" data-key="${k}" data-uid="${uid}" aria-pressed="${String(!!bg[k])}" ${dis(ro)}><span class="gem"></span>${nameB}<small>${leader}</small></button>`)}</div>
+    ${badgeCase(uid,t,ro)}
     <div class="fgrid">${fNum('Pokédex owned','t',uid,'dex',t,{ro,min:0,max:999})}<p class="sub">Next certificate at ${(Math.floor(num(t.dex)/30)+1)*30} owned.</p></div>
     <div class="list">${hs.map((x,i)=>h`<div class="item"><div class="irow two">${fSel('Type','t',uid,'honors.'+i+'.type',t,HONOR_TYPES,{ro})}${rowBtns('t',uid,'honors',i,hs.length,ro)}</div>${fText('Title','t',uid,'honors.'+i+'.name',t,{ro})}${fText('Note','t',uid,'honors.'+i+'.note',t,{ro})}</div>`)}</div>
     ${ro?'':h`<div><button class="btn sm" data-act="add" ${bp('t',uid,'honors')} data-tpl="honor">Add honor</button></div>`}
@@ -734,10 +827,10 @@ function monBody(uid,m,ro,pos,len){
   const gl=S.gmLoy[m.id]||{};
   const L=clamp(num(gl.loyalty),0,5);
   return h`<div class="mb">
-    <div class="idrow"><div class="idimg sq">${pimg(m.img,mName(m),'sq')}${imgPicker('p',id,'img',m,320,320,50000,ro)}</div>
+    <div class="idrow"><div class="idimg sq"><div class="spr big">${monPic(m)}</div>${imgPicker('p',id,'img',m,320,320,50000,ro)}</div>
     <div class="fgrid">
       ${fText('Nickname','p',id,'nick',m,{ro})}
-      ${fText('Species','p',id,'species',m,{ro})}
+      ${fText('Species','p',id,'species',m,{ro,list:'dl-species'})}
       ${fSel('Type 1','p',id,'types.0',m,TYPES,{ro,blank:'None'})}
       ${fSel('Type 2','p',id,'types.1',m,TYPES,{ro,blank:'None'})}
       ${fSel('Size','p',id,'size',m,SIZES,{ro})}
@@ -773,9 +866,9 @@ function monCard(uid,m,ro,pos,len){
   const key='p'+uid+'/'+m.id;
   const open=!!S.ui.open[key];
   const loy=S.me.admin?clamp(num((S.gmLoy[m.id]||{}).loyalty),0,5):null;
-  return h`<article class="mon ${open?'open':''}">
+  return h`<article class="mon ${open?'open':''}" ${typeVars(m)}>
     <div class="mh">
-      <div class="mt">${pimg(m.img,mName(m),'thumb')}<div class="mtx"><h3>${mName(m)}</h3>
+      <div class="mt"><div class="spr">${monPic(m)}</div><div class="mtx"><h3>${mName(m)}</h3>
         <p class="sub">${m.nick&&m.species?m.species:''}${m.item?(m.nick&&m.species?' · ':'')+'holding '+m.item:''}</p>
         <div class="types">${typeChips(m)}${m.status?h`<span class="pill status">${m.status}</span>`:''}${loy!==null?h`<span class="pill gm">Loyalty ${loy}</span>`:''}</div></div>
         <button class="btn sm" data-act="toggle" data-key="${key}" aria-expanded="${String(open)}">${open?'Close':'Open'}</button></div>
@@ -1379,6 +1472,9 @@ function accountTab(){
     <p class="sub">Your display name is what the GM and other players see next to your character, notes and journal entries.</p>
     <div class="row"><button class="btn primary sm" data-act="acctName">Save name</button>${api.canReset()?h`<button class="btn sm" data-act="acctReset">Email me a password reset link</button>`:''}<button class="btn sm ghost" data-act="signOut">Sign out</button></div>
     ${S.ui.acct.msg?h`<p class="sub" role="status">${S.ui.acct.msg}</p>`:''}</section>
+  <section class="panel"><div class="ph"><h2>Appearance</h2></div>
+    <div class="seg" role="group" aria-label="Theme">${[['auto','Auto'],['light','Day'],['dark','Night']].map(([v,l])=>h`<button data-act="themeSet" data-v="${v}" aria-pressed="${String(themePref()===v)}">${l}</button>`)}</div>
+    <p class="sub">Auto follows your device. The choice is remembered on this device only.</p></section>
   <section class="panel"><div class="ph"><h2>What you can change</h2></div>
     <p class="sub">You control your own character sheet, your own Pokémon, and what you add yourself. Anyone can edit the shared People and Leads notes, but only the person who added an entry (or the GM) can delete it. The GM can change anything. Your private notes are visible only to you.</p></section>`;
 }
@@ -1424,12 +1520,12 @@ function headerHtml(){
   const t=PAGE_LABEL[S.tab]||'Overview';
   return h`<button class="btn sm menu-btn" data-act="menu" aria-expanded="${String(!!S.ui.navOpen)}" aria-controls="side">Menu</button>
     <div class="bar-t"><p class="eyebrow">${m.campaign}</p>${S.tab==='overview'?h`<p class="bar-title">${t}</p>`:h`<h1 class="bar-title">${t}</h1>`}</div>
-    <div class="bar-r">${onlineHtml()}${S.me.admin?h`<span class="chip gm">GM</span>`:''}<span class="chip">Session ${num(m.session)||1}</span><span id="savestate" class="save ${S.save.cls}" aria-live="polite">${S.save.text}</span></div>`;
+    <div class="bar-r">${onlineHtml()}<button class="btn sm ghost themebtn" data-act="theme" aria-label="${themeEff()==='dark'?'Switch to the day theme':'Switch to the night theme'}" title="${themeEff()==='dark'?'Day theme':'Night theme'}">${themeEff()==='dark'?ICON_SUN:ICON_MOON}</button>${S.me.admin?h`<span class="chip gm">GM</span>`:''}<span class="chip">Session ${num(m.session)||1}</span><span id="savestate" class="save ${S.save.cls}" aria-live="polite">${S.save.text}</span></div>`;
 }
 function renderHead(){const el=$('#head');if(el)el.innerHTML=headerHtml().s;}
 function sideHtml(){
   if(S.noDb)return '';
-  return h`<div class="brand"><span class="logo lcd" aria-hidden="true">LOG</span><div><b>${S.meta.campaign}</b><small>${S.meta.gm?'Game Master '+S.meta.gm:'Trainer Log'}</small></div></div>
+  return h`<div class="brand"><span class="logo" aria-hidden="true"><i>LOG</i></span><div><b>${S.meta.campaign}</b><small>${S.meta.gm?'Game Master '+S.meta.gm:'Trainer Log'}</small></div></div>
     <nav aria-label="Sections">${navGroups().map(([title,items])=>h`<div class="ng"><p class="nt">${title}</p>${items.map(([k,l])=>h`<button class="nv" data-act="tab" data-tab="${k}" aria-current="${S.tab===k||(k==='map'&&S.tab==='place')?'page':'false'}"><span>${l}</span>${tabCount(k)?h`<span class="n">${tabCount(k)}</span>`:''}</button>`)}</div>`)}</nav>`;
 }
 function banners(){
@@ -1578,7 +1674,7 @@ function giveAwards(){
     const id=S.db.collection('awards').doc().id;
     newDoc('aw',id,{uid,type:a.type,title,note:a.note||'',badge:a.type==='Gym Badge'?a.badge:'',levelUp:!!a.levelUp,session:num(S.meta.session)||1,by:S.me.id,createdAt:now});
     const t=S.trainers[uid];
-    if(a.type==='Gym Badge'&&a.badge)edit('t',uid,'badges.'+a.badge,true);
+    if(a.type==='Gym Badge'&&a.badge){edit('t',uid,'badges.'+a.badge,true);const p={uid,key:a.badge};S.ui.pop=p;setTimeout(()=>{if(S.ui.pop===p)S.ui.pop=null;},1400);}
     if(a.levelUp&&t)edit('t',uid,'level',clamp(num(t.level||1)+1,1,20));
   });
   a.uids={};a.title='';a.note='';
@@ -1748,8 +1844,13 @@ function act(b,e){
     case 'badge':{
       const t=S.trainers[d.uid];
       if(!t)break;
-      edit('t',d.uid,'badges.'+d.key,!(t.badges&&t.badges[d.key]));
+      const turnOn=!(t.badges&&t.badges[d.key]);
+      edit('t',d.uid,'badges.'+d.key,turnOn);
+      if(turnOn){const p={uid:d.uid,key:d.key};S.ui.pop=p;setTimeout(()=>{if(S.ui.pop===p)S.ui.pop=null;},1400);}
+      else S.ui.pop=null;
       render();break;}
+    case 'theme':setTheme(themeEff()==='dark'?'light':'dark');break;
+    case 'themeSet':setTheme(d.v);break;
     case 'roll':doRoll(d.label,num(d.bonus),num(d.tal));renderRoll();break;
     case 'closeRoll':S.ui.rollHidden=true;renderRoll();break;
     case 'adv':S.ui.adv=d.v;render();break;
@@ -1923,6 +2024,9 @@ document.addEventListener('keydown',e=>{
 
 /* ---------- start ---------- */
 async function boot(){
+  applyTheme(themePref());
+  const ds=$('#dl-species');
+  if(ds)ds.innerHTML=DEXN.split('|').map(n=>'<option value="'+esc(n)+'">').join('');
   const dl=$('#dl-places');
   if(dl)dl.innerHTML=PLACES.map(p=>'<option value="'+esc(p)+'">').join('');
   const t0=lsGet('stl.tab');
