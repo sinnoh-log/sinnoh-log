@@ -97,7 +97,7 @@ In this folder run `python3 -m http.server 8000` and open <http://localhost:8000
 When you get a new version of these files:
 
 1. In your GitHub repository, choose **Add file → Upload files** and drag in the new files over the old ones (including the `vendor` folder if it is included; this release adds `vendor/fonts`). **Do not** replace your own `firebase-config.js` unless you re-enter your settings in the new one.
-2. If `firestore.rules` changed, open Firebase console → **Firestore → Rules**, paste in the new contents, and click **Publish**. Do this before players use the new version. This update changed the rules so that players can delete their own trainer sheet. Until you publish them, a player's "Delete this trainer" is refused and the page says so. The GM can always delete.
+2. If `firestore.rules` changed, open Firebase console → **Firestore → Rules**, paste in the new contents, and click **Publish**. Do this before players use the new version. The rules have not changed since the delete-your-own-trainer update, so if you already published those there is nothing to do for Mega Evolution: your approvals are stored in a document the existing rules already limit to you.
 3. GitHub Pages takes a minute or two to update. Each person should refresh the page once (hold Shift while clicking reload if they still see the old version).
 
 Nothing in your database changes when you update the files.
@@ -110,6 +110,25 @@ Nothing in your database changes when you update the files.
 - **Badge case.** The eight Sinnoh badges sit in a case on the trainer sheet. Dull slots are not earned yet. Tap one to light it up. Only the trainer's owner and the GM can change a case. A full case glows gold.
 - **Day and Night.** Use the sun or moon button at the top, or **Account → Appearance**. Auto follows the device. The choice is remembered on that device only.
 - **Fonts** (Pixelify Sans, Nunito and VT323) are included in `vendor/fonts`, so the site does not call Google Fonts. They are free to use under the SIL Open Font License; the licence files are in the same folder.
+
+## Species auto-fill and Mega Evolution
+
+**Auto-fill.** Type a species in a Pokémon's **Species** box and move on. The app fills in its types and base stats, and adds its Mega details if it has a Mega form. Regional forms work too (try "Hisuian Zorua" or "Alolan Vulpix"). Base stats are the games' base stat divided by 15, rounded, never below 1 (Bulbasaur's 49/49/65/65/45 becomes 3/3/4/4/3). That scale is a starting point, so change any number you like. Anything a player has already changed is kept when the species changes. The **Fill types and base stats** button under the fields overwrites them on purpose.
+
+**Mega Evolution.** Every Pokémon with a Mega form gets a **Mega Evolution** panel on its card. It lists what the form needs, and each line turns green when met:
+
+- the Pokémon is holding the right Mega Stone (typed in its **Held item** box),
+- the trainer has a **Key Stone** in their inventory (the name "Key Stone", "Mega Bracelet", "Mega Ring" and the like all count),
+- that Key Stone has not been used yet this battle (**once per battle for the whole trainer**),
+- **you, the GM, have approved that Pokémon.**
+
+When all four are met, the player taps **Mega Evolve**. The card gets a rainbow ring and a Mega sprite, the types, stat bonuses and ability switch to the Mega form, and the trainer's Key Stone shows as **spent**. **Revert to normal** goes back but does not recharge the Key Stone.
+
+**Your approval.** Nothing can Mega Evolve until you mark it **Allowed**. Do that on the **GM Desk** (the Mega Evolution panel lists every Pokémon with a Mega form, by trainer) or on the Pokémon's own card. Players never see these switches. The approval is stored in `meta/mega`, which the existing rules already limit to you.
+
+**Ending a battle.** **End battle** on the Pokémon page reverts that trainer's Mega forms and recharges their Key Stone. **Pokémon Center** and **Rest 8h** do the same. On the GM Desk, **End battle for everyone** does it for the whole table.
+
+**Editing a Mega form.** **Edit details** on the panel lets you change the form's name, stone, types, ability and stat bonuses, or reset them to the official values. Once you edit a value, a later change of species leaves that Mega alone.
 
 ## Deleting trainers and Pokémon
 
