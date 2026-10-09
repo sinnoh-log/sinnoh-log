@@ -240,6 +240,12 @@ progress.hp.bad::-moz-progress-bar{background:var(--bad)}
 .item{border:2px solid var(--line-soft);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;background:var(--panel)}
 .item .irow{display:grid;gap:8px;grid-template-columns:minmax(0,1fr) 72px auto;align-items:end}
 .item .irow.two{grid-template-columns:minmax(0,1fr) auto}
+.item .irow.ic{grid-template-columns:68px minmax(0,1fr) 72px auto}
+.itile{width:68px;height:68px;display:grid;place-items:center;overflow:hidden;border-radius:14px;border:2px solid var(--line);background:linear-gradient(160deg,var(--raised),var(--panel));box-shadow:inset 0 0 0 2px var(--frame-in)}
+.itile .sp{width:60px;height:60px;image-rendering:pixelated}
+.itile .sp-ini{color:var(--muted);text-shadow:none;font-size:30px}
+.sp.mini{width:30px;height:30px;image-rendering:pixelated;vertical-align:middle;margin:-8px 2px -6px -2px}
+@media (max-width:520px){.item .irow.ic{grid-template-columns:64px minmax(0,1fr) auto}.item .irow.ic>.itile{grid-row:span 2;width:64px;height:64px;align-self:center}.item .irow.ic>.fld:first-of-type{grid-column:2/-1}}
 .ibtns{display:flex;gap:4px}
 
 /* trainer cards on party */
@@ -464,6 +470,7 @@ input[type=search]{appearance:none}
 <a id="ptip" class="ptip" href="#place" data-act="place" hidden></a>
 <div id="rollbox" class="rollbox lcd" hidden aria-live="polite"></div>
 <datalist id="dl-species"></datalist>
+<datalist id="dl-items"></datalist>
 <datalist id="dl-places"></datalist>
 <datalist id="dl-freq"><option value="At-Will"><option value="3/day"><option value="1/day"></datalist>
 <datalist id="dl-status"><option value="Burned"><option value="Frozen"><option value="Paralyzed"><option value="Poisoned"><option value="Asleep"><option value="Confused"><option value="Cursed"><option value="Infatuated"></datalist>

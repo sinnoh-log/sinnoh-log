@@ -116,6 +116,24 @@ function spriteSrcs(id){
   if(id>0)l.push(SPR_BASE+id+'.png');
   return l.filter(u=>!SPR_BAD.has(u));
 }
+/* ---------- look: bag items ---------- */
+const ITEMSL="ability-capsule|ability-urge|abomasite|absolite|absorb-bulb|acro-bike|adamant-orb|adrenaline-orb|adventure-rules|aerodactylite|aggronite|aguav-berry|air-balloon|air-mail|alakazite|altarianite|amaze-mulch|ampharosite|amulet-coin|antidote|apicot-berry|apricorn-box|aqua-suit|armor-fossil|aspear-berry|assault-vest|audinite|auroraticket|awakening|azure-flute|babiri-berry|balm-mushroom|banettite|basement-key|bead-mail|beast-ball|beedrillite|belue-berry|berry-juice|berry-pots|berry-pouch|bicycle|big-malasada|big-mushroom|big-nugget|big-pearl|big-root|bike-voucher|binding-band|black-apricorn|black-belt|black-flute|black-glasses|black-sludge|blastoisinite|blazikenite|bloom-mail|blue-apricorn|blue-card|blue-flute|blue-orb|blue-petal|blue-scarf|blue-shard|bluk-berry|boost-mulch|bottle-cap|brick-mail|bridge-mail-d|bridge-mail-m|bridge-mail-s|bridge-mail-t|bridge-mail-v|bright-powder|bubble-mail|bug-gem|bug-memory|burn-drive|burn-heal|calcium|cameruptite|carbos|card-key|casteliacone|cell-battery|charcoal|charizardite-x|charizardite-y|charti-berry|cheri-berry|cherish-ball|chesto-berry|chilan-berry|chill-drive|choice-band|choice-scarf|choice-specs|chople-berry|claw-fossil|cleanse-tag|clear-bell|clever-wing|coba-berry|coin-case|colbur-berry|colress-machine|comet-shard|common-stone|contest-pass|cornn-berry|coupon-1|coupon-2|coupon-3|cover-fossil|custap-berry|damp-mulch|damp-rock|dark-gem|dark-memory|dark-stone|data-card-01|data-card-02|data-card-03|data-card-04|data-card-05|data-card-06|data-card-07|data-card-08|data-card-09|data-card-10|data-card-11|data-card-12|data-card-13|data-card-14|data-card-15|data-card-16|data-card-17|data-card-18|data-card-19|data-card-20|data-card-21|data-card-22|data-card-23|data-card-24|data-card-25|data-card-26|data-card-27|dawn-stone|deep-sea-scale|deep-sea-tooth|destiny-knot|devon-goods|devon-parts|devon-scope|devon-scuba-gear|diancite|dire-hit|dire-hit-2|dire-hit-3|discount-coupon|dive-ball|dna-splicers|dome-fossil|douse-drive|dowsing-machine|draco-plate|dragon-fang|dragon-gem|dragon-memory|dragon-scale|dragon-skull|dread-plate|dream-ball|dream-mail|dropped-item|dubious-disc|durin-berry|dusk-ball|dusk-stone|earth-plate|eject-button|electirizer|electric-gem|electric-memory|electric-seed|elevator-key|elixir|energy-powder|energy-root|enigma-berry|enigma-stone|enigmatic-card|eon-flute|eon-ticket|escape-rope|ether|everstone|eviolite|exp-share|expert-belt|explorer-kit|fab-mail|fairy-gem|fairy-memory|fame-checker|fashion-case|fast-ball|favored-mail|festival-ticket|fighting-gem|fighting-memory|figy-berry|fire-gem|fire-memory|fire-stone|fishing-rod|fist-plate|flame-mail|flame-orb|flame-plate|float-stone|fluffy-tail|flying-gem|flying-memory|focus-band|focus-sash|forage-bag|fresh-water|friend-ball|full-heal|full-incense|full-restore|galactic-key|galladite|ganlon-berry|garchompite|gardevoirite|gb-sounds|gengarite|genius-wing|ghost-gem|ghost-memory|glalitite|glitter-mail|go-goggles|god-stone|gold-bottle-cap|gold-teeth|good-rod|gooey-mulch|gracidea|gram-1|gram-2|gram-3|grass-gem|grass-mail|grass-memory|grassy-seed|great-ball|green-apricorn|green-petal|green-scarf|green-shard|greet-mail|grepa-berry|grip-claw|griseous-orb|ground-gem|ground-memory|growth-mulch|grubby-hanky|guard-spec|gyaradosite|haban-berry|harbor-mail|hard-stone|heal-ball|heal-powder|health-wing|heart-mail|heart-scale|heat-rock|heavy-ball|helix-fossil|heracronite|hm01|hm02|hm03|hm04|hm05|hm06|hm07|holo-caster|hondew-berry|honey|honor-of-kalos|houndoominite|hp-up|hyper-potion|iapapa-berry|ice-gem|ice-heal|ice-memory|ice-stone|icicle-plate|icy-rock|ilimas-normalium-z|inquiry-mail|insect-plate|intriguing-stone|iron|iron-ball|iron-plate|item-drop|item-urge|jaboca-berry|jade-orb|jaw-fossil|journal|kangaskhanite|kasib-berry|kebia-berry|kee-berry|kelpsy-berry|key-stone|key-to-room-1|key-to-room-2|key-to-room-4|key-to-room-6|kings-rock|lafeather-ball|lagging-tail|lagigaton-ball|lagreat-ball|laheavy-ball|lajet-ball|laleaden-ball|lansat-berry|laorigin-ball|lapoke-ball|lastrange-ball|latiasite|latiosite|laultra-ball|lava-cookie|lawing-ball|lax-incense|leaf-stone|left-poke-ball|leftovers|lemonade|lens-case|leppa-berry|letter|level-ball|liberty-pass|liechi-berry|life-orb|lift-key|light-ball|light-clay|light-stone|like-mail|lock-capsule|looker-ticket|loot-sack|lopunnite|lost-item|love-ball|lucarionite|luck-incense|lucky-egg|lucky-punch|lum-berry|luminous-moss|lumiose-galette|lunar-wing|lure-ball|lustrous-orb|luxury-ball|mach-bike|machine-part|macho-brace|magma-emblem|magma-stone|magma-suit|magmarizer|magnet|mago-berry|magost-berry|makeup-bag|manectite|maranga-berry|master-ball|mawilite|max-elixir|max-ether|max-potion|max-repel|max-revive|meadow-plate|mech-mail|medal-box|medichamite|mega-anchor|mega-anklet|mega-bracelet|mega-charm|mega-cuff|mega-glasses|mega-glove|mega-pendant|mega-ring|mega-stickpin|mega-tiara|member-card|mental-herb|metagrossite|metal-coat|metal-powder|meteorite|meteorite-shard|metronome|mewtwonite-x|mewtwonite-y|micle-berry|mind-plate|miracle-seed|misty-seed|moomoo-milk|moon-ball|moon-flute|moon-stone|mosaic-mail|muscle-band|muscle-wing|mystery-egg|mystic-water|mysticticket|nanab-berry|nest-ball|net-ball|never-melt-ice|nomel-berry|normal-gem|nugget|oaks-letter|oaks-parcel|occa-berry|odd-incense|odd-keystone|old-amber|old-charm|old-gateau|old-rod|old-sea-map|oran-berry|orange-mail|orange-petal|oval-charm|oval-stone|pair-of-tickets|pal-pad|pamtre-berry|paralyze-heal|parcel|park-ball|pass|pass-orb|passho-berry|payapa-berry|pearl|pearl-string|pecha-berry|permit|persim-berry|petaya-berry|photo-album|pidgeotite|pinap-berry|pink-apricorn|pink-nectar|pink-petal|pink-scarf|pinsirite|pixie-plate|plasma-card|plume-fossil|poffin-case|point-card|poison-barb|poison-gem|poison-memory|poke-ball|poke-doll|poke-flute|poke-radar|poke-toy|pokeblock-case|pokeblock-kit|pomeg-berry|potion|powder-jar|power-anklet|power-band|power-belt|power-bracer|power-herb|power-lens|power-plant-pass|power-weight|pp-max|pp-up|premier-ball|pretty-wing|prism-scale|prison-bottle|professors-mask|profs-letter|prop-case|protective-pads|protector|protein|psychic-gem|psychic-memory|psychic-seed|pure-incense|purple-nectar|purple-petal|qualot-berry|quick-ball|quick-claw|quick-powder|rabuta-berry|rage-candy-bar|rainbow-flower|rainbow-pass|rainbow-wing|rare-bone|rare-candy|rawst-berry|razor-claw|razor-fang|razz-berry|reaper-cloth|red-apricorn|red-card|red-chain|red-flute|red-nectar|red-orb|red-petal|red-scale|red-scarf|red-shard|relic-band|relic-copper|relic-crown|relic-gold|relic-silver|relic-statue|relic-vase|repeat-ball|repel|reply-mail|reset-urge|resist-wing|retro-mail|reveal-glass|revival-herb|revive|rich-mulch|ride-pager|rindo-berry|ring-target|rm-1-key|rm-2-key|rm-4-key|rm-6-key|rock-gem|rock-incense|rock-memory|rocky-helmet|roller-skates|root-fossil|rose-incense|roseli-berry|roto-bargain|roto-boost|roto-catch|roto-encounter|roto-exp-points|roto-friendship|roto-hatch|roto-hp-restore|roto-pp-restore|roto-prize-money|roto-stealth|rowap-berry|rsvp-mail|ruby|rule-book|sablenite|sachet|sacred-ash|safari-ball|safety-goggles|sail-fossil|salac-berry|salamencite|sapphire|scanner|sceptilite|scizorite|scope-lens|sea-incense|seal-bag|seal-case|secret-key|secret-potion|shadow-mail|shalour-sable|sharp-beak|sharpedonite|shed-shell|shell-bell|shiny-charm|shiny-stone|shoal-salt|shoal-shell|shock-drive|shuca-berry|silk-scarf|silph-scope|silver-powder|silver-wing|sitrus-berry|skull-fossil|sky-plate|slowbronite|slowpoke-tail|smoke-ball|smooth-rock|snow-mail|snowball|soda-pop|soft-sand|soot-sack|soothe-bell|soul-dew|space-mail|sparkling-stone|spell-tag|spelon-berry|splash-plate|spooky-plate|sport-ball|sprayduck|sprinklotad|squirt-bottle|ss-ticket|stable-mulch|star-piece|stardust|starf-berry|steel-gem|steel-mail|steel-memory|steelixite|stick|sticky-barb|stone-plate|storage-key|strange-souvenir|suite-key|sun-flute|sun-stone|super-potion|super-repel|super-rod|surge-badge|surprise-mulch|swampertite|sweet-heart|swift-wing|tamato-berry|tanga-berry|tea|teachy-tv|terrain-extender|thanks-mail|thick-club|thunder-stone|tidal-bell|timer-ball|tiny-mushroom|tm-case|tmv-pass|town-map|toxic-orb|toxic-plate|travel-trunk|tri-pass|tropic-mail|tunnel-mail|twisted-spoon|tyranitarite|ultra-ball|unown-report|up-grade|venusaurite|vs-recorder|vs-seeker|wacan-berry|wailmer-pail|water-gem|water-memory|water-stone|watmel-berry|wave-incense|wave-mail|weakness-policy|wepear-berry|whipped-dream|white-apricorn|white-flute|white-herb|wide-lens|wiki-berry|wise-glasses|wood-mail|works-key|x-accuracy|x-accuracy-2|x-accuracy-3|x-accuracy-6|x-attack|x-attack-2|x-attack-3|x-attack-6|x-defense|x-defense-2|x-defense-3|x-defense-6|x-sp-atk|x-sp-atk-2|x-sp-atk-3|x-sp-atk-6|x-sp-def|x-sp-def-2|x-sp-def-3|x-sp-def-6|x-speed|x-speed-2|x-speed-3|x-speed-6|xtransceiver|yache-berry|yellow-apricorn|yellow-flute|yellow-nectar|yellow-petal|yellow-scarf|yellow-shard|z-power-ring|z-ring|zap-plate|zinc|zoom-lens|zygarde-cube";
+const ITEM_BASE='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/';
+const ITEMMAP=(()=>{const m=new Map();ITEMSL.split('|').forEach(s=>m.set(dexKey(s),s));return m;})();
+/* "Poké Ball", "great balls", "Oran" and "Mega Bracelet" all find an icon; anything else gets none */
+function itemSlug(name){
+  const k=dexKey(name);
+  if(!k)return '';
+  const tries=[k];
+  if(k.slice(-3)==='ies')tries.push(k.slice(0,-3)+'y');
+  if(k.slice(-2)==='es')tries.push(k.slice(0,-2));
+  if(k.slice(-1)==='s')tries.push(k.slice(0,-1));
+  tries.push(k+'berry');
+  for(let i=0;i<tries.length;i++)if(ITEMMAP.has(tries[i]))return ITEMMAP.get(tries[i]);
+  return '';
+}
+const ITEM_CAPS={pp:'PP',hp:'HP',tm:'TM',hm:'HM',tr:'TR',x:'X',z:'Z',xl:'XL'};
+const itemLabel=slug=>slug.split('-').map(w=>w==='poke'?'Poké':(ITEM_CAPS[w]||w.charAt(0).toUpperCase()+w.slice(1))).join(' ');
 
 /* ---------- place data: markers and routes traced from the Sinnoh map (2048 x 1763 px); text from the world notes, player-safe ---------- */
 const MAP_W=2048,MAP_H=1763;
@@ -548,15 +566,40 @@ function monIcon(m){
   const srcs=spriteSrcs(dexId(m.species));
   return srcs.length?h`<img class="sp mi" src="${srcs[0]}" data-fb="${srcs[1]||''}" alt="" width="40" height="40" decoding="async">`:h`<span class="mi-ph" aria-hidden="true"></span>`;
 }
+/* a bag item's icon: the 30px item sprite shown at double size, else its first letter */
+function itemPic(name){
+  const slug=itemSlug(name);
+  const letter=(String(name||'').trim().charAt(0)||'').toUpperCase();
+  const src=slug?ITEM_BASE+slug+'.png':'';
+  if(src&&!SPR_BAD.has(src))return h`<img class="sp it" src="${src}" data-ini="${letter}" alt="" width="60" height="60" decoding="async">`;
+  return letter?h`<span class="sp-ini" aria-hidden="true">${letter}</span>`:'';
+}
+const itemTile=name=>h`<span class="itile" data-slug="${itemSlug(name)}">${itemPic(name)}</span>`;
+function itemMini(name){
+  const slug=itemSlug(name);
+  const src=slug?ITEM_BASE+slug+'.png':'';
+  return src&&!SPR_BAD.has(src)?h`<img class="sp it mini" src="${src}" data-ini="" alt="" width="30" height="30" decoding="async">`:'';
+}
+/* typing in an item's name swaps its icon at once, without redrawing the page under the cursor */
+function liveItemIcon(input){
+  const box=input.closest&&input.closest('.item');
+  const tile=box&&box.querySelector('.itile');
+  if(!tile)return;
+  const slug=itemSlug(input.value);
+  if((tile.getAttribute('data-slug')||'')===slug)return;
+  tile.setAttribute('data-slug',slug);
+  tile.innerHTML=itemPic(input.value).s;
+}
 document.addEventListener('error',e=>{
   const i=e.target;
   if(!i||i.tagName!=='IMG'||!i.classList.contains('sp'))return;
   SPR_BAD.add(i.getAttribute('src'));
   const fb=i.getAttribute('data-fb');
   if(fb&&!SPR_BAD.has(fb)){i.setAttribute('data-fb','');i.src=fb;return;}
+  if(i.classList.contains('mini')){i.remove();return;}
   if(i.classList.contains('mi')){const p=document.createElement('span');p.className='mi-ph';p.setAttribute('aria-hidden','true');i.replaceWith(p);return;}
   const s=document.createElement('span');
-  s.className='sp-ini';s.setAttribute('aria-hidden','true');s.textContent=i.getAttribute('data-ini')||'?';
+  s.className='sp-ini';s.setAttribute('aria-hidden','true');s.textContent=i.getAttribute('data-ini')||(i.classList.contains('it')?'':'?');
   i.replaceWith(s);
 },true);
 const typeVars=m=>{
@@ -756,7 +799,7 @@ function featuresPanel(uid,t,ro){
 function itemsPanel(uid,t,ro){
   const it=t.items||[];
   return h`<section class="panel"><div class="ph"><h2>Inventory</h2>${ro?'':h`<button class="btn sm" data-act="add" ${bp('t',uid,'items')} data-tpl="item">Add item</button>`}</div>
-    ${it.length?h`<div class="list">${it.map((x,i)=>h`<div class="item"><div class="irow">${fText('Item','t',uid,'items.'+i+'.name',t,{ro})}${fNum('Qty','t',uid,'items.'+i+'.qty',t,{ro,min:0})}${rowBtns('t',uid,'items',i,it.length,ro)}</div>${fText('Note','t',uid,'items.'+i+'.note',t,{ro})}</div>`)}</div>`:h`<p class="sub">Nothing carried yet.</p>`}
+    ${it.length?h`<div class="list">${it.map((x,i)=>h`<div class="item"><div class="irow ic">${itemTile(x.name)}${fText('Item','t',uid,'items.'+i+'.name',t,{ro,list:'dl-items'})}${fNum('Qty','t',uid,'items.'+i+'.qty',t,{ro,min:0})}${rowBtns('t',uid,'items',i,it.length,ro)}</div>${fText('Note','t',uid,'items.'+i+'.note',t,{ro})}</div>`)}</div>`:h`<p class="sub">Nothing carried yet.</p>`}
   </section>`;
 }
 function trainerTab(){
@@ -836,7 +879,7 @@ function monBody(uid,m,ro,pos,len){
       ${fSel('Size','p',id,'size',m,SIZES,{ro})}
       ${fSel('Weight','p',id,'weight',m,WEIGHTS,{ro})}
       ${fSel('Monster die','p',id,'die',m,DICE,{ro})}
-      ${fText('Held item','p',id,'item',m,{ro})}
+      ${fText('Held item','p',id,'item',m,{ro,list:'dl-items'})}
       ${fText('Nature','p',id,'natureName',m,{ro})}
       ${fSel('Nature raises','p',id,'up',m,STAT_OPTS,{ro,blank:'None'})}
       ${fSel('Nature lowers','p',id,'down',m,STAT_OPTS,{ro,blank:'None'})}
@@ -869,7 +912,7 @@ function monCard(uid,m,ro,pos,len){
   return h`<article class="mon ${open?'open':''}" ${typeVars(m)}>
     <div class="mh">
       <div class="mt"><div class="spr">${monPic(m)}</div><div class="mtx"><h3>${mName(m)}</h3>
-        <p class="sub">${m.nick&&m.species?m.species:''}${m.item?(m.nick&&m.species?' · ':'')+'holding '+m.item:''}</p>
+        <p class="sub">${m.nick&&m.species?m.species:''}${m.item?h`${m.nick&&m.species?' · ':''}${itemMini(m.item)}holding ${m.item}`:''}</p>
         <div class="types">${typeChips(m)}${m.status?h`<span class="pill status">${m.status}</span>`:''}${loy!==null?h`<span class="pill gm">Loyalty ${loy}</span>`:''}</div></div>
         <button class="btn sm" data-act="toggle" data-key="${key}" aria-expanded="${String(open)}">${open?'Close':'Open'}</button></div>
       <div class="hpline">${hpBar(m.hp)}<span class="mono">${num(m.hp&&m.hp.cur)}/${num(m.hp&&m.hp.max)}</span></div>
@@ -1975,6 +2018,7 @@ function onBound(t){
   }else v=t.value;
   edit(sc,id,path,v);
   if(sc==='t'&&path==='cls')edit('t',id,'adv','');
+  if(sc==='t'&&/^items\.\d+\.name$/.test(path))liveItemIcon(t);
   if(!('nr' in t.dataset))render();
 }
 document.addEventListener('input',e=>{
@@ -2025,6 +2069,8 @@ document.addEventListener('keydown',e=>{
 /* ---------- start ---------- */
 async function boot(){
   applyTheme(themePref());
+  const di=$('#dl-items');
+  if(di)di.innerHTML=ITEMSL.split('|').map(s=>'<option value="'+esc(itemLabel(s))+'">').join('');
   const ds=$('#dl-species');
   if(ds)ds.innerHTML=DEXN.split('|').map(n=>'<option value="'+esc(n)+'">').join('');
   const dl=$('#dl-places');
