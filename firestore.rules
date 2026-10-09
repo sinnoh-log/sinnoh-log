@@ -1,0 +1,182 @@
+rules_version = '2';
+
+// Sinnoh Trainer Log: Cloud Firestore security rules.
+//
+// Who can do what:
+//   GM       a person with a document at admins/<their account ID> (you create it by hand, once).
+//            Can read and change everything, including the gm/ collection that holds loyalty,
+//            NPC secrets and place notes. Players never receive that data.
+//   Player   a signed-in person with a document at members/<their account ID>. A person can create
+//            that document for themselves only by supplying the current table code.
+//            Can read the shared table, change their own trainer sheet and Pokémon, add entries,
+//            change or delete journal entries, timeline events and map pins they added themselves,
+//            edit people and leads (delete only their own), and keep private notes only they can read.
+//   Anyone else (not signed in, or signed in without joining): no access beyond the join check.
+//
+// Anything not listed below is denied.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+    function isGM() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    function isMember() {
+      return signedIn() && (isGM() || exists(/databases/$(database)/documents/members/$(request.auth.uid)));
+    }
+
+    // Entries that carry an "addedBy" field (people, journal, leads, timeline, map pins).
+    // Anyone at the table may add one, stamped with their own account ID.
+    function createOwn() {
+      return isMember() && request.resource.data.addedBy == request.auth.uid;
+    }
+    // Journal, timeline and pins: only the author or the GM may change an entry.
+    function changeOwn() {
+      return isGM() || (isMember()
+        && resource.data.addedBy == request.auth.uid
+        && request.resource.data.addedBy == request.auth.uid);
+    }
+    // People and leads are shared notes: anyone at the table may edit them, but the author stays fixed.
+    function changeShared() {
+      return isGM() || (isMember() && request.resource.data.addedBy == resource.data.addedBy);
+    }
+    // Only the author or the GM may delete any of them.
+    function removeOwn() {
+      return isGM() || (isMember() && resource.data.addedBy == request.auth.uid);
+    }
+
+    // ---- who is allowed in ----
+
+    // The GM's own marker. You add it in the console; nobody can write it from the app.
+    match /admins/{uid} {
+      allow get: if isSelf(uid);
+    }
+
+    // The table code lives here. Only the GM can see or change it.
+    match /config/{doc} {
+      allow read, write: if isGM();
+    }
+
+    // A player joins by creating their own document with the right table code.
+    match /members/{uid} {
+      allow get: if isSelf(uid) || isGM();
+      allow list: if isGM();
+      allow create: if isSelf(uid)
+        && request.resource.data.keys().hasOnly(['code', 'joinedAt'])
+        && request.resource.data.joinedAt is number
+        && request.resource.data.code is string
+        && request.resource.data.code.size() >= 6
+        && exists(/databases/$(database)/documents/config/invite)
+        && request.resource.data.code == get(/databases/$(database)/documents/config/invite).data.code;
+      allow delete: if isGM();
+    }
+
+    // Display names. Anyone may write their own; only people at the table can read them.
+    match /profiles/{uid} {
+      allow read: if isMember();
+      allow create, update: if isSelf(uid) && isMember()
+        && request.resource.data.keys().hasOnly(['name'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 40;
+    }
+
+    // Who has the table open right now.
+    match /presence/{uid} {
+      allow read: if isMember();
+      allow create, update: if isSelf(uid) && isMember()
+        && request.resource.data.keys().hasOnly(['tab', 'at'])
+        && request.resource.data.tab is string
+        && request.resource.data.tab.size() <= 24
+        && request.resource.data.at == request.time;
+      allow delete: if isSelf(uid);
+    }
+
+    // ---- the table ----
+
+    // One trainer sheet per account, stored under that account's ID.
+    match /trainers/{uid} {
+      allow read: if isMember();
+      allow create: if isMember() && (isSelf(uid) || isGM())
+        && request.resource.data.owner == uid;
+      // A player cannot overwrite their sheet with a blank one: createdAt must not change.
+      allow update: if isGM() || (isSelf(uid) && isMember()
+        && resource.data.owner == uid
+        && request.resource.data.owner == uid
+        && request.resource.data.createdAt == resource.data.createdAt);
+      allow delete: if isGM();
+
+      match /pokemon/{pid} {
+        allow read: if isMember();
+        allow create, update: if isMember() && (isSelf(uid) || isGM())
+          && request.resource.data.owner == uid;
+        allow delete: if isMember() && (isSelf(uid) || isGM());
+      }
+    }
+
+    match /people/{id} {
+      allow read: if isMember();
+      allow create: if createOwn();
+      allow update: if changeShared();
+      allow delete: if removeOwn();
+    }
+    match /journal/{id} {
+      allow read: if isMember();
+      allow create: if createOwn();
+      allow update: if changeOwn();
+      allow delete: if removeOwn();
+    }
+    match /leads/{id} {
+      allow read: if isMember();
+      allow create: if createOwn();
+      allow update: if changeShared();
+      allow delete: if removeOwn();
+    }
+    match /timeline/{id} {
+      allow read: if isMember();
+      allow create: if createOwn();
+      allow update: if changeOwn();
+      allow delete: if removeOwn();
+    }
+    match /pins/{id} {
+      allow read: if isMember();
+      allow create: if createOwn();
+      allow update: if changeOwn();
+      allow delete: if removeOwn();
+    }
+
+    // Set by the GM, read by everyone at the table.
+    match /awards/{id} {
+      allow read: if isMember();
+      allow write: if isGM();
+    }
+    match /meta/{id} {
+      allow read: if isMember();
+      allow write: if isGM();
+    }
+    match /places/{id} {
+      allow read: if isMember();
+      allow write: if isGM();
+    }
+    match /mapimg/{id} {
+      allow read: if isMember();
+      allow write: if isGM();
+    }
+
+    // GM only: loyalty scores, NPC secrets, place notes.
+    match /gm/{id} {
+      allow read, write: if isGM();
+    }
+
+    // Private notes. Only their owner can read or write them, and only while at the table.
+    match /data/users/{uid}/{rest=**} {
+      allow read, write: if isSelf(uid) && isMember();
+    }
+  }
+}

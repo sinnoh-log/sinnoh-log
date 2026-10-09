@@ -1,0 +1,125 @@
+# Sinnoh Trainer Log: GitHub Pages edition
+
+A shared campaign tracker for your table. Everyone creates an account, signs in, and controls their own trainer and Pokémon. The GM sees and changes everything.
+
+- **Hosting:** GitHub Pages (free). The site is plain files, so there is nothing to build.
+- **Accounts and data:** Firebase (Google), free "Spark" plan. No credit card needed.
+- **Who gets in:** only people who create an account **and** enter a table code that you choose.
+
+## What each person can do
+
+| | Players | GM |
+|---|---|---|
+| Their own trainer sheet and Pokémon | edit | edit |
+| Other players' sheets | read only | edit (for example, awarding badges and levels) |
+| People and leads | add and edit (anyone), delete their own | edit or delete anything |
+| Journal, timeline, map pins | add, and edit or delete their own | edit or delete anything |
+| Region map, place pages, banner, table settings | read | edit |
+| Honors and awards | see | give and revoke |
+| Loyalty scores, NPC secrets, GM place notes | never sent to players | read and edit |
+| Private notes | only they can read them | only they can read theirs |
+| Table code and player list | no access | change code, remove players |
+
+These limits are enforced on Google's servers by `firestore.rules`, not just hidden in the page.
+
+A player can edit every field of their own sheet, including level and badges. If you want those to be GM-only, ask for a rules change.
+
+## Set-up (about 20 minutes, once)
+
+### 1. Create a Firebase project
+
+1. Go to <https://console.firebase.google.com> and choose **Add project**. Name it anything. You can turn Google Analytics off.
+2. On the project's home page, click the **web** icon (`</>`) to add a web app. Give it a nickname. Do **not** tick Firebase Hosting.
+3. Firebase shows a block of settings called `firebaseConfig`. Keep that page open. You can find it again later under the gear icon → **Project settings → General → Your apps**.
+
+Firebase rearranges its console menus from time to time. If a label below does not match what you see, use the search box at the top of the console.
+
+### 2. Paste the settings into this folder
+
+Open `firebase-config.js` in any text editor. Replace each `PASTE_...` value with the matching value from `firebaseConfig`. Save the file.
+
+These settings are not passwords, and it is normal for them to be public in your repository.
+
+### 3. Turn on sign-in
+
+In the Firebase console left menu: **Security → Authentication** (older layouts put it under **Build**). Click **Get started**, then the **Sign-in method** tab.
+
+- Turn on **Email/Password**.
+- Optional: turn on **Google** (it asks for a support email). If you would rather not offer it, set `google: false` in `firebase-config.js`.
+
+Then open **Authentication → Settings → Authorized domains** and **Add domain**: `YOURNAME.github.io` (your GitHub user name, lower case, no `https://`, no repository name). `localhost` is already listed for testing on your own computer.
+
+### 4. Create the database
+
+In the left menu open **Databases & Storage → Firestore** and click **Add database**. Choose **Standard edition**, leave the database ID as `(default)`, pick a location near your players (it cannot be changed later), and start in **Production mode**.
+
+### 5. Publish the security rules
+
+In Firestore, open the **Rules** tab, delete what is there, paste in the whole contents of `firestore.rules`, and click **Publish**.
+
+Do this before you share the link with anyone.
+
+### 6. Put the site on GitHub
+
+1. Create a new repository on GitHub. On a free account it has to be public.
+2. Upload everything in this folder, including the `vendor` folder: **Add file → Upload files**.
+3. In the repository, open **Settings → Pages**, set **Source** to **Deploy from a branch**, choose `main` and `/ (root)`, and save.
+4. After a minute or two the site is live at `https://YOURNAME.github.io/REPOSITORY-NAME/`.
+
+### 7. Make yourself the GM
+
+1. Open your site and choose **Create an account**. Leave **Table code** blank, because you have not made one yet.
+2. You land on **Join the table**. Open **Setting this site up as the GM?** and copy your **account ID**. (You can also find it later in the console under **Authentication → Users**, in the **User UID** column.)
+3. In the Firebase console, open Firestore and its **Data** tab, click **Start collection**, and create two things:
+   - Collection `admins`, document ID = your account ID, one field: `gm` (boolean) = `true`.
+   - Collection `config`, document ID = `invite`, one field: `code` (string) = the table code you want to give players. Use at least 6 characters, such as a short phrase.
+4. Reload the site. You are now signed in as the GM and a **GM Desk** appears in the menu.
+
+From then on you can change the table code, and see and remove players, on **GM Desk → Table access**.
+
+### 8. Upload the map
+
+Open the **Map** page and choose **Upload map**, then pick your Sinnoh map image. The hover highlights, place cards and place pages switch on when the picture has the same shape as the original map (the page tells you if it does not).
+
+The map image is stored in your Firebase database, not in the repository, so it is not publicly downloadable from GitHub.
+
+### 9. Invite your players
+
+Send them the site address and the table code. Use a code that is not easy to guess (for example three unrelated words), because anyone who knows it can join. They choose **Create an account**, enter a display name, email, password and the code, and they land on their own empty sheet.
+
+## Running it on your own computer
+
+In this folder run `python3 -m http.server 8000` and open <http://localhost:8000>. It uses the same Firebase project and data as the live site.
+
+## Good to know
+
+- **The repository contains** the app and the player-facing text for each place on the map. Nothing secret lives in it: no GM notes, no NPC secrets, no passwords, no map image. Those are in Firebase, and the rules keep players out of the GM-only parts.
+- **Cost.** The Spark plan has daily limits (about 50,000 reads and 20,000 writes). They reset around midnight Pacific time. A table of a handful of players should stay far below them. If a limit is ever hit, the app stops loading data until the next day. Nothing is charged on the Spark plan.
+- **Backups.** Every player has **Download my backup**. As GM, your backup contains the whole table. Do one now and then.
+- **Removing someone.** **GM Desk → Table access → Remove** ends their access. Anyone who still knows the table code can join again, so change the code too if you want to keep someone out.
+- **Forgotten passwords.** Players use **Forgot your password?** on the sign-in screen. The email comes from Firebase.
+- **Changing a name.** **Account** in the menu.
+- **Optional hardening.** In Google Cloud Console, under **APIs & Services → Credentials**, you can restrict the browser API key to `https://YOURNAME.github.io/*` (and `http://localhost:8000/*` if you test locally).
+
+## If something goes wrong
+
+| What you see | What to do |
+|---|---|
+| "Not connected to Firebase yet" | `firebase-config.js` still has the `PASTE_...` placeholders, or the file was not uploaded. |
+| "This web address is not authorized for sign-in yet" | Add `YOURNAME.github.io` under Authentication → Settings → Authorized domains. |
+| "This sign-in method is not turned on yet" | Turn on Email/Password (or Google) under Authentication → Sign-in method. |
+| "Access was refused…" or "Could not open the table" | The rules are not published, or `firebase-config.js` points at a different project. Redo step 5 and check step 2. |
+| "That table code did not work" | The code must match `config/invite` exactly, including capitals, and be at least 6 characters. Check it in the Firestore console. |
+| You added `admins/…` but still see "Join the table" | The document ID must be exactly the account ID shown on that screen. Reload after saving. |
+| The Map page has no picture | The GM has not uploaded one yet (step 8). |
+
+## What is in this folder
+
+| File | What it is |
+|---|---|
+| `index.html`, `app.js` | The tracker itself. |
+| `backend.js` | Sign-in screen and the connection to Firebase. |
+| `firebase-config.js` | Your project's settings. The one file you edit. |
+| `firestore.rules` | The access rules you paste into Firebase. |
+| `vendor/` | Google's Firebase browser library, unmodified, so the site does not depend on an outside CDN. |
+| `.nojekyll` | Tells GitHub Pages to serve the files as they are. Harmless if it did not upload. |
