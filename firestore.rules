@@ -110,7 +110,8 @@ service cloud.firestore {
         && resource.data.owner == uid
         && request.resource.data.owner == uid
         && request.resource.data.createdAt == resource.data.createdAt);
-      allow delete: if isGM();
+      // The GM can delete any sheet. A player can delete their own.
+      allow delete: if isGM() || (isSelf(uid) && isMember());
 
       match /pokemon/{pid} {
         allow read: if isMember();
@@ -154,7 +155,9 @@ service cloud.firestore {
     // Set by the GM, read by everyone at the table.
     match /awards/{id} {
       allow read: if isMember();
-      allow write: if isGM();
+      allow create, update: if isGM();
+      // The person an honor was given to may delete it (used when they delete their own trainer).
+      allow delete: if isGM() || (isMember() && resource.data.uid == request.auth.uid);
     }
     match /meta/{id} {
       allow read: if isMember();

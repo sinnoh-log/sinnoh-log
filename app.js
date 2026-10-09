@@ -90,7 +90,7 @@ const S={
   trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},
   awards:{},timeline:{},pins:{},banner:{},places:{},gmPl:{},placeId:null,members:{},invite:null,mapChunks:{},mapSrc:'',room:null,peers:[],avatars:{},
   pick:null,names:{},save:{cls:'',text:'Saved'},rolls:[],_tsig:'',
-  ui:{open:{},adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},
+  ui:{open:{},adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},
     award:{uids:{},type:'Gym Badge',badge:'coal',title:'',note:'',levelUp:true}}
 };
 
@@ -677,7 +677,22 @@ function trainerTab(){
     <div class="sheet">
       <div class="col">${identityPanel(uid,t,ro)}${vitalsPanel(uid,t,ro)}${honorsPanel(uid,t,ro)}</div>
       <div class="col">${skillsPanel(uid,t,ro)}${featuresPanel(uid,t,ro)}${itemsPanel(uid,t,ro)}</div>
-    </div>`;
+    </div>
+    ${ro?'':deleteTrainerPanel(uid,t)}`;
+}
+function deleteTrainerPanel(uid,t){
+  const n=monsOf(uid).length;
+  const st=S.ui.delT;
+  const word=(t.name||'').trim()||'delete';
+  const mine=uid===S.me.id;
+  const things=n+" Pokémon"+' and the honors recorded for '+(mine?'you':'this trainer');
+  return h`<section class="panel dz"><div class="ph"><h2>Delete this trainer</h2></div>
+    ${st.uid===uid?h`<p>This permanently deletes <b>${tName(t)}</b>, ${things}. It cannot be undone. To confirm, type <b>${word}</b> below.</p>
+      <div class="fgrid"><label class="fld"><span class="fl">Type to confirm</span><input type="text" data-u="delT.text" data-nr value="${st.text}" autocomplete="off" spellcheck="false" maxlength="80"></label></div>
+      <div class="row"><button class="btn sm danger armed" data-act="delTGo" data-uid="${uid}">Delete forever</button><button class="btn sm" data-act="delTCancel">Cancel</button></div>`
+      :h`<p class="sub">Removes ${mine?'your':'this'} sheet, ${things}. You will be asked to confirm.</p>
+      <div><button class="btn sm danger" data-act="delTOpen" data-uid="${uid}">Delete this trainer…</button></div>`}
+  </section>`;
 }
 
 /* ---------- pokemon tab ---------- */
@@ -750,7 +765,7 @@ function monBody(uid,m,ro,pos,len){
       <div class="row"><button class="btn sm" data-act="slot" data-uid="${uid}" data-pid="${m.id}">${m.slot==='box'?'Move to party':'Move to box'}</button>
         <button class="btn sm ghost" data-act="ord" data-uid="${uid}" data-pid="${m.id}" data-d="-1" ${pos===0?raw('disabled'):''} aria-label="Move earlier">↑</button>
         <button class="btn sm ghost" data-act="ord" data-uid="${uid}" data-pid="${m.id}" data-d="1" ${pos===len-1?raw('disabled'):''} aria-label="Move later">↓</button></div>
-      ${delBtn('p',id,'Release')}</div>`}
+      ${delBtn('p',id,'Delete Pokémon')}</div>`}
   </div>`;
 }
 
@@ -1583,6 +1598,34 @@ async function uploadMap(file){
   for(let i=n;i<old;i++)await col.doc('c'+i).delete();
   return sinn;
 }
+async function deleteTrainer(uid){
+  const t=S.trainers[uid];
+  if(!t)return;
+  const db=S.db;
+  const pids=monsOf(uid).map(m=>m.id);
+  const awIds=entriesOf(S.awards).filter(a=>a.uid===uid).map(a=>a.id);
+  /* forget queued saves so nothing is written back after the delete */
+  Array.from(Q.keys()).forEach(k=>{if(k==='t|'+uid||k.indexOf('p|'+uid+'/')===0){clearTimeout(Q.get(k).timer);Q.delete(k);}});
+  const tref=db.collection('trainers').doc(uid);
+  const batch=db.batch();
+  pids.forEach(id=>batch.delete(tref.collection('pokemon').doc(id)));
+  awIds.forEach(id=>batch.delete(db.collection('awards').doc(id)));
+  if(S.me.admin)pids.forEach(id=>batch.delete(db.collection('gm').doc('loy_'+id)));
+  batch.delete(tref);
+  /* local state first, like every other delete here; the live listeners put things back if the server refuses */
+  delete S.trainers[uid];delete S.pokemon[uid];
+  awIds.forEach(id=>{delete S.awards[id];});
+  S.ui.delT={uid:null,text:''};
+  if(S.viewUid===uid)S.viewUid=null;
+  setStatus('busy');render();
+  try{
+    await batch.commit();
+    toast('Trainer deleted',true);
+  }catch(e){
+    fail(e);
+    toast('Could not delete that trainer.');
+  }
+}
 async function removeMap(){
   const col=S.db.collection('mapimg');
   const old=num(S.mapChunks.meta&&S.mapChunks.meta.n);
@@ -1638,6 +1681,18 @@ function act(b,e){
       break;}
     case 'rmImg':{const p=d.p.split('|');edit(p[0],p[1],p[2],'');render();break;}
     case 'rmMap':removeMap();break;
+    case 'delTOpen':{
+      if(!canEditT(d.uid))break;
+      S.ui.delT={uid:d.uid,text:''};render();
+      const i=$('input[data-u="delT.text"]');if(i)i.focus();
+      break;}
+    case 'delTCancel':S.ui.delT={uid:null,text:''};render();break;
+    case 'delTGo':{
+      const t=S.trainers[d.uid];
+      if(!t||!canEditT(d.uid))break;
+      const word=(t.name||'').trim()||'delete';
+      if(String(S.ui.delT.text||'').trim().toLowerCase()!==word.toLowerCase()){toast('That does not match. Type "'+word+'" to confirm.');break;}
+      deleteTrainer(d.uid);break;}
     case 'signOut':if(CFG&&CFG.api)CFG.api.signOut();break;
     case 'acctName':{
       const n=String(S.ui.acct.name!=null?S.ui.acct.name:'').trim().slice(0,40);

@@ -12,6 +12,7 @@ A shared campaign tracker for your table. Everyone creates an account, signs in,
 |---|---|---|
 | Their own trainer sheet and Pokémon | edit | edit |
 | Other players' sheets | read only | edit (for example, awarding badges and levels) |
+| Deleting a trainer or a Pokémon | their own (type the name to confirm) | anyone's |
 | People and leads | add and edit (anyone), delete their own | edit or delete anything |
 | Journal, timeline, map pins | add, and edit or delete their own | edit or delete anything |
 | Region map, place pages, banner, table settings | read | edit |
@@ -91,6 +92,23 @@ Send them the site address and the table code. Use a code that is not easy to gu
 
 In this folder run `python3 -m http.server 8000` and open <http://localhost:8000>. It uses the same Firebase project and data as the live site.
 
+## Updating the site
+
+When you get a new version of these files:
+
+1. In your GitHub repository, choose **Add file → Upload files** and drag in the new files over the old ones (including the `vendor` folder if it is included). **Do not** replace your own `firebase-config.js` unless you re-enter your settings in the new one.
+2. If `firestore.rules` changed, open Firebase console → **Firestore → Rules**, paste in the new contents, and click **Publish**. Do this before players use the new version. This update changed the rules so that players can delete their own trainer sheet. Until you publish them, a player's "Delete this trainer" is refused and the page says so. The GM can always delete.
+3. GitHub Pages takes a minute or two to update. Each person should refresh the page once (hold Shift while clicking reload if they still see the old version).
+
+Nothing in your database changes when you update the files.
+
+## Deleting trainers and Pokémon
+
+- **A Pokémon:** open its card on the **Pokémon** page and tap **Delete Pokémon** twice.
+- **A trainer:** at the bottom of the **Trainer** page, choose **Delete this trainer**, then type the trainer's name to confirm. This removes the sheet, all of its Pokémon, the honors recorded for it and (for the GM) the loyalty notes. It cannot be undone, so download a backup first if you are unsure.
+- Players can delete their own. The GM can delete anyone's (open that trainer from the Overview first).
+- Deleting a trainer does not remove the person's account or table access. They can make a new trainer from the **Trainer** page.
+
 ## Good to know
 
 - **The repository contains** the app and the player-facing text for each place on the map. Nothing secret lives in it: no GM notes, no NPC secrets, no passwords, no map image. Those are in Firebase, and the rules keep players out of the GM-only parts.
@@ -112,6 +130,7 @@ In this folder run `python3 -m http.server 8000` and open <http://localhost:8000
 | "That table code did not work" | The code must match `config/invite` exactly, including capitals, and be at least 6 characters. Check it in the Firestore console. |
 | You added `admins/…` but still see "Join the table" | The document ID must be exactly the account ID shown on that screen. Reload after saving. |
 | The Map page has no picture | The GM has not uploaded one yet (step 8). |
+| "Could not delete that trainer" (as a player) | The new `firestore.rules` have not been published yet. See **Updating the site**. |
 
 ## What is in this folder
 
