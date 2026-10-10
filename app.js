@@ -1,5 +1,6 @@
 (function(){
 'use strict';
+const BUILD='2026-10-09 · Handbook data';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -354,6 +355,7 @@ function startWatches(){
     if(s.exists)S.megaOk=withPending('mg','mega',s.data());
     else if(!Q.has('mg|mega'))S.megaOk={};
   },'mega');
+  watch(db.collection('meta').doc('pta_idx'),s=>{ptaSetIdx(s.exists?s.data():null);},'pta');
   watch(db.collection('mapimg'),s=>{
     const o={};
     s.docs.forEach(d=>{o[d.id]=d.data();});
@@ -495,7 +497,7 @@ const TPL={
   item:()=>({name:'',qty:1,note:''}),
   honor:()=>({type:'Other',name:'',note:''})
 };
-const TPL_MAX={moves:6,passives:4};
+const TPL_MAX={moves:6,passives:8};
 
 /* ---------- images: downscale to small JPEG data URLs, show through blob URLs ---------- */
 const JPEG_RE=/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/;
@@ -697,11 +699,19 @@ const baseList=b=>STAT_KEYS.map(k=>num(b&&b[k]));
 
 /* ---------- Mega forms ---------- */
 const megasFor=sp=>{const si=speciesInfo(sp);return si&&!si.form?MEGAS.filter(x=>x.b===si.id):[];};
+/* the handbook's own entry for a Mega form (stat bonuses and Mega passive), once the GM has imported it */
+const hbMega=f=>{const L=PTA.lists;return (L&&L.megaMap&&L.megaMap.get(dexKey(f)))||null;};
 function megaPreset(x,si){
   const bonus={};
   STAT_KEYS.forEach((k,i)=>{bonus[k]=statFrom(x.s[i])-si.base[k];});
   const o={form:x.f,stone:x.st,types:typePair(x.t),bonus,ability:x.a,sid:x.i,auto:true};
   if(x.mv)o.move=x.mv;
+  const hb=hbMega(x.f);
+  if(hb){
+    STAT_KEYS.forEach(k=>{bonus[k]=num(hb.bon&&hb.bon[k]);});
+    o.types=[(hb.ty||[])[0]||'',(hb.ty||[])[1]||''];
+    if((hb.ps||[]).length)o.ability=hb.ps.map(p=>p.t?p.n+': '+p.t:p.n).join(' · ');
+  }
   return o;
 }
 function pickMega(m,list){
@@ -768,8 +778,9 @@ function fillFromSpecies(uid,pid,force){
   const curT=[(m.types||[])[0]||'',(m.types||[])[1]||''];
   const curB=baseList(m.base);
   const defB=curB.every(v=>v===3)||curB.every(v=>v===0);
-  const tOk=force||(!curT[0]&&!curT[1])||(prev&&sameArr(curT,prev.types));
-  const bOk=force||defB||(prev&&sameArr(curB,baseList(prev.base)));
+  const sg=m.autoSig||{};
+  const tOk=force||(!curT[0]&&!curT[1])||(prev&&sameArr(curT,prev.types))||sg.ty===hsh(curT.join('/'));
+  const bOk=force||defB||(prev&&sameArr(curB,baseList(prev.base)))||sg.ba===hsh(curB.join(','));
   const res={name:si.name,types:si.types,base:si.base,setT:false,setB:false,keepT:!tOk,keepB:!bOk};
   if(tOk&&!sameArr(curT,si.types)){edit('p',id,'types',si.types.slice());res.setT=true;}
   if(bOk&&!sameArr(curB,baseList(si.base))){edit('p',id,'base',Object.assign({},m.base||{},si.base));res.setB=true;}
@@ -777,7 +788,7 @@ function fillFromSpecies(uid,pid,force){
   return res;
 }
 /* keeps a Pokémon's Mega details in step with its species while they are still the auto-filled ones */
-function syncMega(uid,pid){
+function syncMega(uid,pid,keepOn){
   const id=uid+'/'+pid;
   const m=getLocal('p',id);
   const si=m&&speciesInfo(m.species);
@@ -789,17 +800,24 @@ function syncMega(uid,pid){
     return '';
   }
   if(!cur||cur.auto){
-    const x=pickMega(m,list);
-    if(cur&&cur.form===x.f&&sameArr(baseList(cur.bonus),STAT_KEYS.map((k,i)=>statFrom(x.s[i])-si.base[k])))return '';
-    edit('p',id,'mega',megaPreset(x,si));
-    if(m.megaOn)edit('p',id,'megaOn',false);
-    return x.f;
+    const x=keepOn&&cur?(list.find(y=>y.f===cur.form)||pickMega(m,list)):pickMega(m,list);
+    const pre=megaPreset(x,si);
+    if(cur&&cur.form===x.f&&sameArr(baseList(cur.bonus),baseList(pre.bonus))&&cur.ability===pre.ability&&sameArr((cur.types||[]).filter(Boolean),pre.types.filter(Boolean)))return '';
+    edit('p',id,'mega',pre);
+    if(m.megaOn&&!keepOn)edit('p',id,'megaOn',false);
+    return keepOn&&cur&&cur.form===x.f?'':x.f;
   }
   return '';
 }
-function applySpecies(uid,pid,force){
+/* the basic fill: types and base stats worked out from the game's own numbers, used when the handbook has no entry */
+function basicSpecies(uid,pid,force){
+  const m0=getLocal('p',uid+'/'+pid);
+  const si0=m0&&speciesInfo(m0.species);
+  if(!si0)return false;
+  if(!force&&num(m0.autoSid)===si0.sid&&!m0.autoPta)return true;   /* already filled in for this species */
   const r=fillFromSpecies(uid,pid,force);
   if(!r)return false;
+  if(m0.autoPta)edit('p',uid+'/'+pid,'autoPta','');
   const mf=syncMega(uid,pid);
   const bits=[];
   if(r.setT||r.setB||force)bits.push('Filled in '+r.name+': '+r.types.filter(Boolean).join(' / ')+' · '+STATS.map(s=>s[2]+' '+r.base[s[0]]).join(' '));
@@ -808,22 +826,78 @@ function applySpecies(uid,pid,force){
   if(bits.length)toast(bits.join(' '),true);
   return true;
 }
-/* the species box finished changing: fill in the rest */
+/* species box: the handbook entry when there is one (stats, passives, moves), otherwise the basic fill */
+function applySpecies(uid,pid,force){
+  const m0=getLocal('p',uid+'/'+pid);
+  if(!m0)return false;
+  const pr=ptaResolve(m0.species);
+  if(!pr)return basicSpecies(uid,pid,force);
+  const k=ptaKey(pr);
+  if(!force&&m0.autoPta===k)return true;
+  if(ptaRec(pr)){ptaApply(uid,pid,ptaRec(pr),force);return true;}
+  ptaChunk(ptaLetter(k)).then(()=>{
+    const m=getLocal('p',uid+'/'+pid);
+    if(!m||ptaResolve(m.species)!==pr)return;
+    if(ptaRec(pr))ptaApply(uid,pid,ptaRec(pr),force);
+    else basicSpecies(uid,pid,force);
+    scheduleRender();
+  });
+  return true;
+}
+/* a redraw after a blur waits for the pointer to come up, so the click that caused the blur still lands */
+function renderSoon(){
+  let done=false;
+  const go=()=>{if(done)return;done=true;document.removeEventListener('pointerup',go,true);scheduleRender();};
+  document.addEventListener('pointerup',go,true);
+  setTimeout(go,350);
+}
+/* the species box was picked from the list, changed, or left: fill in the rest */
 function onSpeciesChange(t){
+  if(ptaRowFill(t))return true;
   const m=/^p\|([^|]+)\/([^|]+)\|species$/.exec(t.dataset.b||'');
   if(!m)return false;
   if(!getLocal('p',m[1]+'/'+m[2]))return true;
-  applySpecies(m[1],m[2],false);
-  render();
+  const before=Q.size;
+  if(applySpecies(m[1],m[2],false)&&(Q.size!==before||S.noteUntil>Date.now()))renderSoon();
   return true;
 }
 function fillHint(uid,m){
+  const pr=ptaResolve(m.species);
+  if(pr){
+    const rec=ptaRec(pr);
+    if(!rec)ptaWarm(pr);
+    const F=rec&&ptaFields(rec);
+    if(F&&ptaSame(m,F))return h`<p class="sub wide fillrow">Types, stats, passives and moves match the handbook entry for ${rec.n}.</p>`;
+    const ask=S.ui.confirm==='fill|'+m.id;
+    return h`<div class="wide fillrow"><button class="btn sm ${ask?'danger armed':''}" data-act="autofill" data-uid="${uid}" data-pid="${m.id}">${ask?'Tap again to replace your passives and moves':'Fill from the handbook: '+(rec?rec.n:pr)}</button></div>`;
+  }
   const si=speciesInfo(m.species);
   if(!si)return '';
   const curT=[(m.types||[])[0]||'',(m.types||[])[1]||''];
   const same=sameArr(curT,si.types)&&sameArr(baseList(m.base),baseList(si.base));
   if(same)return h`<p class="sub wide fillrow">Types and base stats match ${si.name}.</p>`;
   return h`<div class="wide fillrow"><button class="btn sm" data-act="autofill" data-uid="${uid}" data-pid="${m.id}">Fill types and base stats from ${si.name}</button></div>`;
+}
+/* the Fill button: the handbook entry when there is one, and a second tap before it replaces edits the player made */
+async function fillClick(uid,pid){
+  const id=uid+'/'+pid;
+  const m=getLocal('p',id);
+  if(!m)return;
+  const pr=ptaResolve(m.species);
+  if(!pr){basicSpecies(uid,pid,true);render();return;}
+  const rec=ptaRec(pr)||(await ptaChunk(ptaLetter(ptaKey(pr))).then(()=>ptaRec(pr)));
+  const m2=getLocal('p',id);
+  if(!m2)return;
+  if(!rec){basicSpecies(uid,pid,true);render();return;}
+  const key='fill|'+pid;
+  if(ptaWouldReplace(m2,ptaFields(rec))&&S.ui.confirm!==key){
+    S.ui.confirm=key;render();
+    setTimeout(()=>{if(S.ui.confirm===key){S.ui.confirm=null;render();}},4000);
+    return;
+  }
+  S.ui.confirm=null;
+  ptaApply(uid,pid,rec,true);
+  render();
 }
 
 /* ---------- Pokémon-card panel ---------- */
@@ -987,6 +1061,263 @@ function liveKeyLine(input,uid){
     if(!line){line=document.createElement('div');line.className='kline';box.appendChild(line);}
     line.innerHTML=((c&&c.s)||'')+'<span class="sub">Lets your Pokémon Mega Evolve, once per battle.</span>';
   }else if(line)line.remove();
+}
+
+/* ---------- PTA handbook data: species, moves, passives ----------
+   The text comes from the PTA 3 handbooks. It is not part of this site's files. The GM imports it once
+   (GM Desk, Handbook data) and it is kept in the table's database, where only signed-in members can read it.
+   Each document holds one JSON string, so the database has almost nothing to index. */
+const PTA={idx:null,chunks:{},subs:{},busy:{},fail:{},lists:null,listsSub:null,listsBusy:null,listsFail:0};
+const ptaKey=s=>dexKey(String(s==null?'':s).replace(/\bshiny\b/ig,' '));
+const ptaLetter=k=>/^[a-z]/.test(k)?k.charAt(0):'_';
+const hsh=v=>{let x=5381;const s=String(v);for(let i=0;i<s.length;i++)x=((x<<5)+x+s.charCodeAt(i))|0;return (x>>>0).toString(36);};
+const NAME_RE=/^p\|([^|]+)\/([^|]+)\|(moves|passives)\.(\d+)\.name$/;
+const jparse=s=>{try{return JSON.parse(s);}catch(e){return null;}};
+
+/* the list of every species name in the handbook */
+function ptaSetIdx(d){
+  const names=d&&jparse(d.j);
+  if(!Array.isArray(names)||!names.length){PTA.idx=null;ptaFillLists();return;}
+  const byKey=new Map(),base=new Map();
+  names.forEach(n=>{
+    byKey.set(ptaKey(n),n);
+    const b=ptaKey(String(n).replace(/\s*\(.*$/,''));
+    if(!base.has(b))base.set(b,[]);
+    base.get(b).push(n);
+  });
+  PTA.idx={names,byKey,base,t:num(d.t)};
+  ptaFillLists();
+}
+/* "Pikachu", "shiny pikachu" and "Zigzagoon (Urban)" find an entry; regional forms are left to the basic list */
+function ptaResolve(sp){
+  const I=PTA.idx;
+  if(!I)return null;
+  const k=ptaKey(sp);
+  if(!k)return null;
+  if(I.byKey.has(k))return I.byKey.get(k);
+  if(REGION_RE.test(String(sp)))return null;
+  const b=I.base.get(k);
+  return b&&b.length?b[0]:null;
+}
+const ptaRec=name=>{const k=ptaKey(name),c=PTA.chunks[ptaLetter(k)];return (c&&c[k])||null;};
+
+/* one document per first letter, read when a species of that letter is first needed */
+function ptaChunk(L){
+  if(PTA.chunks[L])return Promise.resolve(PTA.chunks[L]);
+  if(PTA.busy[L])return PTA.busy[L];
+  if(!S.db)return Promise.resolve(null);
+  let done;
+  const p=new Promise(r=>{done=r;});
+  PTA.busy[L]=p;
+  let first=true;
+  const fin=v=>{if(first){first=false;clearTimeout(to);delete PTA.busy[L];if(!v)PTA.fail[L]=Date.now();done(v);}};
+  const to=setTimeout(()=>fin(null),9000);
+  if(PTA.subs[L])try{PTA.subs[L]();}catch(e){}
+  PTA.subs[L]=S.db.collection('meta').doc('pta_'+L).onSnapshot(s=>{
+    if(!s.exists){
+      if(s.metadata&&s.metadata.fromCache)return;
+      PTA.chunks[L]={};
+    }else PTA.chunks[L]=jparse((s.data()||{}).j)||{};
+    const was=!first;
+    fin(PTA.chunks[L]);
+    if(was)scheduleRender();
+  },()=>fin(null));
+  return p;
+}
+function ptaWarm(name){
+  const L=ptaLetter(ptaKey(name));
+  if(PTA.chunks[L]||PTA.busy[L]||(PTA.fail[L]&&Date.now()-PTA.fail[L]<30000))return;
+  ptaChunk(L).then(()=>scheduleRender());
+}
+
+/* every move, passive and skill, for the name boxes */
+function ptaLists(){
+  if(PTA.lists)return Promise.resolve(PTA.lists);
+  if(PTA.listsBusy)return PTA.listsBusy;
+  if(!S.db||!PTA.idx||(PTA.listsFail&&Date.now()-PTA.listsFail<30000))return Promise.resolve(null);
+  let done,first=true;
+  const p=new Promise(r=>{done=r;});
+  PTA.listsBusy=p;
+  const fin=v=>{if(first){first=false;clearTimeout(to);PTA.listsBusy=null;if(!v)PTA.listsFail=Date.now();done(v);}};
+  const to=setTimeout(()=>fin(null),9000);
+  PTA.listsSub=S.db.collection('meta').doc('pta_lists').onSnapshot(s=>{
+    if(!s.exists){if(s.metadata&&s.metadata.fromCache)return;fin(null);return;}
+    const d=jparse((s.data()||{}).j)||{};
+    const mk=a=>{const m=new Map();(a||[]).forEach(x=>m.set(dexKey(x.n),x));return m;};
+    PTA.lists={moves:d.moves||[],passives:d.passives||[],skills:d.skills||[],megas:d.megas||[],moveMap:mk(d.moves),passMap:mk(d.passives),megaMap:mk(d.megas)};
+    ptaFillLists();
+    ptaResyncMegas();
+    fin(PTA.lists);
+  },()=>fin(null));
+  return p;
+}
+
+function ptaFillLists(){
+  const ds=$('#dl-species');
+  if(ds){
+    const have=new Set(DEXN.split('|').map(dexKey));
+    const extra=PTA.idx?PTA.idx.names.filter(n=>!have.has(dexKey(n))):[];
+    ds.innerHTML=DEXN.split('|').concat(extra).map(n=>'<option value="'+esc(n)+'">').join('');
+  }
+  const L=PTA.lists;
+  const dm=$('#dl-moves'),dp=$('#dl-passives');
+  if(dm)dm.innerHTML=L?L.moves.map(x=>'<option value="'+esc(x.n)+'">').join(''):'';
+  if(dp)dp.innerHTML=L?L.passives.map(x=>'<option value="'+esc(x.n)+'">').join(''):'';
+}
+
+/* Mega details that were filled in automatically pick up the handbook's numbers once they are available (the player's own Pokémon only) */
+function ptaResyncMegas(){
+  if(!S.me.id||!S.ready)return;
+  setTimeout(()=>{
+    monsOf(S.me.id).forEach(m=>{if(m.mega&&m.mega.auto&&canEditT(S.me.id))syncMega(S.me.id,m.id,true);});
+    scheduleRender();
+  },0);
+}
+
+/* ---------- a handbook entry as the fields of a Pokémon sheet ---------- */
+function ptaFields(r){
+  const t=(r.ty||[]).slice(0,2);
+  const gloss=x=>x.t&&x.t.length<=48?x.n+' ('+x.t+')':x.n;
+  return {
+    types:[t[0]||'',t[1]||''],
+    base:{atk:num(r.at),def:num(r.df),spa:num(r.sa),spd:num(r.sd),spe:num(r.sp)},
+    hp:num(r.hp),
+    size:SIZES.indexOf(r.sz)>=0?r.sz:'Medium',
+    weight:WEIGHTS.indexOf(r.wt)>=0?r.wt:'Medium',
+    skills:(r.sk||[]).map(gloss).join(', '),
+    passives:(r.ps||[]).map(x=>({name:x.n,text:x.t||''})),
+    moves:(r.mv||[]).map(x=>({name:x.n,freq:x.f||'At-Will',kind:x.k||'Physical',range:x.r||'',type:x.t||'Normal',dice:x.d||'',text:x.x||'',used:0}))
+  };
+}
+const sigPs=a=>hsh(JSON.stringify((a||[]).map(x=>[x.name||'',x.text||''])));
+const sigMv=a=>hsh(JSON.stringify((a||[]).map(x=>[x.name||'',x.freq||'',x.kind||'',x.range||'',x.type||'',x.dice||'',x.text||''])));
+const namesOf=a=>(a||[]).map(x=>dexKey(x.name)).join('|');
+function ptaSame(m,F){
+  const curT=[(m.types||[])[0]||'',(m.types||[])[1]||''];
+  return sameArr(curT,F.types)&&sameArr(baseList(m.base),baseList(F.base))&&num(m.hp&&m.hp.max)===F.hp
+    &&m.size===F.size&&m.weight===F.weight&&namesOf(m.passives)===namesOf(F.passives)&&namesOf(m.moves)===namesOf(F.moves);
+}
+/* true when the Pokémon already has passives or moves of the player's own that a fill would replace */
+function ptaWouldReplace(m,F){
+  const sig=m.autoSig||{};
+  const ps=m.passives||[],mv=m.moves||[];
+  const ownPs=ps.length&&sig.ps!==sigPs(ps)&&sigPs(ps)!==sigPs(F.passives);
+  const ownMv=mv.length&&sig.mv!==sigMv(mv)&&sigMv(mv)!==sigMv(F.moves);
+  return !!(ownPs||ownMv);
+}
+
+/* fills in a Pokémon from its handbook entry. Fields the player has changed since the last fill are left alone, unless force is set. */
+function ptaApply(uid,pid,rec,force){
+  const id=uid+'/'+pid;
+  const m=getLocal('p',id);
+  if(!m)return false;
+  const F=ptaFields(rec);
+  const sig=Object.assign({},m.autoSig||{});
+  const si=speciesInfo(m.species);
+  const prev=m.autoSid?infoBySid(m.autoSid):null;
+  const curT=[(m.types||[])[0]||'',(m.types||[])[1]||''];
+  const curB=baseList(m.base);
+  const hp=m.hp||{};
+  const ps=m.passives||[],mv=m.moves||[];
+  const was=(k,cur)=>sig[k]===hsh(cur);
+  const ok={
+    ty:force||(!curT[0]&&!curT[1])||was('ty',curT.join('/'))||!!(prev&&sameArr(curT,prev.types)),
+    ba:force||curB.every(v=>v===3)||curB.every(v=>v===0)||was('ba',curB.join(','))||!!(prev&&sameArr(curB,baseList(prev.base))),
+    hp:force||!num(hp.max)||(num(hp.max)===20&&num(hp.cur)===20)||was('hp',String(num(hp.max))),
+    sz:force||!m.size||m.size==='Medium'||was('sz',m.size),
+    wt:force||!m.weight||m.weight==='Medium'||was('wt',m.weight),
+    sk:force||!String(m.skills||'').trim()||was('sk',String(m.skills||'')),
+    ps:force||!ps.length||sig.ps===sigPs(ps),
+    mv:force||!mv.length||sig.mv===sigMv(mv)
+  };
+  const kept=[];
+  if(ok.ty){edit('p',id,'types',F.types.slice());sig.ty=hsh(F.types.join('/'));}else kept.push('types');
+  if(ok.ba){edit('p',id,'base',Object.assign({},m.base||{},F.base));sig.ba=hsh(baseList(F.base).join(','));}else kept.push('base stats');
+  if(ok.hp){
+    const cur=num(hp.cur)>=num(hp.max)?F.hp:Math.min(num(hp.cur),F.hp);
+    edit('p',id,'hp',Object.assign({},hp,{cur,max:F.hp}));sig.hp=hsh(String(F.hp));
+  }else kept.push('HP');
+  if(ok.sz){edit('p',id,'size',F.size);sig.sz=hsh(F.size);}else kept.push('size');
+  if(ok.wt){edit('p',id,'weight',F.weight);sig.wt=hsh(F.weight);}else kept.push('weight');
+  if(ok.sk){edit('p',id,'skills',F.skills);sig.sk=hsh(F.skills);}else kept.push('skills');
+  if(ok.ps){edit('p',id,'passives',F.passives.map(x=>Object.assign({},x)));sig.ps=sigPs(F.passives);}else kept.push('passives');
+  if(ok.mv){edit('p',id,'moves',F.moves.map(x=>Object.assign({},x)));sig.mv=sigMv(F.moves);}else kept.push('moves');
+  edit('p',id,'autoSig',sig);
+  edit('p',id,'autoPta',ptaKey(rec.n));
+  if(si&&num(m.autoSid)!==si.sid)edit('p',id,'autoSid',si.sid);
+  const mf=syncMega(uid,pid);
+  const bits=['Filled in '+rec.n+' from the handbook: '+F.types.filter(Boolean).join(' / ')+' · HP '+F.hp+' · '+F.passives.length+' passive'+(F.passives.length===1?'':'s')+' · '+F.moves.length+' move'+(F.moves.length===1?'':'s')+'.'];
+  if(kept.length)bits.push('Kept your '+kept.join(', ')+'.');
+  if(mf)bits.push(mf+' details added.');
+  toast(bits.join(' '),true);
+  return true;
+}
+
+/* typing a move or passive name fills in the rest of its row, when the row is still empty */
+function ptaRowFill(t){
+  const mt=NAME_RE.exec(t.dataset.b||'');
+  if(!mt)return false;
+  const uid=mt[1],pid=mt[2],kind=mt[3],i=+mt[4];
+  const id=uid+'/'+pid;
+  const go=()=>{
+    const m=getLocal('p',id);
+    const L=PTA.lists;
+    const row=m&&(m[kind]||[])[i];
+    if(!row||!L)return;
+    const def=(kind==='moves'?L.moveMap:L.passMap).get(dexKey(row.name));
+    if(!def)return;
+    let next,msg;
+    if(kind==='moves'){
+      if(String(row.text||'').trim()||String(row.dice||'').trim())return;
+      next=Object.assign({},row,{name:def.n,freq:def.f||row.freq,kind:def.k||row.kind,range:def.r||row.range,type:def.t||row.type,dice:def.d||'',text:def.x||''});
+      msg='Filled in '+def.n+' from the handbook.';
+    }else{
+      if(String(row.text||'').trim())return;
+      next=Object.assign({},row,{name:def.n,text:def.t||''});
+      msg='Filled in '+def.n+' from the handbook.';
+    }
+    edit('p',id,kind,m[kind].map((x,j)=>j===i?next:x));
+    toast(msg,true);
+    renderSoon();
+  };
+  if(PTA.lists)go();
+  else ptaLists().then(go);
+  return true;
+}
+
+/* ---------- GM Desk: import ---------- */
+function ptaDesk(){
+  const I=PTA.idx,im=S.ui.pta||{};
+  const when=I&&I.t?new Date(I.t).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}):'';
+  return h`<section class="panel"><div class="ph"><h2>Handbook data</h2><span class="pill gm">GM only</span>
+      <div class="acts"><button class="btn sm" data-act="ptaPick" ${im.busy?raw('disabled'):''}>${I?'Import again':'Import handbook data'}</button></div></div>
+    ${I?h`<p class="sub">${I.names.length} Pokémon from the PTA 3 Pokédex are in your database${when?', imported '+when:''}. Type a species and its stats, passives and moves fill in. Type a move or passive name and its details fill in.</p>`
+      :h`<p class="sub">Not imported yet. Choose <b>pta-handbook-data.json</b> from the update download. This fills in stats, passives and moves when someone types a species. The handbook text goes into your database, not into the public site.</p>`}
+    ${im.busy?h`<progress class="ptaprog" max="${num(im.total)}" value="${num(im.done)}" aria-label="Import progress"></progress>`:''}
+    ${im.msg?h`<p class="sub ${im.bad?'bad':''}" role="status">${im.msg}</p>`:''}
+  </section>`;
+}
+async function ptaImport(file){
+  const im=S.ui.pta=S.ui.pta||{};
+  const say=(msg,bad)=>{im.msg=msg;im.bad=!!bad;im.busy=false;scheduleRender();};
+  let d=null;
+  try{d=JSON.parse(await file.text());}catch(e){}
+  if(!d||d.format!=='sinnoh-pta-handbook'||!Array.isArray(d.species)||!d.species.length){say('That is not the handbook data file. Use pta-handbook-data.json from the update download.',true);return;}
+  const groups={};
+  d.species.forEach(s=>{const k=ptaKey(s&&s.n);if(!k)return;const L=ptaLetter(k);(groups[L]||(groups[L]={}))[k]=s;});
+  const letters=Object.keys(groups).sort();
+  im.busy=true;im.done=0;im.total=letters.length+2;im.msg='Importing…';im.bad=false;scheduleRender();
+  try{
+    for(const L of letters){
+      await S.db.collection('meta').doc('pta_'+L).set({v:1,j:JSON.stringify(groups[L])});
+      im.done++;scheduleRender();
+    }
+    await S.db.collection('meta').doc('pta_lists').set({v:1,j:JSON.stringify({moves:d.moves||[],passives:d.passives||[],skills:d.skills||[],megas:d.megas||[]})});
+    im.done++;
+    await S.db.collection('meta').doc('pta_idx').set({v:1,t:Date.now(),j:JSON.stringify(d.species.map(s=>s.n))});
+    im.done++;
+  }catch(e){say('The import stopped ('+((e&&e.code)||'error')+'). Some of it may be saved. Run it again to finish.',true);return;}
+  say('Imported '+d.species.length+' Pokémon, '+(d.moves||[]).length+' moves, '+(d.passives||[]).length+' passives and '+(d.megas||[]).length+' Mega forms.',false);
 }
 
 /* ---------- overview ---------- */
@@ -1192,7 +1523,7 @@ function moveRow(id,m,x,i,ro){
   const p='moves.'+i+'.';
   return h`<div class="move">
     <div class="mv1">
-      ${fText('Move','p',id,p+'name',m,{ro})}
+      ${fText('Move','p',id,p+'name',m,{ro,list:'dl-moves'})}
       ${fText('Uses','p',id,p+'freq',m,{ro,list:'dl-freq'})}
       ${n?h`<span class="pips" role="group" aria-label="Daily uses">${Array.from({length:n},(_,j)=>h`<button class="pip ${j<used?'spent':''}" data-act="pip" ${bp('p',id,'moves.'+i+'.used')} data-j="${j}" aria-label="Use ${j+1}" ${dis(ro)}></button>`)}</span>`:h`<span></span>`}
       ${rowBtns('p',id,'moves',i,(m.moves||[]).length,ro)}
@@ -1242,7 +1573,7 @@ function monBody(uid,m,ro,pos,len){
     ${megaPanel(uid,m,ro)}
     ${fText('Skills','p',id,'skills',m,{ro,ph:'Short list, separated by commas'})}
     <div class="list"><div class="ph"><h2>Passives</h2>${ro||ps.length>=TPL_MAX.passives?'':h`<button class="btn sm" data-act="add" ${bp('p',id,'passives')} data-tpl="passive">Add passive</button>`}<span class="sub">${ps.length} of ${TPL_MAX.passives}</span></div>
-      ${ps.map((x,i)=>h`<div class="item"><div class="irow two">${fText('Passive','p',id,'passives.'+i+'.name',m,{ro})}${rowBtns('p',id,'passives',i,ps.length,ro)}</div>${fArea('Effect','p',id,'passives.'+i+'.text',m,{ro})}</div>`)}</div>
+      ${ps.map((x,i)=>h`<div class="item"><div class="irow two">${fText('Passive','p',id,'passives.'+i+'.name',m,{ro,list:'dl-passives'})}${rowBtns('p',id,'passives',i,ps.length,ro)}</div>${fArea('Effect','p',id,'passives.'+i+'.text',m,{ro})}</div>`)}</div>
     <div class="list"><div class="ph"><h2>Moves</h2>${ro||mv.length>=TPL_MAX.moves?'':h`<button class="btn sm" data-act="add" ${bp('p',id,'moves')} data-tpl="move">Add move</button>`}<span class="sub">${mv.length} of ${TPL_MAX.moves}</span></div>
       ${mv.map((x,i)=>moveRow(id,m,x,i,ro))}</div>
     ${fArea('Notes','p',id,'notes',m,{ro,rows:3})}
@@ -1283,6 +1614,7 @@ function pokemonTab(){
   if(!t)return h`${trainerPicker()}${emptyTrainer()}`;
   const ro=!canEditT(uid);
   const pt=partyOf(uid),bx=boxOf(uid);
+  if(PTA.idx&&!ro)ptaLists();
   return h`${trainerPicker()}
     <section class="panel"><div class="ph"><h2>${tName(t)}’s Pokémon</h2>
       <div class="acts">${ro?'':h`<button class="btn primary sm" data-act="newMon">Add Pokémon</button><button class="btn sm" data-act="heal">Pokémon Center</button><button class="btn sm" data-act="rest">Rest 8h</button><button class="btn sm" data-act="endBattle">End battle</button>`}</div></div>
@@ -1513,6 +1845,7 @@ function gmTab(){
   ${CFG?tableAccess():''}
   ${awardForm()}${awardHistory()}
   ${megaDesk()}
+  ${ptaDesk()}
   <section class="panel"><div class="ph"><h2>Party snapshot</h2></div>
     <p>${top?h`Highest badge count: <b class="mono">${top[1]}</b> (${tName(S.trainers[top[0]])}).`:'No trainers yet.'}</p>
     <p class="sub">Loyalty and NPC secrets are stored where only editors can read them. Players never receive that data.</p></section>
@@ -1934,7 +2267,7 @@ function banners(){
   return '';
 }
 function footer(){
-  return h`<div class="foot"><span>${S.me.id?'Your private notes are visible only to you.':''}</span>${S.dl&&S.me.id?h`<button class="btn sm ghost" data-act="export">Download my backup</button>`:''}${CFG?h`<button class="btn sm ghost" data-act="signOut">Sign out</button>`:''}</div>`;
+  return h`<div class="foot"><span>${S.me.id?'Your private notes are visible only to you.':''}</span>${S.dl&&S.me.id?h`<button class="btn sm ghost" data-act="export">Download my backup</button>`:''}${CFG?h`<button class="btn sm ghost" data-act="signOut">Sign out</button>`:''}<span class="ver">Version ${BUILD}</span></div>`;
 }
 function mainHtml(){
   if(S.noDb)return emptyState('This tracker needs a signed-in view','Open it from your claude.ai link while signed in. The shared table is stored with the page, so it cannot load anywhere else.');
@@ -2343,9 +2676,13 @@ function act(b,e){
     case 'megaGate':megaGate(d.pid,d.v==='1');break;
     case 'autofill':{
       if(!canEditT(d.uid))break;
-      applySpecies(d.uid,d.pid,true);
-      syncMega(d.uid,d.pid);
-      render();break;}
+      fillClick(d.uid,d.pid);
+      break;}
+    case 'ptaPick':{
+      if(!S.me.admin)break;
+      const fp=$('#ptafile');
+      if(fp)fp.click();
+      break;}
     case 'newDoc':addEntry(d.kind);break;
     case 'delDoc':{
       const key=d.sc+'|'+d.id;
@@ -2406,7 +2743,7 @@ document.addEventListener('input',e=>{
   const t=e.target;
   if(!t||!t.dataset)return;
   if(t.dataset.pq!=null){S.ui.q.places=t.value;refreshPlaceList();return;}
-  if(t.dataset.b!=null){onBound(t);return;}
+  if(t.dataset.b!=null){onBound(t);if(e.inputType==='insertReplacementText')onSpeciesChange(t);return;}
   if(t.dataset.u!=null){
     const k=t.dataset.u.split('.');
     S.ui[k[0]][k[1]]=t.value;
@@ -2423,6 +2760,12 @@ document.addEventListener('click',e=>{
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t&&t.dataset&&t.dataset.b&&onSpeciesChange(t))return;
+  if(t&&t.id==='ptafile'){
+    const f=t.files&&t.files[0];
+    try{t.value='';}catch(err){}
+    if(f&&S.me.admin)ptaImport(f);
+    return;
+  }
   if(!t||t.id!=='filepick')return;
   const f=t.files&&t.files[0];
   const pk=S.pick;
@@ -2442,6 +2785,10 @@ document.addEventListener('change',async e=>{
     if(err&&err.code)fail(err);
     else toast(err&&err.message==='too big'?'That picture is too large even after shrinking. Try another one.':'Could not read that picture');
   }
+});
+document.addEventListener('focusout',e=>{
+  const t=e.target;
+  if(t&&t.dataset&&t.dataset.b)onSpeciesChange(t);
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&tipId)hideTip(true);

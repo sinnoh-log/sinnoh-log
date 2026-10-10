@@ -329,6 +329,12 @@ progress.hp.bad::-moz-progress-bar{background:var(--bad)}
 .stat .sm{flex-wrap:wrap;gap:2px 8px}
 .stat .sm .mbn{white-space:nowrap;font:800 11px var(--f-body);padding:0 6px;border-radius:6px;background:var(--mega-lin);color:var(--mega-ink)}
 .fillrow{font-size:13px}
+progress.ptaprog{appearance:none;-webkit-appearance:none;width:100%;height:10px;border:2px solid var(--lcd-edge);border-radius:8px;background:var(--lcd-inset);overflow:hidden;margin:8px 0}
+progress.ptaprog::-webkit-progress-bar{background:var(--lcd-inset)}
+progress.ptaprog::-webkit-progress-value{background:var(--good);transition:width .25s ease}
+progress.ptaprog::-moz-progress-bar{background:var(--good)}
+.sub.bad{color:var(--bad)}
+.foot .ver{margin-left:auto}
 .mgd{margin-top:10px;padding:10px 12px;border:2px solid var(--line-soft);border-radius:12px;background:var(--panel)}
 .mgn{display:flex;gap:8px;align-items:center;min-width:0}
 .mgn .mi,.mgn .mi-ph{width:40px;height:40px;flex:none}
@@ -509,9 +515,12 @@ input[type=search]{appearance:none}
   </div>
 </div>
 <input type="file" id="filepick" class="sr" accept="image/*" tabindex="-1" aria-hidden="true">
+<input type="file" id="ptafile" class="sr" accept=".json,application/json" tabindex="-1" aria-hidden="true">
 <a id="ptip" class="ptip" href="#place" data-act="place" hidden></a>
 <div id="rollbox" class="rollbox lcd" hidden aria-live="polite"></div>
 <datalist id="dl-species"></datalist>
+<datalist id="dl-moves"></datalist>
+<datalist id="dl-passives"></datalist>
 <datalist id="dl-items"></datalist>
 <datalist id="dl-places"></datalist>
 <datalist id="dl-freq"><option value="At-Will"><option value="3/day"><option value="1/day"></datalist>
@@ -523,5 +532,5 @@ input[type=search]{appearance:none}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=2026-10-09-Handbook-data"></script>
 </body></html>

@@ -97,10 +97,11 @@ In this folder run `python3 -m http.server 8000` and open <http://localhost:8000
 When you get a new version of these files:
 
 1. In your GitHub repository, choose **Add file → Upload files** and drag in the new files over the old ones (including the `vendor` folder if it is included; this release adds `vendor/fonts`). **Do not** replace your own `firebase-config.js` unless you re-enter your settings in the new one.
-2. If `firestore.rules` changed, open Firebase console → **Firestore → Rules**, paste in the new contents, and click **Publish**. Do this before players use the new version. The rules have not changed since the delete-your-own-trainer update, so if you already published those there is nothing to do for Mega Evolution: your approvals are stored in a document the existing rules already limit to you.
-3. GitHub Pages takes a minute or two to update. Each person should refresh the page once (hold Shift while clicking reload if they still see the old version).
+2. If `firestore.rules` changed, open Firebase console → **Firestore → Rules**, paste in the new contents, and click **Publish**. Do this before players use the new version. The rules have not changed since the delete-your-own-trainer update, so if you already published those there is nothing to do for Mega Evolution or the handbook data: both are stored in documents the existing rules already limit to you.
+3. GitHub Pages takes a minute or two to update (check the repository's **Actions** tab for a green tick). Each person should refresh the page once, holding Shift while clicking reload.
+4. **Check that the new version is running.** The very bottom of every page says **Version** followed by a date and a name (this release: `Version 2026-10-09 · Handbook data`). If it is missing or shows something older, the browser is still using the old files. Reload with Shift held, or open the site in a private window. If a private window is also old, the upload did not replace the files: check that `app.js` and `index.html` are in the top level of the repository (not in a sub-folder) and that you pressed **Commit changes**.
 
-Nothing in your database changes when you update the files.
+Nothing in your database changes when you update the files. The handbook data is a separate one-time step (see **Handbook data** below).
 
 ## How it looks
 
@@ -111,9 +112,27 @@ Nothing in your database changes when you update the files.
 - **Day and Night.** Use the sun or moon button at the top, or **Account → Appearance**. Auto follows the device. The choice is remembered on that device only.
 - **Fonts** (Pixelify Sans, Nunito and VT323) are included in `vendor/fonts`, so the site does not call Google Fonts. They are free to use under the SIL Open Font License; the licence files are in the same folder.
 
+## Handbook data: stats, passives and moves
+
+Once you import the PTA 3 Pokédex data, typing a species fills in everything the book lists for it, and typing a move or passive name fills in that row.
+
+**Import it once.** The data is in `pta-handbook-data.json`, which came with the update as a separate download. **Do not upload that file to GitHub.** The book's text would then be public. Instead: sign in as the GM, open **GM Desk → Handbook data**, tap **Import handbook data** and choose the file. It takes a few seconds and stores the data in your Firebase database, where only signed-in members of your table can read it. The panel then shows how many Pokémon are in the database. Importing again simply replaces it, so you can use that if you ever get a corrected file. Nobody else needs to do anything.
+
+**What a species fills in.** Type a species (including the book's own variants, such as "Zigzagoon (Urban)" or "Raichu (Island)", which now appear in the suggestion list) and move on. Types, the book's real stats (HP, Attack, Defense, Special Attack, Special Defense, Speed), size, weight, skills, passives with their full text, and the three moves with kind, type, range, uses, damage and effect are all filled in. These are the book's numbers, not the ÷15 conversion used before. Things to know:
+
+- A field you changed after the last fill is **kept** when the species changes (change a passive, and the passives stay; the moves you did not touch still follow the new species). A short note says what was kept.
+- The **Fill from the handbook** button under the species box puts everything back on purpose. If it would replace passives or moves you wrote, it asks you to tap a second time.
+- Passives the book only names (it defines each one in the first Pokémon that has it) are filled in from that first definition.
+- Species the book does not list, such as regional forms ("Alolan Vulpix"), still get the basic types and base stats described below.
+- A Pokémon can now hold up to 8 passives, since some entries have five or more.
+
+**Moves and passives by name.** In a move row, type a move's name (the list of suggestions has all 527 in the book) and, if the row's **Effect** and **Damage** are still empty, its kind, type, range, uses, damage and effect fill in. In a passive row, typing a passive's name fills in its effect. A row with text you wrote is never overwritten.
+
+**Mega Evolution numbers.** For the 43 Mega forms in the Players Handbook 2, the Mega panel uses the book's stat bonuses and Mega passive instead of an approximation. Mega details that were filled in automatically update by themselves the next time the owner opens the app after the import. Ones a player edited by hand are left alone.
+
 ## Species auto-fill and Mega Evolution
 
-**Auto-fill.** Type a species in a Pokémon's **Species** box and move on. The app fills in its types and base stats, and adds its Mega details if it has a Mega form. Regional forms work too (try "Hisuian Zorua" or "Alolan Vulpix"). Base stats are the games' base stat divided by 15, rounded, never below 1 (Bulbasaur's 49/49/65/65/45 becomes 3/3/4/4/3). That scale is a starting point, so change any number you like. Anything a player has already changed is kept when the species changes. The **Fill types and base stats** button under the fields overwrites them on purpose.
+**Auto-fill.** Without the handbook data (or for a species it does not list), type a species in a Pokémon's **Species** box and move on. The app fills in its types and base stats, and adds its Mega details if it has a Mega form. Regional forms work too (try "Hisuian Zorua" or "Alolan Vulpix"). Base stats are the games' base stat divided by 15, rounded, never below 1 (Bulbasaur's 49/49/65/65/45 becomes 3/3/4/4/3). That scale is a starting point, so change any number you like. Anything a player has already changed is kept when the species changes. The **Fill types and base stats** button under the fields overwrites them on purpose.
 
 **Mega Evolution.** Every Pokémon with a Mega form gets a **Mega Evolution** panel on its card. It lists what the form needs, and each line turns green when met:
 
