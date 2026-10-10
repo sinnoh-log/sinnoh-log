@@ -21,6 +21,7 @@ A shared campaign tracker for your table. Everyone creates an account, signs in,
 | Battle page: turn order, health, stages, status | see the order and what the GM reveals; change their own Pokémon | run the whole battle, change anyone's |
 | Dice rolls and the table's roll log | roll for their own Pokémon and trainer; everyone sees the log | roll for foes, apply damage, clear the log |
 | Giving a Pokémon to a trainer | no | yes (GM Desk, or from a foe in a battle) |
+| Pokédex: seen and caught marks | their own (while the Pokédex is not locked) | anyone's, and the lock |
 | Private notes | only they can read them | only they can read theirs |
 | Table code and player list | no access | change code, remove players |
 
@@ -100,9 +101,9 @@ In this folder run `python3 -m http.server 8000` and open <http://localhost:8000
 When you get a new version of these files:
 
 1. In your GitHub repository, choose **Add file → Upload files** and drag in the new files over the old ones (including the `vendor` folder if it is included; this release adds `vendor/fonts`). **Do not** replace your own `firebase-config.js` unless you re-enter your settings in the new one.
-2. If `firestore.rules` changed, open Firebase console → **Firestore → Rules**, paste in the new contents, and click **Publish**. Do this before players use the new version. The rules have not changed since the delete-your-own-trainer update, so if you already published those there is nothing to do for Mega Evolution, the handbook data, evolution, or the Battle page: they are all stored in documents the existing rules already cover (the secret foe sheets go in `gm/battle`, which only you can read).
+2. If `firestore.rules` changed, open Firebase console → **Firestore → Rules**, paste in the new contents, and click **Publish**. Do this before players use the new version. The rules have not changed since the delete-your-own-trainer update, so if you already published those there is nothing to do for Mega Evolution, the handbook data, evolution, the Battle page, the combat reference or the Pokédex: they are all stored in documents the existing rules already cover (the secret foe sheets go in `gm/battle`, which only you can read; a player's Seen and Caught marks go on their own trainer sheet; the Pokédex lock goes in `meta/mega`, which only you can write).
 3. GitHub Pages takes a minute or two to update (check the repository's **Actions** tab for a green tick). Each person should refresh the page once, holding Shift while clicking reload.
-4. **Check that the new version is running.** The very bottom of every page says **Version** followed by a date and a name (this release: `Version 2026-10-10 · Battle`). If it is missing or shows something older, the browser is still using the old files. Reload with Shift held, or open the site in a private window. If a private window is also old, the upload did not replace the files: check that `app.js` and `index.html` are in the top level of the repository (not in a sub-folder) and that you pressed **Commit changes**.
+4. **Check that the new version is running.** The very bottom of every page says **Version** followed by a date and a name (this release: `Version 2026-10-10 · Pokédex`). If it is missing or shows something older, the browser is still using the old files. Reload with Shift held, or open the site in a private window. If a private window is also old, the upload did not replace the files: check that `app.js` and `index.html` are in the top level of the repository (not in a sub-folder) and that you pressed **Commit changes**.
 
 Nothing in your database changes when you update the files. The handbook data is a separate step (see **Handbook data** below). The handbook data is version 2 (`pta-handbook-data.json`): it adds evolution lines and five species the first file missed (Bisharp, Heliolisk, Amoonguss, Stantler and Azumarill). **If you have already imported that file, this release needs no new import.** If you have not, import it once (**GM Desk → Handbook data → Import again**). Until then everything else keeps working, but Pokémon show no Evolution panel, foes and gifts fall back to basic numbers, and the GM Desk says a re-import is needed.
 
@@ -210,6 +211,40 @@ A foe has its own sheet (species, types, HP, stats, moves, passives, your notes)
 
 **Caught.** On a foe's sheet, pick a trainer under **Caught by** and tap **Give to trainer**: its sheet and current HP are copied into that trainer's party (or box if the party is full) and it leaves the fight.
 
+## Combat reference
+
+At the bottom of the **Battle** page is a **Combat reference** with five folding sections: **Afflictions**, **Stat ▲ and ▼**, **Weather, terrain and zones**, **Type matchups** and **Rolls at a glance**. It is a short reminder in plain words, condensed from the PTA 3.5 Players Handbook (the handbook has the full rules). Everyone sees it.
+
+- **Statuses explain themselves.** When a Pokémon or foe on the Battle page has an affliction ticked, a small note under the status buttons says what it does (the damage, the cure check, who is immune).
+- **Type matchups** has a three-box helper: pick the attacking type and one or two defending types and it says how the move lands and how many dice that adds or removes, then lists every attacking type under Extremely effective, Super effective, Resisted, Shielded and No effect. It uses the same chart as the rolls.
+- Nothing here is saved or shared. It is just a page to look things up.
+
+## Pokédex
+
+**Table → Pokédex** is a book of every species (1025), with a search and filters, and a page for each one.
+
+**The list.** Search by name or number (`pika`, `25`, `#393`; punctuation does not matter). Filter by **Region** (National, or **Sinnoh**, the 210-species Platinum order with its own numbers), **Generation**, **Type**, and **Show** (everything, seen or caught, caught, not caught yet). The list shows 60 at a time with **Show more**.
+
+**An entry** has, from top to bottom:
+
+- The picture, number, types, and the **Seen / Caught** buttons.
+- **Game entry.** The in-game description (the Platinum text where there is one, otherwise the newest) and the genus, such as "Mouse Pokémon". This is read live from PokeAPI's public data on GitHub when you open the entry. It is **not stored** and **needs an internet connection**. If it cannot load, the entry says so and offers **Retry**.
+- **Handbook.** The PTA entry: size, weight, HP and stats, skills, passives, moves, and what it evolves into with the stone or condition. This comes from the handbook data you imported (see **Handbook data** above), so it is the same text as in your sheets. A species with several entries (Raichu and its Island form, Meowth's climates, Wormadam's cloaks) shows each. A species the handbook does not list (most legendaries) says so and shows the game stats divided by 15 instead. If you have not imported the handbook yet, that is shown for everything.
+- **Evolution family.** The whole line as a tree. Tap any member to open it. This is the games' evolution line, which can differ from the handbook's wording.
+- **Other forms:** regional forms and Mega Evolutions, when there are any.
+- **← →** step to the previous or next entry in whatever list you were looking at.
+
+**Seen and caught.** Marks are kept per trainer, on the trainer sheet. A Pokémon in your party or box counts as **caught** automatically, and a foe the GM has shown you in battle (its picture is visible) counts as **seen**. Two buttons appear when they would help: **Record … owned species as caught** (saves your current Pokémon as caught, so they stay caught if you release them) and **Set “Pokédex owned” … ** (copies the caught count onto the Trainer sheet's *Pokédex owned* box, which drives the certificate every 30). Neither runs by itself.
+
+**For the GM.**
+
+- Use the trainer buttons at the top to view and mark any trainer's book.
+- **Mark seen for every trainer** (on an entry) is for "the whole party saw a Gible".
+- **Lock the Pokédex for players** turns the book into a discovery game. A species the trainer has not met shows as **???**: no name, no picture, no handbook text, and it cannot be found by typing its name (a number still finds the empty slot). A **seen** species shows its name, picture, types and family. A **caught** species shows everything, except that what it evolves into stays **???** until you have met that one too. While it is locked, players cannot change their own marks: the book fills in from their Pokémon and from battles, and you can mark anything by hand. You always see everything.
+- The lock is a **spoiler guard, not security**. It hides things in the page, and a determined player could still look the species up elsewhere. The handbook data itself is readable by every member either way, as before.
+
+**Where it comes from.** Names, types and base stats of all 1025 species, the evolution lines and the Sinnoh order are built into `app.js` (taken from the open-source `@pkmn/dex` data and PokeAPI's Pokédex lists). Pictures come from the PokeAPI sprites repository on GitHub, the same place the Pokémon sprites already come from. Nothing about the Pokédex needs a new import or a new database rule.
+
 ## Dice and the roll log
 
 **Rolling a move.** Every move on a Pokémon card has a **Roll …** button (players do not get it on another player's Pokémon, which they can only read). It opens a small form:
@@ -251,6 +286,7 @@ A foe has its own sheet (species, types, HP, stats, moves, passives, your notes)
 - **The repository contains** the app and the player-facing text for each place on the map. Nothing secret lives in it: no GM notes, no NPC secrets, no passwords, no map image. Those are in Firebase, and the rules keep players out of the GM-only parts.
 - **Cost.** The Spark plan has daily limits (about 50,000 reads and 20,000 writes). They reset around midnight Pacific time. A table of a handful of players should stay far below them. If a limit is ever hit, the app stops loading data until the next day. Nothing is charged on the Spark plan.
 - **What the Battle page keeps secret, and what it does not.** Foe sheets are protected by the database itself (`gm/battle`), so players cannot read them even if they try. The roll log and the Mega and evolution approvals are different: they are stored where a determined player editing their own sheet could tamper with them, so they rely on trust at the table, as the Mega approvals already did.
+- **The Pokédex needs the internet for one thing:** the in-game description in each entry is read from PokeAPI on GitHub when you open it. Everything else in it works from the page and your database. The lock hides things in the page; it is not a security feature.
 - **Backups.** Every player has **Download my backup**. As GM, your backup contains the whole table. Do one now and then.
 - **Removing someone.** **GM Desk → Table access → Remove** ends their access. Anyone who still knows the table code can join again, so change the code too if you want to keep someone out.
 - **Forgotten passwords.** Players use **Forgot your password?** on the sign-in screen. The email comes from Firebase.

@@ -579,6 +579,82 @@ input[type=search]{appearance:none}
 .rlog .rv{display:block;margin-top:2px;font:800 15px var(--f-body)}
 .rlog .rd{display:block;margin-top:1px;font-size:12.5px}
 @media (max-width:620px){.bmain{grid-template-columns:auto auto minmax(0,1fr) auto}.bhp{grid-column:1/-1;order:5}}
+/* combat reference */
+.refp .refsec{border-top:1px solid var(--line-soft)}
+.refp .refsec:first-of-type{border-top:0}
+.refh{appearance:none;display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;background:none;border:0;padding:10px 2px;font:800 15px var(--f-body);color:var(--ink);cursor:pointer;text-align:left;min-height:44px}
+.refh:hover{color:var(--accent)}
+.refh:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:8px}
+.refx{font:700 20px/1 var(--f-pix);color:var(--accent);width:24px;text-align:center}
+.refb{display:flex;flex-direction:column;gap:8px;padding:2px 2px 12px;min-width:0}
+.refdl{display:grid;grid-template-columns:minmax(0,1fr);gap:2px 0;margin:0}
+.refdl dt{font:800 14px var(--f-body);margin-top:8px}
+.refdl dd{margin:0;font-size:13.5px;line-height:1.45;color:var(--ink);overflow-wrap:anywhere}
+@media (min-width:760px){.refdl{grid-template-columns:max-content minmax(0,1fr);gap:8px 14px}.refdl dt{margin-top:0;text-align:right}}
+.reful{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:13.5px;line-height:1.45}
+.refg{font:800 13px var(--f-body);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:6px 0 0}
+.refmx{align-items:end}
+.refres{margin:0;font-size:14px;line-height:1.6}
+.refgrps{display:flex;flex-direction:column;gap:8px}
+.refgrp{display:flex;flex-direction:column;gap:4px}
+.affnotes{list-style:none;margin:2px 0 4px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:10px;font-size:12.5px;line-height:1.45}
+.affnotes b{font-weight:800}
+
+/* Pokédex */
+.dxprog{position:relative;height:10px;border-radius:999px;background:var(--panel);border:1px solid var(--line);overflow:hidden}
+.dxprog i{position:absolute;left:0;top:0;bottom:0;display:block}
+.dxprog i.s{background:var(--accent-soft)}
+.dxprog i.c{background:var(--good)}
+.dxf{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))}
+.dxf .dxq{grid-column:1/-1}
+@media (min-width:760px){.dxf .dxq{grid-column:span 2}}
+.dxgrid{list-style:none;margin:0;padding:0;display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(min(100%,138px),1fr))}
+.dxgrid li{display:flex;min-width:0}
+.dxc{appearance:none;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;padding:8px 6px 10px;background:var(--raised);border:2px solid var(--line);border-radius:12px;color:var(--ink);font:inherit;cursor:pointer;text-align:center;min-width:0}
+.dxc:hover{border-color:var(--accent)}
+.dxc:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.dxc.seen{border-color:var(--accent)}
+.dxc.got{border-color:var(--good)}
+.dxc .dxno{font:800 11.5px var(--f-body);color:var(--muted);align-self:flex-start}
+.dxc .dxnm{font:800 14px/1.2 var(--f-body);overflow-wrap:anywhere}
+.dxc .types{display:flex;flex-wrap:wrap;gap:3px;justify-content:center}
+.dxc .ty{font-size:10.5px;padding:3px 6px 2px}
+.dxc .dxim{width:64px;height:64px;image-rendering:pixelated}
+.dxc .sp-ini{color:var(--muted);text-shadow:none;font-size:28px}
+.dxph{display:block;width:64px;height:64px;border-radius:50%;background:var(--panel);border:2px dashed var(--line)}
+.dxc.unk .dxnm{color:var(--muted)}
+.dxhead{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.dxartw{display:flex;align-items:center;justify-content:center;width:160px;height:160px;flex:0 0 auto;border-radius:16px;background:var(--panel);border:2px solid var(--line)}
+.dxart{width:160px;height:160px;object-fit:contain;image-rendering:auto}
+.dxartw .sp-ini{color:var(--muted);text-shadow:none;font-size:56px}
+.dxinfo{display:flex;flex-direction:column;gap:6px;flex:1 1 220px;min-width:0;align-items:flex-start}
+.dxinfo .types{display:flex;flex-wrap:wrap;gap:5px}
+.dxno{font:800 12.5px var(--f-body);color:var(--muted);margin:0}
+.dxname{font:600 26px/1.15 var(--f-pix);margin:0}
+.dxmk{align-items:center}
+.dxquote{margin:0;padding:10px 14px;border-left:4px solid var(--accent);background:var(--panel);border-radius:0 10px 10px 0;font-size:15px;line-height:1.5}
+.dxrec{display:flex;flex-direction:column;gap:8px}
+.dxrec+.dxrec{border-top:1px solid var(--line-soft);padding-top:12px;margin-top:4px}
+.dxst{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:6px}
+.dxs{display:flex;flex-direction:column;align-items:center;padding:6px 4px;border:2px solid var(--line);border-radius:10px;background:var(--panel)}
+.dxs span{font:800 11.5px var(--f-body);color:var(--muted)}
+.dxs b{font:700 22px/1.1 var(--f-num)}
+.dxs small{font-size:11.5px;color:var(--muted)}
+.dxmvs,.dxevs,.dxforms{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.dxmvs li{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);display:flex;flex-direction:column;gap:3px}
+.dxmvs p,.dxevs p{margin:0}
+.dxevs li{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.dxforms li{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.dxch{appearance:none;display:inline-flex;align-items:center;gap:4px;padding:2px 10px 2px 4px;background:var(--raised);border:2px solid var(--line);border-radius:999px;color:var(--ink);font:800 13px var(--f-body);cursor:pointer;min-height:36px}
+.dxch:hover{border-color:var(--accent)}
+.dxch:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.dxch.cur{border-color:var(--accent);background:var(--accent-soft)}
+.dxch .mi{width:32px;height:32px;image-rendering:pixelated}
+.dxch .mi-ph{display:inline-block;width:32px;height:32px}
+.dxtree,.dxtree ul{list-style:none;margin:0;padding:0}
+.dxtree ul{margin-left:16px;padding-left:12px;border-left:2px solid var(--line)}
+.dxtree li{margin-top:6px}
+@media (max-width:520px){.dxhead{flex-direction:column;align-items:flex-start}.dxartw{width:100%;max-width:200px;height:200px}.dxart{width:100%;height:100%}.dxgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 <script>try{var __t=localStorage.getItem('stl.theme');if(__t==='light'||__t==='dark')document.documentElement.setAttribute('data-theme',__t);}catch(e){}</script>
 <div class="shell" id="shell">
@@ -607,5 +683,5 @@ input[type=search]{appearance:none}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-10-10-Battle"></script>
+<script src="app.js?v=2026-10-10-Pok-dex"></script>
 </body></html>
