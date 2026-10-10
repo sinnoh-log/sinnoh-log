@@ -17,10 +17,12 @@ A shared campaign tracker for your table. Everyone creates an account, signs in,
 | Journal, timeline, map pins | add, and edit or delete their own | edit or delete anything |
 | Region map, place pages, banner, table settings | read | edit |
 | Honors and awards | see | give and revoke |
-| Loyalty scores, NPC secrets, GM place notes, foe sheets | never sent to players | read and edit |
+| Loyalty scores, NPC secrets, GM place notes, foe sheets, NPC trainers' rosters and secrets | never sent to players | read and edit |
 | Battle page: turn order, health, stages, status | see the order and what the GM reveals; change their own Pokémon | run the whole battle, change anyone's |
 | Dice rolls and the table's roll log | roll for their own Pokémon and trainer; everyone sees the log | roll for foes, apply damage, clear the log |
 | Giving a Pokémon to a trainer | no | yes (GM Desk, or from a foe in a battle) |
+| NPC trainers: making them, their Pokémon, putting them in a battle | no | yes (NPC Trainers page) |
+| Seeing an NPC trainer | only after the GM shows it, and only what the GM ticked | everything |
 | Pokédex: seen and caught marks | their own (while the Pokédex is not locked) | anyone's, and the lock |
 | Private notes | only they can read them | only they can read theirs |
 | Table code and player list | no access | change code, remove players |
@@ -101,9 +103,9 @@ In this folder run `python3 -m http.server 8000` and open <http://localhost:8000
 When you get a new version of these files:
 
 1. In your GitHub repository, choose **Add file → Upload files** and drag in the new files over the old ones (including the `vendor` folder if it is included; this release adds `vendor/fonts`). **Do not** replace your own `firebase-config.js` unless you re-enter your settings in the new one.
-2. If `firestore.rules` changed, open Firebase console → **Firestore → Rules**, paste in the new contents, and click **Publish**. Do this before players use the new version. The rules have not changed since the delete-your-own-trainer update, so if you already published those there is nothing to do for Mega Evolution, the handbook data, evolution, the Battle page, the combat reference or the Pokédex: they are all stored in documents the existing rules already cover (the secret foe sheets go in `gm/battle`, which only you can read; a player's Seen and Caught marks go on their own trainer sheet; the Pokédex lock goes in `meta/mega`, which only you can write).
+2. If `firestore.rules` changed, open Firebase console → **Firestore → Rules**, paste in the new contents, and click **Publish**. Do this before players use the new version. The rules have not changed since the delete-your-own-trainer update, so if you already published those there is nothing to do for Mega Evolution, the handbook data, evolution, the Battle page, the combat reference, the Pokédex or NPC trainers: they are all stored in documents the existing rules already cover (the secret foe sheets go in `gm/battle` and each NPC trainer in `gm/nt_…`, which only you can read; what the table is shown of an NPC goes in `meta/npcs`, which only you can write; a player's Seen and Caught marks go on their own trainer sheet; the Pokédex lock goes in `meta/mega`, which only you can write).
 3. GitHub Pages takes a minute or two to update (check the repository's **Actions** tab for a green tick). Each person should refresh the page once, holding Shift while clicking reload.
-4. **Check that the new version is running.** The very bottom of every page says **Version** followed by a date and a name (this release: `Version 2026-10-10 · Pokédex`). If it is missing or shows something older, the browser is still using the old files. Reload with Shift held, or open the site in a private window. If a private window is also old, the upload did not replace the files: check that `app.js` and `index.html` are in the top level of the repository (not in a sub-folder) and that you pressed **Commit changes**.
+4. **Check that the new version is running.** The very bottom of every page says **Version** followed by a date and a name (this release: `Version 2026-10-10 · NPC trainers`). If it is missing or shows something older, the browser is still using the old files. Reload with Shift held, or open the site in a private window. If a private window is also old, the upload did not replace the files: check that `app.js` and `index.html` are in the top level of the repository (not in a sub-folder) and that you pressed **Commit changes**.
 
 Nothing in your database changes when you update the files. The handbook data is a separate step (see **Handbook data** below). The handbook data is version 2 (`pta-handbook-data.json`): it adds evolution lines and five species the first file missed (Bisharp, Heliolisk, Amoonguss, Stantler and Azumarill). **If you have already imported that file, this release needs no new import.** If you have not, import it once (**GM Desk → Handbook data → Import again**). Until then everything else keeps working, but Pokémon show no Evolution panel, foes and gifts fall back to basic numbers, and the GM Desk says a re-import is needed.
 
@@ -211,6 +213,28 @@ A foe has its own sheet (species, types, HP, stats, moves, passives, your notes)
 
 **Caught.** On a foe's sheet, pick a trainer under **Caught by** and tap **Give to trainer**: its sheet and current HP are copied into that trainer's party (or box if the party is full) and it leaves the fight.
 
+## NPC trainers
+
+**Game Master → NPC Trainers** is where you make the people your table meets who have Pokémon of their own: a rival, a gym leader, a stranger on a route. Nothing you put there reaches the players until you decide to show it.
+
+**Making one.** Tap **New NPC trainer** and fill in the name, role or title, where you met, **notes the table learns once you show them**, and a **secret** that only you ever see. Then use **Give this NPC a Pokémon**: type a species (and a name if you like) and tap **Add Pokémon**. Its types, stats, passives and moves fill in from the handbook data, like a foe. Tap **Edit** on a Pokémon to change anything: HP, stats (Base and Adj), moves (typing a move's name into an empty row fills in the rest), passives and your notes about it. **Fill from the handbook** (two taps) puts the handbook numbers back. **Remove Pokémon** and **Delete this NPC** also take two taps.
+
+**Where it is kept.** Each NPC is one document, `gm/nt_…`, that Firestore's rules let only you read. A player's browser never receives it, so the secret, the notes and every sheet are not hidden "behind" the page: they are simply not there. What the table may see is a separate, small document, `meta/npcs`, that holds only the NPCs you have shown and, for each one, only what you ticked.
+
+**Showing an NPC.** In **GM only · what the players see**, tick **Show this NPC to the table**. That alone shows just the name. Then tick any of **Role**, **Where you met** and **Your notes** to add those. The line below spells out what the players see right now. Players find them on the **People** page, under **Trainers you have met** (you see the same panel there, marked as what the players see). Untick **Show this NPC** and she disappears from their screens again; what you ticked is remembered for next time.
+
+**Showing a Pokémon.** Every Pokémon starts fully hidden. On its sheet, tick **Name**, **Picture** and **Types** to show those on the NPC's card (**Show all** and **Hide all** do the lot). With the name hidden the card says "Unknown Pokémon" and the picture does not give the name away; the moves, stats, passives and your notes are never shown. A Pokémon only appears on the card once the NPC herself is shown. A Pokémon with its picture shown on a card counts as **seen** in the Pokédex.
+
+**In a battle.** On the NPC's page, **Add to battle** puts one Pokémon in and **Add the whole team to the battle** puts them all in. (The Battle page has the same buttons under **Who is fighting → NPC trainers**.) They join as **foes**, with the full sheet in `gm/battle`, so everything in **Foes the players cannot see** applies: they start as "Foe A", "Foe B" with no picture, types or health, and you show what you like. A foe remembers whose it is: you see "Foe · Cynthia" on its row and "Belongs to Cynthia" on its sheet. The players see her name on it only once you have shown her.
+
+**Good to know.**
+
+- A foe is a **copy**. Damage, status and moves used in the battle change the foe, not the roster, so the NPC's Pokémon are back at full strength the next time. What you had ticked to show on the roster is copied into the battle when you add the Pokémon (after that the battle's own controls rule).
+- Deleting an NPC, or removing a Pokémon, does not touch foes already in a battle: they stay, without the link and without her name.
+- NPC against NPC is not set up: foes are always the GM's side.
+- **Give to trainer** on a foe's sheet works for an NPC's Pokémon too, if a player ends up with one.
+- **Download my backup** includes your NPC trainers and what is shown, when you are the GM.
+
 ## Combat reference
 
 At the bottom of the **Battle** page is a **Combat reference** with five folding sections: **Afflictions**, **Stat ▲ and ▼**, **Weather, terrain and zones**, **Type matchups** and **Rolls at a glance**. It is a short reminder in plain words, condensed from the PTA 3.5 Players Handbook (the handbook has the full rules). Everyone sees it.
@@ -285,7 +309,7 @@ At the bottom of the **Battle** page is a **Combat reference** with five folding
 
 - **The repository contains** the app and the player-facing text for each place on the map. Nothing secret lives in it: no GM notes, no NPC secrets, no passwords, no map image. Those are in Firebase, and the rules keep players out of the GM-only parts.
 - **Cost.** The Spark plan has daily limits (about 50,000 reads and 20,000 writes). They reset around midnight Pacific time. A table of a handful of players should stay far below them. If a limit is ever hit, the app stops loading data until the next day. Nothing is charged on the Spark plan.
-- **What the Battle page keeps secret, and what it does not.** Foe sheets are protected by the database itself (`gm/battle`), so players cannot read them even if they try. The roll log and the Mega and evolution approvals are different: they are stored where a determined player editing their own sheet could tamper with them, so they rely on trust at the table, as the Mega approvals already did.
+- **What the Battle page keeps secret, and what it does not.** Foe sheets and NPC trainers are protected by the database itself (`gm/battle`, `gm/nt_…`), so players cannot read them even if they try. The roll log and the Mega and evolution approvals are different: they are stored where a determined player editing their own sheet could tamper with them, so they rely on trust at the table, as the Mega approvals already did.
 - **The Pokédex needs the internet for one thing:** the in-game description in each entry is read from PokeAPI on GitHub when you open it. Everything else in it works from the page and your database. The lock hides things in the page; it is not a security feature.
 - **Backups.** Every player has **Download my backup**. As GM, your backup contains the whole table. Do one now and then.
 - **Removing someone.** **GM Desk → Table access → Remove** ends their access. Anyone who still knows the table code can join again, so change the code too if you want to keep someone out.

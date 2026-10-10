@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-10 · Pokédex';
+const BUILD='2026-10-10 · NPC trainers';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -41,8 +41,8 @@ const NAV=[
   ['World',[['people','People'],['leads','Leads'],['map','Map']]],
   ['Table',[['trainer','Trainer'],['pokemon','Pokémon'],['dex','Pokédex'],['battle','Battle']]]
 ];
-const GM_NAV=['Game Master',[['gm','GM Desk']]];
-const PAGE_LABEL={overview:'Overview',journal:'Journal',timeline:'Timeline',people:'People',leads:'Leads',map:'Map',place:'Place',trainer:'Trainer sheet',pokemon:'Pokémon',dex:'Pokédex',battle:'Battle',gm:'GM Desk',account:'Account'};
+const GM_NAV=['Game Master',[['gm','GM Desk'],['npc','NPC Trainers']]];
+const PAGE_LABEL={overview:'Overview',journal:'Journal',timeline:'Timeline',people:'People',leads:'Leads',map:'Map',place:'Place',trainer:'Trainer sheet',pokemon:'Pokémon',dex:'Pokédex',battle:'Battle',gm:'GM Desk',npc:'NPC Trainers',account:'Account'};
 const PIN_KINDS=[['place','Place'],['party','Party'],['danger','Danger'],['lead','Lead']];
 const AWARD_TYPES=['Gym Badge','Trial Medal','Frontier Symbol','Contest Ribbon','Certificate','Emblem of Recognition','Loyal Partner','Moment of Destiny','Other'];
 
@@ -88,7 +88,7 @@ const S={
   ready:false,noDb:false,db:null,user:null,dl:null,
   me:{id:null,admin:false,canWrite:true},
   tab:'overview',viewUid:null,
-  megaOk:{},battle:{},battleGm:{},trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},
+  megaOk:{},battle:{},battleGm:{},trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},gmNt:{},npcPub:{},
   awards:{},timeline:{},pins:{},banner:{},places:{},gmPl:{},placeId:null,members:{},invite:null,mapChunks:{},mapSrc:'',room:null,peers:[],avatars:{},
   pick:null,names:{},save:{cls:'',text:'Saved'},rolls:[],_tsig:'',
   ui:{open:{},adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},pop:null,megaPop:null,
@@ -150,7 +150,7 @@ const PD_BY={};PD.forEach(f=>{PD_BY[f.id]=f;});
 const PLACES=PD.map(f=>f.name).sort();
 
 /* ---------- store: refs, local copies, write queue ---------- */
-const SET_ALWAYS=new Set(['meta','gl','gn','bn','pl','gp','mg','bt','gb']);
+const SET_ALWAYS=new Set(['meta','gl','gn','bn','pl','gp','mg','bt','gb','gt','np']);
 function refFor(sc,id){
   const db=S.db;
   switch(sc){
@@ -172,6 +172,8 @@ function refFor(sc,id){
     case 'gb':return db.collection('gm').doc('battle');
     case 'pl':return db.collection('places').doc(id);
     case 'gp':return db.collection('gm').doc('place_'+id);
+    case 'gt':return db.collection('gm').doc('nt_'+id);
+    case 'np':return db.collection('meta').doc('npcs');
   }
 }
 function getLocal(sc,id){
@@ -194,6 +196,8 @@ function getLocal(sc,id){
     case 'gb':return S.battleGm;
     case 'pl':return S.places[id];
     case 'gp':return S.gmPl[id];
+    case 'gt':return S.gmNt[id];
+    case 'np':return S.npcPub;
   }
 }
 function putLocal(sc,id,d){
@@ -216,6 +220,8 @@ function putLocal(sc,id,d){
     case 'gb':S.battleGm=d;break;
     case 'pl':S.places[id]=d;break;
     case 'gp':S.gmPl[id]=d;break;
+    case 'gt':S.gmNt[id]=d;break;
+    case 'np':S.npcPub=d;break;
   }
 }
 function dropLocal(sc,id){
@@ -233,6 +239,7 @@ function dropLocal(sc,id){
     case 'aw':delete S.awards[id];break;
     case 'pl':delete S.places[id];break;
     case 'gp':delete S.gmPl[id];break;
+    case 'gt':delete S.gmNt[id];break;
   }
 }
 
@@ -293,7 +300,7 @@ function withPending(sc,id,d){
 function edit(sc,id,path,v){
   let doc=getLocal(sc,id);
   if(!doc){
-    if(sc==='gl'||sc==='gn'||sc==='pl'||sc==='gp'||sc==='mg'||sc==='bt'||sc==='gb'){doc={};putLocal(sc,id,doc);}
+    if(sc==='gl'||sc==='gn'||sc==='pl'||sc==='gp'||sc==='mg'||sc==='bt'||sc==='gb'||sc==='np'){doc={};putLocal(sc,id,doc);}
     else return;
   }
   const parts=path.split('.');
@@ -368,6 +375,10 @@ function startWatches(){
     if(s.exists)S.battle=withPending('bt','battle',s.data());
     else if(!Q.has('bt|battle'))S.battle={};
   },'battle');
+  watch(db.collection('meta').doc('npcs'),s=>{
+    if(s.exists)S.npcPub=withPending('np','npcs',s.data());
+    else if(!Q.has('np|npcs'))S.npcPub={};
+  },'npcs');
   watch(db.collection('meta').doc('pta_idx'),s=>{ptaSetIdx(s.exists?s.data():null);},'pta');
   watch(db.collection('mapimg'),s=>{
     const o={};
@@ -381,18 +392,20 @@ function startWatches(){
   },'meta');
   if(S.me.admin){
     watch(db.collection('gm'),s=>{
-      const loy={},npc={},gpl={};
+      const loy={},npc={},gpl={},gnt={};
       let gbat=null;
       s.docs.forEach(d=>{
         if(d.id==='battle')gbat=withPending('gb','battle',d.data());
         else if(d.id.indexOf('loy_')===0)loy[d.id.slice(4)]=withPending('gl',d.id.slice(4),d.data());
         else if(d.id.indexOf('npc_')===0)npc[d.id.slice(4)]=withPending('gn',d.id.slice(4),d.data());
         else if(d.id.indexOf('place_')===0)gpl[d.id.slice(6)]=withPending('gp',d.id.slice(6),d.data());
+        else if(d.id.indexOf('nt_')===0)gnt[d.id.slice(3)]=withPending('gt',d.id.slice(3),d.data());
       });
       Object.keys(S.gmPl).forEach(id=>{if(!(id in gpl)&&Q.has('gp|'+id))gpl[id]=S.gmPl[id];});
       Object.keys(S.gmLoy).forEach(id=>{if(!(id in loy)&&Q.has('gl|'+id))loy[id]=S.gmLoy[id];});
       Object.keys(S.gmNpc).forEach(id=>{if(!(id in npc)&&Q.has('gn|'+id))npc[id]=S.gmNpc[id];});
-      S.gmLoy=loy;S.gmNpc=npc;S.gmPl=gpl;
+      Object.keys(S.gmNt).forEach(id=>{if(!(id in gnt)&&Q.has('gt|'+id))gnt[id]=S.gmNt[id];});
+      S.gmLoy=loy;S.gmNpc=npc;S.gmPl=gpl;S.gmNt=gnt;
       if(gbat)S.battleGm=gbat;else if(!Q.has('gb|battle'))S.battleGm={};
     },'gm');
   }
@@ -871,6 +884,7 @@ function renderSoon(){
 function onSpeciesChange(t){
   if(ptaRowFill(t))return true;
   if(foeRowFill(t))return true;
+  if(ntRowFill(t))return true;
   const m=/^p\|([^|]+)\/([^|]+)\|species$/.exec(t.dataset.b||'');
   if(!m)return false;
   if(!getLocal('p',m[1]+'/'+m[2]))return true;
@@ -2220,6 +2234,7 @@ function foePub(f){
     hp:hv>=2?{p,c:num(hp.cur),m:num(hp.max)}:hv===1?{p}:null,
     st:sh.st?String(f.st||''):null,
     sg:sh.st?stgObj(f):null,
+    o:ntOwnerLabel(f),
     down:num(hp.cur)<=0
   };
 }
@@ -2620,7 +2635,8 @@ function btRow(cid,idx,gm,turn){
   const canOpen=gm||mine;
   const secret=v.side==='f'&&gm&&v.f;
   const ini=v.side==='a'?num(btC(cid).ini):(gm?btIni(cid):null);
-  const sub=v.side==='a'?v.owner:(secret?'Foe · players see “'+v.pubName+'”':'Foe');
+  const own=secret?ntFoeOwner(v.f):(v.pub&&v.pub.o)||'';
+  const sub=v.side==='a'?v.owner:'Foe'+(own?' · '+own:'')+(secret?' · players see “'+v.pubName+'”':'');
   const types=v.types&&v.types.length?chipsOf(v.types):'';
   const hidden=v.side==='f'&&!secret&&!v.types;
   return h`<li class="brow ${v.side==='a'?'ally':'foe'} ${turn?'turn':''} ${v.down?'down':''}" data-cid="${cid}">
@@ -2677,6 +2693,7 @@ function btFoeBody(cid,v,idx){
         ${fText('Name while hidden','gb','battle',P+'pn',S.battleGm,{})}</div>
       <p class="sub">Players now see: <b>${pub.n}</b>${pub.sp?'':' (no picture)'}${pub.ty?' · '+(pub.ty.join(' / ')||'types'):' · types hidden'}${pub.hp?(pub.hp.c!=null?' · health '+pub.hp.c+'/'+pub.hp.m:' · health bar'):' · health hidden'}${pub.down?' · Down':''}. Their phones never receive the numbers you keep hidden.</p></div>
     ${btAmt(cid)}
+    ${ntFoeOwner(f)?h`<p class="sub">Belongs to <b>${ntFoeOwner(f)}</b>${ntOwnerLabel(f)?' (the table has met them)':' (the table has not been told about them)'}.</p>`:''}
     <div class="fgrid">
       ${fText('Name','gb','battle',P+'nick',S.battleGm,{})}
       ${fText('Species','gb','battle',P+'sp',S.battleGm,{list:'dl-species'})}
@@ -2725,6 +2742,7 @@ function btAddPanel(){
         <label class="fld"><span class="fl">How many</span><input type="number" inputmode="numeric" min="1" max="8" data-u="bt.foeN" data-nr value="${u.foeN}"></label>
       </div>
       <div class="row"><button class="btn primary sm" data-act="b_addfoe">Add foe</button></div></div>
+    ${ntBattlePanel()}
   </section>`;
 }
 function battleTab(){
@@ -2881,6 +2899,9 @@ function dxBattle(){
       const v=btInfo(cid,false);
       if(v&&v.side==='f'&&v.sp){const id=dexId(v.sp);if(id)s.add(id);}
     });
+    /* a Pokémon the GM has shown with its picture, on an NPC the table has met, counts as seen */
+    const nn=(S.npcPub&&S.npcPub.n)||{};
+    Object.keys(nn).forEach(k=>(nn[k].m||[]).forEach(m=>{if(m&&m.sp){const id=dexId(m.sp);if(id)s.add(id);}}));
   }catch(e){}
   return s;
 }
@@ -3189,6 +3210,351 @@ function dxAct(b){
       if(!S.me.admin)break;
       edit('mg','mega','dx_lock',!!b.checked);
       render();break;
+  }
+}
+
+/* ---------- NPC trainers: people the GM runs, with Pokémon of their own ----------
+   Same idea as the hidden foes in a battle, with two documents:
+     gm/nt_<id>   the NPC itself: notes, secrets and every Pokémon's full sheet. Firestore's rules let only the GM read it,
+                  so a player's browser never receives it.
+     meta/npcs    what the table may see: only the NPCs the GM has shown, and of those only the parts ticked.
+   A Pokémon on an NPC's team is copied into a battle as a foe (gm/battle), so the battle's own reveal controls apply. */
+S.ui.nt=S.ui.nt||{open:{},mon:{}};
+
+const NTS=()=>S.gmNt||{};
+const ntIds=()=>Object.keys(NTS()).sort((a,b)=>num(NTS()[a].order)-num(NTS()[b].order)||num(NTS()[a].createdAt)-num(NTS()[b].createdAt));
+const ntName=nt=>(nt&&String(nt.name||'').trim())||'Unnamed NPC';
+const ntTeam=nt=>(nt&&Array.isArray(nt.team))?nt.team:[];
+const ntPub=id=>(S.npcPub&&S.npcPub.n&&S.npcPub.n[id])||null;
+const newMonId=()=>'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const ntMonName=m=>m.nick||m.sp||'New Pokémon';
+const ntShown=m=>{const s=(m&&m.sh)||{};return !!(num(s.name)||num(s.pic)||num(s.types));};
+/* the trainer's name on a foe, once the table has been shown that NPC */
+const ntOwnerLabel=f=>{const p=f&&f.nt?ntPub(f.nt):null;return p?p.n:null;};
+/* the GM's own view of whose Pokémon a foe is */
+const ntFoeOwner=f=>f?(f.nt&&NTS()[f.nt]?ntName(NTS()[f.nt]):(f.own||'')):'';
+function ntInBattle(id,mid){
+  const fo=foesOf();
+  return Object.keys(fo).some(cid=>fo[cid].nt===id&&fo[cid].ni===mid&&btC(cid));
+}
+
+/* ----- what the table sees ----- */
+function ntPubOf(nt){
+  if(!nt||!num(nt.rev&&nt.rev.on))return null;
+  const r=nt.rev||{};
+  const txt=k=>String(nt[k]||'').trim();
+  return {
+    n:ntName(nt),
+    r:num(r.role)&&txt('role')?txt('role'):null,
+    pl:num(r.place)&&txt('place')?txt('place'):null,
+    b:num(r.notes)&&txt('notes')?txt('notes'):null,
+    m:ntTeam(nt).filter(ntShown).map(m=>{
+      const s=m.sh||{};
+      return {i:String(m.id||''),n:num(s.name)?ntMonName(m):'Unknown Pokémon',sp:num(s.pic)?String(m.sp||''):'',ty:num(s.types)?(m.ty||[]).filter(Boolean):null};
+    })
+  };
+}
+/* writes the public copy only when it has changed. Hiding the NPC removes it. */
+function ntPublish(id){
+  if(!S.me.admin)return;
+  const nt=NTS()[id];
+  const o=nt?ntPubOf(nt):null;
+  const cur=(S.npcPub&&S.npcPub.n)||{};
+  if(o){
+    if(JSON.stringify(cur[id])!==JSON.stringify(o))edit('np','npcs','n.'+id,o);
+  }else if(cur[id]){
+    const n=Object.assign({},cur);delete n[id];
+    edit('np','npcs','n',n);
+  }
+  /* foes of this NPC carry the trainer's name once it is shown, and lose it when it is hidden again */
+  const fo=foesOf();
+  Object.keys(fo).forEach(cid=>{if(fo[cid].nt===id&&btC(cid))foePublish(cid);});
+}
+function ntPreview(nt){
+  const p=ntPubOf(nt);
+  if(!p)return 'Nothing. The table does not know this NPC exists.';
+  const bits=['the name “'+p.n+'”'];
+  if(p.r)bits.push('the role');
+  if(p.pl)bits.push('where you met');
+  if(p.b)bits.push('your notes');
+  bits.push(p.m.length?p.m.length+(p.m.length===1?' Pokémon':' Pokémon')+' (what you ticked for each)':'no Pokémon');
+  return bits.join(', ');
+}
+
+/* ----- building the roster ----- */
+function ntNew(){
+  if(!S.me.admin)return;
+  const id=S.db.collection('gm').doc().id;
+  newDoc('gt',id,{name:'',role:'',place:'',notes:'',secret:'',team:[],rev:{on:false,role:false,place:false,notes:false},order:Date.now(),createdAt:Date.now()});
+  S.ui.nt.open[id]=true;
+  render();
+}
+async function ntAddMon(id){
+  if(!S.me.admin||!NTS()[id])return;
+  const u=S.ui.nt;
+  const sp=String(u['sp_'+id]||'').trim(),nick=String(u['nk_'+id]||'').trim();
+  if(!sp){toast('Type a species first.');return;}
+  u['sp_'+id]='';u['nk_'+id]='';
+  const pr=ptaResolve(sp);
+  let rec=null;
+  if(pr)rec=ptaRec(pr)||await ptaChunk(ptaLetter(ptaKey(pr))).then(()=>ptaRec(pr));
+  const si=rec?null:speciesInfo(sp);
+  const nt=NTS()[id];
+  if(!nt)return;
+  const mid=newMonId();
+  const mon=Object.assign({id:mid,nick,bonus:zeroStats(),notes:'',sh:{name:false,pic:false,types:false}},foeFromRec(rec,si,sp));
+  edit('gt',id,'team',ntTeam(nt).concat([mon]));
+  u.mon={};u.mon[mid]=true;
+  toast('Gave '+sp+' to '+ntName(nt)+(rec||si?'':'. That species is not in the data, so fill in its numbers by hand')+'.',true);
+  render();
+}
+/* replaces a Pokémon's types, stats, passives and moves with the handbook entry for its species */
+async function ntFillMon(id,mid){
+  if(!S.me.admin)return;
+  const nt=NTS()[id];
+  const i=ntTeam(nt).findIndex(x=>x.id===mid);
+  if(i<0)return;
+  const sp=ntConfSp(nt,i);
+  const pr=ptaResolve(sp);
+  let rec=null;
+  if(pr)rec=ptaRec(pr)||await ptaChunk(ptaLetter(ptaKey(pr))).then(()=>ptaRec(pr));
+  const si=rec?null:speciesInfo(sp);
+  if(!rec&&!si){toast('That species is not in the data.');return;}
+  const cur=NTS()[id];
+  const j=ntTeam(cur).findIndex(x=>x.id===mid);
+  if(j<0)return;
+  const m=ntTeam(cur)[j];
+  const next=Object.assign({},m,foeFromRec(rec,si,sp),{bonus:zeroStats()});
+  edit('gt',id,'team.'+j,next);
+  toast('Filled in '+(rec?rec.n:si.name)+' from the '+(rec?'handbook':'game data')+'.',true);
+  render();
+}
+const ntConfSp=(nt,i)=>String((ntTeam(nt)[i]||{}).sp||'');
+
+/* typing a move's name in a roster Pokémon's sheet fills in the rest of the row from the handbook, when the row is still empty */
+const NT_MV_RE=/^gt\|([^|]+)\|team\.(\d+)\.mv\.(\d+)\.name$/;
+function ntRowFill(t){
+  const mt=NT_MV_RE.exec(t.dataset.b||'');
+  if(!mt)return false;
+  const id=mt[1],i=+mt[2],k=+mt[3];
+  const go=()=>{
+    const m=ntTeam(NTS()[id])[i];
+    const row=m&&(m.mv||[])[k];
+    const L=PTA.lists;
+    if(!row||!L)return;
+    const def=L.moveMap.get(dexKey(row.name));
+    if(!def)return;
+    if(String(row.text||'').trim()||String(row.dice||'').trim())return;
+    const next=Object.assign({},row,{name:def.n,freq:def.f||row.freq,kind:def.k||row.kind,range:def.r||row.range,type:def.t||row.type,dice:def.d||'',text:def.x||''});
+    edit('gt',id,'team.'+i+'.mv',m.mv.map((x,j)=>j===k?next:x));
+    toast('Filled in '+def.n+' from the handbook.',true);
+    renderSoon();
+  };
+  if(PTA.lists)go();else ptaLists().then(go);
+  return true;
+}
+
+/* ----- into a battle ----- */
+function ntFoeFrom(id,nt,m){
+  const hp=m.hp||{cur:20,max:20};
+  const mx=Math.max(1,num(hp.max));
+  return {nick:m.nick||'',sp:m.sp||'',ty:[(m.ty||[])[0]||'',(m.ty||[])[1]||''],sz:m.sz||'Medium',wt:m.wt||'Medium',
+    hp:{cur:clamp(num(hp.cur)>0?num(hp.cur):mx,1,mx),max:mx},
+    base:Object.assign({atk:3,def:3,spa:3,spd:3,spe:3},m.base),bonus:Object.assign(zeroStats(),m.bonus),stages:zeroStats(),st:'',
+    notes:m.notes||'',sk:m.sk||'',ps:(m.ps||[]).map(x=>Object.assign({},x)),mv:(m.mv||[]).map(x=>Object.assign({},x,{used:0})),
+    sh:{name:num(m.sh&&m.sh.name),pic:num(m.sh&&m.sh.pic),types:num(m.sh&&m.sh.types),st:0,hp:0},
+    pn:foeLetter(),nt:id,ni:m.id,own:ntName(nt)};
+}
+function ntToBattle(id,mid,quiet){
+  if(!S.me.admin)return;
+  const nt=NTS()[id];
+  const m=nt&&ntTeam(nt).find(x=>x.id===mid);
+  if(!m||ntInBattle(id,mid))return;
+  const b=BT();
+  const cid=newCid();
+  const f=ntFoeFrom(id,nt,m);
+  edit('gb','battle','foes.'+cid,f);
+  btInsert(cid,{s:'f',pub:foePub(f)},fSpd(f)+(b.mode==='d20'?rnd(20):0),rnd(20));
+  if(!quiet)render();
+}
+function ntTeamToBattle(id){
+  if(!S.me.admin)return;
+  const nt=NTS()[id];
+  const left=ntTeam(nt).filter(m=>!ntInBattle(id,m.id));
+  left.forEach(m=>ntToBattle(id,m.id,true));
+  if(left.length)toast(left.length+(left.length===1?' Pokémon':' Pokémon')+' from '+ntName(nt)+' added to the battle, hidden from the players until you show them.',true);
+  render();
+}
+function ntDelete(id){
+  if(!S.me.admin||!NTS()[id])return;
+  const nt=NTS()[id];
+  const cur=(S.npcPub&&S.npcPub.n)||{};
+  if(cur[id]){const n=Object.assign({},cur);delete n[id];edit('np','npcs','n',n);}
+  /* foes already in a battle stay, but lose the link and the trainer's name */
+  const fo=foesOf();
+  Object.keys(fo).forEach(cid=>{if(fo[cid].nt===id){edit('gb','battle','foes.'+cid+'.nt','');edit('gb','battle','foes.'+cid+'.ni','');foePublish(cid);}});
+  delete S.ui.nt.open[id];
+  removeDoc('gt',id);
+  toast(ntName(nt)+' was deleted.',true);
+}
+function ntTwice(key,fn){
+  if(S.ui.confirm===key){S.ui.confirm=null;fn();return;}
+  S.ui.confirm=key;render();
+  setTimeout(()=>{if(S.ui.confirm===key){S.ui.confirm=null;render();}},4000);
+}
+
+/* ----- the GM's page ----- */
+function ntMonBody(id,nt,m,i,len){
+  const P='team.'+i+'.';
+  const s=m.sh||{};
+  const mvs=m.mv||[],ps=m.ps||[];
+  const ask=S.ui.confirm==='ntf|'+m.id,askRm=S.ui.confirm==='ntr|'+m.id;
+  return h`<div class="bbody fsheet">
+    <div class="mgate secret"><span class="fl">GM only · what the players see of this Pokémon (once the NPC is shown, or in a battle)</span>
+      <div class="row evchips" role="group" aria-label="Show players">
+        ${[['name','Name'],['pic','Picture'],['types','Types']].map(([k,l])=>h`<label class="chip chkc"><input type="checkbox" ${bd('gt',id,P+'sh.'+k)} ${num(s[k])?raw('checked'):''}><span>${l}</span></label>`)}
+        <button class="btn sm" data-act="nt_see" data-id="${id}" data-mid="${m.id}" data-v="all">Show all</button><button class="btn sm ghost" data-act="nt_see" data-id="${id}" data-mid="${m.id}" data-v="none">Hide all</button></div>
+      <p class="sub">${ntShown(m)?'Hidden from the players until the NPC is shown.':'Nothing shown.'} The rest of this sheet, its moves and your notes never reach their phones.</p></div>
+    <div class="fgrid">
+      ${fText('Name','gt',id,P+'nick',nt,{})}
+      ${fText('Species','gt',id,P+'sp',nt,{list:'dl-species'})}
+      ${fSel('Type 1','gt',id,P+'ty.0',nt,TYPES,{blank:'None'})}
+      ${fSel('Type 2','gt',id,P+'ty.1',nt,TYPES,{blank:'None'})}
+      ${fNum('HP now','gt',id,P+'hp.cur',nt,{min:0})}
+      ${fNum('HP max','gt',id,P+'hp.max',nt,{min:1})}
+    </div>
+    <div class="stats">${STATS.map(st=>h`<div class="stat lcd"><span class="sl">${st[2]}</span><span class="sv">${fStat(m,st[0])}</span><span class="sm"><span>mod ${sgn(mod(fStat(m,st[0])))}</span></span>
+      <div class="mini"><label>Base<input type="number" ${bd('gt',id,P+'base.'+st[0])} value="${num(m.base&&m.base[st[0]])}"></label><label>Adj<input type="number" ${bd('gt',id,P+'bonus.'+st[0])} value="${num(m.bonus&&m.bonus[st[0]])}"></label></div></div>`)}</div>
+    <div class="list"><div class="ph"><h3>Moves</h3><button class="btn sm" data-act="add" ${bp('gt',id,P+'mv')} data-tpl="move">Add move</button></div>
+      ${mvs.length?mvs.map((x,k)=>h`<div class="move"><div class="mv1">${fText('Move','gt',id,P+'mv.'+k+'.name',nt,{list:'dl-moves'})}${fText('Uses','gt',id,P+'mv.'+k+'.freq',nt,{})}<span></span>${rowBtns('gt',id,P+'mv',k,mvs.length,false)}</div>
+        <div class="mv2">${fSel('Kind','gt',id,P+'mv.'+k+'.kind',nt,KINDS,{})}${fSel('Type','gt',id,P+'mv.'+k+'.type',nt,TYPES,{})}${fText('Range','gt',id,P+'mv.'+k+'.range',nt,{})}${fText('Damage','gt',id,P+'mv.'+k+'.dice',nt,{ph:'e.g. 3d8'})}</div>
+        ${fArea('Effect','gt',id,P+'mv.'+k+'.text',nt,{rows:2})}</div>`):h`<p class="sub">No moves yet. Add one, or type a move name to fill it in from the handbook.</p>`}
+    </div>
+    <div class="list"><div class="ph"><h3>Passives</h3><button class="btn sm" data-act="add" ${bp('gt',id,P+'ps')} data-tpl="passive">Add passive</button></div>
+      ${ps.length?ps.map((x,k)=>h`<div class="item"><div class="irow two">${fText('Passive','gt',id,P+'ps.'+k+'.name',nt,{list:'dl-passives'})}${rowBtns('gt',id,P+'ps',k,ps.length,false)}</div>${fArea('What it does','gt',id,P+'ps.'+k+'.text',nt,{rows:2})}</div>`):h`<p class="sub">No passives.</p>`}
+    </div>
+    ${fArea('Notes about this Pokémon (only you see these)','gt',id,P+'notes',nt,{rows:2})}
+    <div class="row">
+      <button class="btn sm ${ask?'danger armed':''}" data-act="nt_fill" data-id="${id}" data-mid="${m.id}">${ask?'Tap again to replace its stats, passives and moves':'Fill from the handbook'}</button>
+      <button class="btn sm danger ${askRm?'armed':''}" data-act="nt_monrm" data-id="${id}" data-mid="${m.id}">${askRm?'Tap again to remove it':'Remove Pokémon'}</button>
+      <span class="ibtns"><button class="btn sm ghost" data-act="mv" ${bp('gt',id,'team')} data-i="${i}" data-d="-1" ${i===0?raw('disabled'):''} aria-label="Move earlier">↑</button><button class="btn sm ghost" data-act="mv" ${bp('gt',id,'team')} data-i="${i}" data-d="1" ${i===len-1?raw('disabled'):''} aria-label="Move later">↓</button></span></div>
+  </div>`;
+}
+function ntMonRow(id,nt,m,i,len){
+  const open=!!S.ui.nt.mon[m.id];
+  const inB=ntInBattle(id,m.id);
+  return h`<div class="ntmon" data-mid="${m.id}">
+    <div class="row sp"><span class="row ntmh">${monIcon({species:m.sp})}<b>${ntMonName(m)}</b>${m.nick&&m.sp?h`<span class="sub">${m.sp}</span>`:''}${chipsOf(m.ty)}${ntShown(m)?h`<span class="pill good">Some shown</span>`:h`<span class="pill">Hidden</span>`}${inB?h`<span class="pill gm">In battle</span>`:''}</span>
+      <span class="row"><button class="btn sm" data-act="nt_foe" data-id="${id}" data-mid="${m.id}" ${inB?raw('disabled'):''}>Add to battle</button><button class="btn sm" data-act="nt_mon" data-mid="${m.id}" aria-expanded="${String(open)}">${open?'Close':'Edit'}</button></span></div>
+    ${open?ntMonBody(id,nt,m,i,len):''}
+  </div>`;
+}
+function ntBody(id,nt){
+  const r=nt.rev||{};
+  const on=!!num(r.on);
+  const team=ntTeam(nt);
+  const left=team.filter(m=>!ntInBattle(id,m.id)).length;
+  const askDel=S.ui.confirm==='ntd|'+id;
+  return h`<div class="ntbody">
+    <div class="mgate secret"><span class="fl">GM only · what the players see</span>
+      <label class="row"><input type="checkbox" ${bd('gt',id,'rev.on')} ${on?raw('checked'):''}><span><b>Show this NPC to the table</b></span></label>
+      <div class="row evchips" role="group" aria-label="Also show">
+        ${[['role','Role'],['place','Where you met'],['notes','Your notes']].map(([k,l])=>h`<label class="chip chkc"><input type="checkbox" ${bd('gt',id,'rev.'+k)} ${num(r[k])?raw('checked'):''} ${on?'':raw('disabled')}><span>${l}</span></label>`)}</div>
+      <p class="sub">Players now see: ${ntPreview(nt)}. It appears under <b>People</b>, in <b>Trainers you have met</b>. Their Pokémon appear there once you tick what to show for each one below.</p></div>
+    <div class="fgrid">
+      ${fText('Name','gt',id,'name',nt,{cls:'wide'})}
+      ${fText('Role or title','gt',id,'role',nt,{ph:'e.g. Gym Leader, Team Galactic grunt'})}
+      ${fText('Where you met','gt',id,'place',nt,{list:'dl-places'})}
+      ${fArea('Notes the table learns once you show them','gt',id,'notes',nt,{rows:3,cls:'wide'})}
+      ${fArea('Secret (only you see this)','gt',id,'secret',nt,{rows:3,cls:'wide'})}
+    </div>
+    <div class="ph"><h3>Pokémon</h3><button class="btn sm primary" data-act="nt_team" data-id="${id}" ${left?'':raw('disabled')}>Add the whole team to the battle</button></div>
+    ${team.length?h`<div class="ntteam">${team.map((m,i)=>ntMonRow(id,nt,m,i,team.length))}</div>`:h`<p class="sub">No Pokémon yet. Add one below: its stats, passives and moves fill in from the handbook.</p>`}
+    <div class="mgd"><b>Give this NPC a Pokémon</b>
+      <div class="fgrid">
+        <label class="fld"><span class="fl">Species</span><input type="text" list="dl-species" data-u="nt.sp_${id}" data-nr value="${S.ui.nt['sp_'+id]||''}" placeholder="e.g. Garchomp"></label>
+        <label class="fld"><span class="fl">Name (optional)</span><input type="text" data-u="nt.nk_${id}" data-nr value="${S.ui.nt['nk_'+id]||''}"></label>
+      </div>
+      <div class="row"><button class="btn primary sm" data-act="nt_add" data-id="${id}">Add Pokémon</button></div></div>
+    <div class="row"><button class="btn sm danger ${askDel?'armed':''}" data-act="nt_rm" data-id="${id}">${askDel?'Tap again to delete this NPC and its Pokémon':'Delete this NPC'}</button></div>
+  </div>`;
+}
+function ntCard(id){
+  const nt=NTS()[id];
+  const open=!!S.ui.nt.open[id];
+  const pub=ntPub(id);
+  const team=ntTeam(nt);
+  return h`<article class="entry ntcard" data-id="${id}">
+    <div class="row sp"><div><h3>${ntName(nt)}</h3><div class="meta">${nt.role?h`<span>${nt.role}</span>`:''}${nt.place?h`<span>${nt.place}</span>`:''}<span>${team.length} Pokémon</span></div></div>
+      <div class="row">${pub?h`<span class="pill good">Shown to players</span>`:h`<span class="pill">Hidden</span>`}<button class="btn sm" data-act="nt_open" data-id="${id}" aria-expanded="${String(open)}">${open?'Close':'Open'}</button></div></div>
+    ${open?ntBody(id,nt):''}
+  </article>`;
+}
+function npcTab(){
+  const ids=ntIds();
+  return h`<section class="panel"><div class="ph"><h2>NPC trainers</h2><span class="pill gm">GM only</span><div class="acts"><button class="btn primary sm" data-act="nt_new">New NPC trainer</button></div></div>
+    <p class="sub">Create a trainer, give them Pokémon, and add them to a battle. Everything here stays in a document only you can read. The players see an NPC only after you tick <b>Show this NPC to the table</b>, and then only what you ticked, including for each Pokémon. In a battle the Pokémon start hidden as “Foe A”, “Foe B”.</p></section>
+  ${ids.length?h`<div class="list">${ids.map(ntCard)}</div>`:emptyState('No NPC trainers yet','Make one for a rival, a gym leader or a stranger with a team. Nothing you put here reaches the players until you show it.',h`<button class="btn primary" data-act="nt_new">New NPC trainer</button>`)}`;
+}
+
+/* ----- what players see: People page ----- */
+function ntPubMon(m){
+  const id=m.sp?dexId(m.sp):0;
+  const srcs=id?spriteSrcs(id):[];
+  return h`<span class="ntpm">${srcs.length?h`<img class="sp mi" src="${srcs[0]}" data-fb="${srcs.slice(1).join('|')}" alt="" width="40" height="40" loading="lazy" decoding="async">`:h`<span class="mi-ph" aria-hidden="true"></span>`}<span class="ntpn"><b>${m.n}</b>${m.ty&&m.ty.length?h`<span class="types">${chipsOf(m.ty)}</span>`:''}</span></span>`;
+}
+function ntPublicPanel(){
+  const n=(S.npcPub&&S.npcPub.n)||{};
+  const ids=Object.keys(n).sort((a,b)=>String(n[a].n).localeCompare(String(n[b].n)));
+  if(!ids.length)return '';
+  return h`<section class="panel ntpub"><div class="ph"><h2>Trainers you have met</h2>${S.me.admin?h`<span class="pill gm">What the players see</span>`:''}</div>
+    <div class="grid cards">${ids.map(id=>{const p=n[id];return h`<article class="entry pcard"><div class="pc-body">
+      <h3>${p.n}</h3>
+      <div class="meta">${p.r?h`<span>${p.r}</span>`:''}${p.pl?h`<span>Met at ${p.pl}</span>`:''}</div>
+      ${p.b?h`<p class="prewrap">${p.b}</p>`:''}
+      ${(p.m||[]).length?h`<div class="ntpms">${p.m.map(ntPubMon)}</div>`:''}
+    </div></article>`;})}</div></section>`;
+}
+/* in the battle's "Who is fighting" panel */
+function ntBattlePanel(){
+  const ids=ntIds().filter(id=>ntTeam(NTS()[id]).length);
+  if(!ids.length)return '';
+  return h`<div class="mgd"><b>NPC trainers</b>
+    <p class="sub">Their Pokémon join as foes with their own sheets, hidden from the players until you show them.</p>
+    ${ids.map(id=>{const nt=NTS()[id],team=ntTeam(nt),left=team.filter(m=>!ntInBattle(id,m.id)).length;
+      return h`<div class="row sp"><b>${ntName(nt)}</b><button class="btn sm" data-act="nt_team" data-id="${id}" ${left?'':raw('disabled')}>Add whole team</button></div>
+        <div class="row evchips">${team.map(m=>h`<button class="btn sm chk" data-act="nt_foe" data-id="${id}" data-mid="${m.id}" aria-pressed="${String(ntInBattle(id,m.id))}" ${ntInBattle(id,m.id)?raw('disabled'):''}>${monIcon({species:m.sp})}${ntMonName(m)}</button>`)}</div>`;})}
+  </div>`;
+}
+
+/* ----- actions ----- */
+function ntAct(b){
+  const d=b.dataset;
+  if(!S.me.admin)return;
+  switch(d.act){
+    case 'nt_new':ntNew();break;
+    case 'nt_open':S.ui.nt.open[d.id]=!S.ui.nt.open[d.id];render();break;
+    case 'nt_mon':S.ui.nt.mon[d.mid]=!S.ui.nt.mon[d.mid];render();break;
+    case 'nt_add':ntAddMon(d.id);break;
+    case 'nt_foe':ntToBattle(d.id,d.mid);break;
+    case 'nt_team':ntTeamToBattle(d.id);break;
+    case 'nt_see':{
+      const nt=NTS()[d.id];
+      const i=ntTeam(nt).findIndex(x=>x.id===d.mid);
+      if(i<0)break;
+      const on=d.v==='all';
+      edit('gt',d.id,'team.'+i+'.sh',{name:on,pic:on,types:on});
+      ntPublish(d.id);render();break;}
+    case 'nt_fill':ntTwice('ntf|'+d.mid,()=>ntFillMon(d.id,d.mid));break;
+    case 'nt_monrm':ntTwice('ntr|'+d.mid,()=>{
+      const nt=NTS()[d.id];
+      edit('gt',d.id,'team',ntTeam(nt).filter(x=>x.id!==d.mid));
+      delete S.ui.nt.mon[d.mid];
+      const fo=foesOf();
+      Object.keys(fo).forEach(cid=>{if(fo[cid].nt===d.id&&fo[cid].ni===d.mid)edit('gb','battle','foes.'+cid+'.ni','');});
+      ntPublish(d.id);render();
+    });break;
+    case 'nt_rm':ntTwice('ntd|'+d.id,()=>ntDelete(d.id));break;
   }
 }
 
@@ -3544,7 +3910,7 @@ function peopleTab(){
     .filter(p=>(!af||p.att===af)&&(!q||[p.name,p.role,p.place,p.notes].some(x=>String(x||'').toLowerCase().includes(q))))
     .sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)||String(a.name||'').localeCompare(String(b.name||'')));
   const total=Object.keys(S.people).length;
-  return h`<section class="panel"><div class="ph"><h2>People you have met</h2>${canShared()?h`<button class="btn primary sm" data-act="newDoc" data-kind="ppl">Add person</button>`:''}</div>
+  return h`${ntPublicPanel()}<section class="panel"><div class="ph"><h2>People you have met</h2>${canShared()?h`<button class="btn primary sm" data-act="newDoc" data-kind="ppl">Add person</button>`:''}</div>
     <p class="sub">Shared by the whole party. Anyone can add or edit; only the author or the GM can delete.</p>
     <div class="tools"><label class="fld"><span class="fl">Search</span><input type="search" data-u="q.people" value="${S.ui.q.people||''}" placeholder="Name, place, notes"></label>
       <label class="fld"><span class="fl">Attitude</span><select data-u="f.att"><option value="">Everyone</option>${ATTITUDES.map(([v,l])=>h`<option value="${v}" ${af===v?raw('selected'):''}>${l}</option>`)}</select></label></div></section>
@@ -4131,9 +4497,9 @@ function footer(){
 function mainHtml(){
   if(S.noDb)return emptyState('This tracker needs a signed-in view','Open it from your claude.ai link while signed in. The shared table is stored with the page, so it cannot load anywhere else.');
   if(!S.ready)return h`<p class="loading">OPENING THE TABLE…</p>`;
-  const views={overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,dex:dexTab,battle:battleTab,gm:gmTab,account:accountTab};
+  const views={overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,dex:dexTab,battle:battleTab,gm:gmTab,npc:npcTab,account:accountTab};
   let tab=S.tab;
-  if(tab==='gm'&&!S.me.admin)tab='overview';
+  if((tab==='gm'||tab==='npc')&&!S.me.admin)tab='overview';
   if(tab==='account'&&!CFG)tab='overview';
   return h`${banners()}${(views[tab]||overviewTab)()}${footer()}`;
 }
@@ -4329,6 +4695,7 @@ function act(b,e){
   const d=b.dataset;
   if(d.act&&d.act.indexOf('b_')===0){batAct(b,e);return;}
   if(d.act&&d.act.indexOf('dx_')===0){dxAct(b,e);return;}
+  if(d.act&&d.act.indexOf('nt_')===0){ntAct(b,e);return;}
   switch(d.act){
     case 'tab':S.ui.navOpen=false;setTab(d.tab);break;
     case 'menu':{
@@ -4468,6 +4835,7 @@ function act(b,e){
         const tmp=arr[i];arr[i]=arr[j];arr[j]=tmp;
       }
       edit(sc,id,path,arr);
+      if(sc==='gt')ntPublish(id);
       render();break;}
     case 'pip':{
       const parts=d.p.split('|');
@@ -4586,7 +4954,7 @@ async function exportBackup(){
   if(!S.dl)return;
   const me=S.me.id;
   const out={app:'Sinnoh Trainer Log',exportedAt:new Date().toISOString(),trainer:S.trainers[me]||null,pokemon:S.pokemon[me]||{},privateNotes:S.notes};
-  if(S.me.admin)out.table={trainers:S.trainers,pokemon:S.pokemon,people:S.people,journal:S.journal,leads:S.leads,timeline:S.timeline,awards:S.awards,pins:S.pins,meta:S.meta,megaApproval:S.megaOk,loyalty:S.gmLoy,npcSecrets:S.gmNpc,placePages:S.places,placeNotes:S.gmPl};
+  if(S.me.admin)out.table={trainers:S.trainers,pokemon:S.pokemon,people:S.people,journal:S.journal,leads:S.leads,timeline:S.timeline,awards:S.awards,pins:S.pins,meta:S.meta,megaApproval:S.megaOk,loyalty:S.gmLoy,npcSecrets:S.gmNpc,npcTrainers:S.gmNt,npcPublic:S.npcPub,placePages:S.places,placeNotes:S.gmPl};
   try{await S.dl.save({filename:'sinnoh-trainer-log-backup.json',data:JSON.stringify(out,null,2)});}
   catch(e){if(!e||e.code!=='declined')toast('Could not offer the download');}
 }
@@ -4611,6 +4979,7 @@ function onBound(t){
   if(sc==='t'&&/^items\.\d+\.name$/.test(path)){liveItemIcon(t);liveKeyLine(t,id);}
   if(sc==='p'&&/^mega\.(?!auto)/.test(path))edit(sc,id,'mega.auto',false);
   if(sc==='gb'&&/^foes\.[^.]+\./.test(path))foePublish(path.split('.')[1]);
+  if(sc==='gt')ntPublish(id);
   if(!('nr' in t.dataset))render();
 }
 document.addEventListener('input',e=>{
