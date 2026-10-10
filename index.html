@@ -673,6 +673,26 @@ input[type=search]{appearance:none}
 .ntpn{display:flex;flex-direction:column;gap:2px;min-width:0}
 .ntpn b{font:800 14px var(--f-body);overflow-wrap:anywhere}
 .ntpub{margin-bottom:14px}
+.ptr{position:relative;display:block;overflow:hidden;width:100%;aspect-ratio:4/5;border-radius:12px;border:2px solid var(--line);background:var(--panel)}
+.ptr img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:var(--x,50%) var(--y,50%);transform:scale(var(--z,1));transform-origin:var(--x,50%) var(--y,50%);display:block;user-select:none;-webkit-user-drag:none;pointer-events:none}
+.ptr.thumb{width:52px;height:52px;aspect-ratio:1;flex:none}
+.ptr.edit{cursor:grab;touch-action:none}
+.ptr.edit.drag{cursor:grabbing}
+.ptr.edit:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.ptfr{display:flex;flex-direction:column;gap:8px}
+.ptfr .ptz{width:100%;accent-color:var(--accent)}
+.ptfr .row{gap:6px}
+.ptrcol{display:flex;flex-direction:column;gap:4px;align-items:center;width:96px;flex:none}
+.ptrbtn{display:block;width:100%;padding:0;border:0;background:none;border-radius:12px;cursor:zoom-in}
+.ptrbtn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.ptrh{font:700 11px var(--f-body);color:var(--muted);text-align:center}
+.lbx{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:16px;background:rgba(5,10,28,.82);cursor:zoom-out}
+.lbx[hidden]{display:none}
+.lbx-card{margin:0;display:flex;flex-direction:column;gap:8px;align-items:center;max-width:100%;max-height:100%}
+.lbx-card img{display:block;max-width:min(94vw,1000px);max-height:calc(100vh - 110px);max-height:calc(100dvh - 110px);width:auto;height:auto;object-fit:contain;border-radius:12px;border:3px solid #fff;background:#fff;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.lbx-card figcaption{display:flex;gap:14px;align-items:center;color:#fff;font:700 15px var(--f-body)}
+html.lbx-on,html.lbx-on body{overflow:hidden}
+@media (max-width:520px){.ntbody>.idrow .idimg{flex-direction:column;align-items:stretch}.ntbody .idimg .ptr.edit,.ntbody .idimg .pimg{width:min(220px,100%);align-self:flex-start}}
 .nthd{display:flex;gap:12px;align-items:center;min-width:0}
 .nthd .pimg.thumb{width:52px;height:52px}
 .ntbody>.idrow .idimg .sub{font-size:12px}
@@ -701,6 +721,7 @@ input[type=search]{appearance:none}
 <input type="file" id="ptafile" class="sr" accept=".json,application/json" tabindex="-1" aria-hidden="true">
 <a id="ptip" class="ptip" href="#place" data-act="place" hidden></a>
 <div id="rollbox" class="rollbox lcd" hidden aria-live="polite"></div>
+<div id="lbx" class="lbx" data-act="lbxx" hidden></div>
 <datalist id="dl-species"></datalist>
 <datalist id="dl-moves"></datalist>
 <datalist id="dl-passives"></datalist>
@@ -715,5 +736,5 @@ input[type=search]{appearance:none}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-10-10-NPC-pictures"></script>
+<script src="app.js?v=2026-10-10-NPC-picture-framing"></script>
 </body></html>

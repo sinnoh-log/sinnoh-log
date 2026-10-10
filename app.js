@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-10 · NPC pictures';
+const BUILD='2026-10-10 · NPC picture framing';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -91,7 +91,7 @@ const S={
   megaOk:{},battle:{},battleGm:{},trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},gmNt:{},npcPub:{},
   awards:{},timeline:{},pins:{},banner:{},places:{},gmPl:{},placeId:null,members:{},invite:null,mapChunks:{},mapSrc:'',room:null,peers:[],avatars:{},
   pick:null,names:{},save:{cls:'',text:'Saved'},rolls:[],_tsig:'',
-  ui:{open:{},adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},pop:null,megaPop:null,
+  ui:{open:{},lbx:null,adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},pop:null,megaPop:null,
     award:{uids:{},type:'Gym Badge',badge:'coal',title:'',note:'',levelUp:true}}
 };
 
@@ -665,10 +665,10 @@ function applyTheme(v){
 function setTheme(v){lsSet('stl.theme',v==='auto'?'':v);applyTheme(v);render();}
 const ICON_SUN=raw('<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2" fill="currentColor" stroke="none"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg>');
 const ICON_MOON=raw('<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1z"/></svg>');
-function imgPicker(sc,id,path,doc,w,h2,cap,ro){
+function imgPicker(sc,id,path,doc,w,h2,cap,ro,max){
   if(ro)return '';
   const has=!!getIn(doc,path);
-  return h`<div class="row"><button class="btn sm" data-act="pick" data-img="${sc+'|'+id+'|'+path}" data-w="${w}" data-h="${h2}" data-cap="${cap}">${has?'Change picture':'Upload picture'}</button>${has?h`<button class="btn sm ghost" data-act="rmImg" ${bp(sc,id,path)}>Remove</button>`:''}</div>`;
+  return h`<div class="row"><button class="btn sm" data-act="pick" data-img="${sc+'|'+id+'|'+path}" data-w="${w}" data-h="${h2}" data-max="${max||0}" data-cap="${cap}">${has?'Change picture':'Upload picture'}</button>${has?h`<button class="btn sm ghost" data-act="rmImg" ${bp(sc,id,path)}>Remove</button>`:''}</div>`;
 }
 function avatarEl(uid){
   const a=S.avatars[uid];
@@ -3406,27 +3406,164 @@ function ntPubOf(nt){
     })
   };
 }
-/* The portrait. The GM's copy sits in the NPC's own document (`img`), which only the GM can read. The table's copy is a
-   separate small document, mapimg/npc_<id>, that exists only while the NPC is shown and its Picture box is ticked. It rides in
-   the collection the map already uses, so the existing rules cover it. */
+/* The portrait. The GM's copy sits in the NPC's own document (`img`, the whole picture, plus `imgc`, how it sits in the frame),
+   which only the GM can read. The table's copy is a separate small document, mapimg/npc_<id>, that exists only while the NPC is
+   shown and its Picture box is ticked. It rides in the collection the map already uses, so the existing rules cover it. */
 const ntImgOk=v=>/^data:image\//.test(String(v||''));
 const ntPicDoc=id=>'npc_'+id;
+/* how the picture sits in its frame: the point that stays put (x, y in percent) and the zoom */
+const ntCrop=c=>{
+  c=c||{};
+  return {x:clamp(Math.round(num(c.x==null?50:c.x)*10)/10,0,100),y:clamp(Math.round(num(c.y==null?50:c.y)*10)/10,0,100),z:clamp(Math.round(num(c.z==null?1:c.z)*100)/100,1,3)};
+};
 const ntPicOf=id=>{const c=S.mapChunks&&S.mapChunks[ntPicDoc(id)];return c&&ntImgOk(c.d)?c.d:'';};
+const ntPicCrop=id=>ntCrop(S.mapChunks&&S.mapChunks[ntPicDoc(id)]&&S.mapChunks[ntPicDoc(id)].c);
 function ntPicSync(id){
   if(!S.me.admin)return;
   const nt=NTS()[id];
   const r=(nt&&nt.rev)||{};
   const want=nt&&num(r.on)&&num(r.pic)&&ntImgOk(nt.img)?String(nt.img):'';
   const have=ntPicOf(id);
-  if(want===have)return;
-  const ref=S.db.collection('mapimg').doc(ntPicDoc(id));
-  if(want){
-    S.mapChunks[ntPicDoc(id)]={d:want,v:Date.now()};
-    ref.set({d:want,v:Date.now()}).catch(e=>fail(e));
+  if(!want&&!have)return;
+  const wc=ntCrop(nt&&nt.imgc),hc=ntPicCrop(id);
+  if(want&&want===have&&JSON.stringify(wc)===JSON.stringify(hc))return;
+  const k=ntPicDoc(id),ref=S.db.collection('mapimg').doc(k),v=Date.now();
+  if(want&&want===have){
+    /* only the frame changed: no need to send the picture again */
+    S.mapChunks[k]=Object.assign({},S.mapChunks[k],{c:wc,v});
+    ref.update({c:wc,v}).catch(e=>fail(e));
+  }else if(want){
+    S.mapChunks[k]={d:want,c:wc,v};
+    ref.set({d:want,c:wc,v}).catch(e=>fail(e));
   }else{
-    delete S.mapChunks[ntPicDoc(id)];
+    delete S.mapChunks[k];
     ref.delete().catch(e=>fail(e));
   }
+}
+/* the picture in its frame. cls: "thumb" (square), "edit" (the GM's, draggable) or nothing (4:5 portrait) */
+function ntPortrait(src,crop,cls,attrs){
+  const u=imgSrc(src);
+  if(!u)return '';
+  const c=ntCrop(crop);
+  return h`<div class="ptr ${cls||''}" ${attrs||''} ${raw('style="--x:'+c.x+'%;--y:'+c.y+'%;--z:'+c.z+'"')}><img src="${u}" alt="" draggable="false"></div>`;
+}
+/* the frame controls under the GM's picture */
+function ntFramePanel(id,nt){
+  const c=ntCrop(nt.imgc);
+  return h`<div class="ptfr"><label class="fld"><span class="fl">Zoom</span><input type="range" class="ptz" data-id="${id}" min="1" max="3" step="0.05" value="${c.z}" aria-label="Zoom the picture"></label>
+    <div class="row"><button class="btn sm" data-act="nt_fr0" data-id="${id}">Reset frame</button><button class="btn sm" data-act="lbx" data-k="${'gt|'+id}">View full picture</button></div>
+    <span class="sub">Drag the picture to move it. Arrow keys work too.</span></div>`;
+}
+/* ----- moving and zooming the picture in its frame ----- */
+let ntFrDrag=null,ntFrTimer=0;
+function ntFrameSave(id,c){
+  edit('gt',id,'imgc',ntCrop(c));
+  clearTimeout(ntFrTimer);
+  ntFrTimer=setTimeout(()=>ntPublish(id),350);
+}
+function ntFrameApply(f,c){
+  const im=f&&f.querySelector('img');
+  if(!im)return;
+  const set=el=>{el.style.setProperty('--x',c.x+'%');el.style.setProperty('--y',c.y+'%');el.style.setProperty('--z',c.z);};
+  set(f);
+  /* the small picture on her card in the list follows along */
+  const th=f.closest('.ntcard')&&f.closest('.ntcard').querySelector('.nthd .ptr');
+  if(th)set(th);
+}
+/* how far the zoomed picture overhangs the frame, in pixels: a full sweep of x or y from 0 to 100 moves the picture by this much */
+function ntFrameGeom(f,z){
+  const im=f.querySelector('img'),r=f.getBoundingClientRect();
+  const nw=im&&im.naturalWidth||r.width,nh=im&&im.naturalHeight||r.height;
+  const k=Math.max(r.width/nw,r.height/nh);
+  return {ox:nw*k*z-r.width,oy:nh*k*z-r.height};
+}
+function ntFrameStart(f,e){
+  const id=f.dataset.id,nt=NTS()[id];
+  if(!nt||!S.me.admin)return;
+  const c=ntCrop(nt.imgc);
+  ntFrDrag={id,f,x0:e.clientX,y0:e.clientY,c0:c,c,g:ntFrameGeom(f,c.z)};
+  try{f.setPointerCapture(e.pointerId);}catch(err){}
+  try{f.focus({preventScroll:true});}catch(err){}
+  f.classList.add('drag');
+  e.preventDefault();
+}
+function ntFrameMove(e){
+  const d=ntFrDrag;
+  if(!d)return;
+  const c=Object.assign({},d.c0);
+  if(d.g.ox>0.5)c.x=clamp(d.c0.x-(e.clientX-d.x0)/d.g.ox*100,0,100);
+  if(d.g.oy>0.5)c.y=clamp(d.c0.y-(e.clientY-d.y0)/d.g.oy*100,0,100);
+  d.c=ntCrop(c);
+  ntFrameApply(d.f,d.c);
+}
+function ntFrameEnd(){
+  const d=ntFrDrag;
+  if(!d)return;
+  ntFrDrag=null;
+  d.f.classList.remove('drag');
+  if(JSON.stringify(d.c)!==JSON.stringify(d.c0))ntFrameSave(d.id,d.c);
+}
+function ntFrameKey(f,e){
+  const id=f.dataset.id,nt=NTS()[id];
+  if(!nt||!S.me.admin)return false;
+  const step=e.shiftKey?10:3;
+  const dx={ArrowRight:-step,ArrowLeft:step}[e.key]||0,dy={ArrowDown:-step,ArrowUp:step}[e.key]||0;
+  if(!dx&&!dy)return false;
+  const c=ntCrop(nt.imgc),g=ntFrameGeom(f,c.z);
+  if(g.ox>0.5)c.x=clamp(c.x+dx,0,100);
+  if(g.oy>0.5)c.y=clamp(c.y+dy,0,100);
+  const n=ntCrop(c);
+  ntFrameApply(f,n);
+  ntFrameSave(id,n);
+  e.preventDefault();
+  return true;
+}
+function ntFrameZoom(t,commit){
+  const id=t.dataset.id,nt=NTS()[id];
+  if(!nt||!S.me.admin)return;
+  const c=ntCrop(Object.assign({},nt.imgc,{z:+t.value}));
+  const f=t.closest('.idimg')&&t.closest('.idimg').querySelector('.ptr.edit');
+  if(f)ntFrameApply(f,c);
+  if(commit)ntFrameSave(id,c);
+}
+/* ----- the full picture, in front of the page ----- */
+function lbxSrc(k){
+  const p=String(k||'').split('|'),id=p[1];
+  if(p[0]==='npc'){
+    const src=ntPicOf(id),pub=S.npcPub&&S.npcPub.n&&S.npcPub.n[id];
+    return src?{src,name:(pub&&pub.n)||'Trainer'}:null;
+  }
+  if(p[0]==='gt'&&S.me.admin){const nt=NTS()[id];return nt&&ntImgOk(nt.img)?{src:nt.img,name:ntName(nt)}:null;}
+  return null;
+}
+function lbxRender(){
+  const el=$('#lbx');
+  if(!el)return;
+  const v=S.ui.lbx?lbxSrc(S.ui.lbx):null;
+  if(!v){
+    if(S.ui.lbx)S.ui.lbx=null;
+    if(!el.hidden){el.hidden=true;el.innerHTML='';document.documentElement.classList.remove('lbx-on');}
+    return;
+  }
+  const sig=S.ui.lbx+'|'+v.src.length+'|'+v.name;
+  if(!el.hidden&&el.dataset.sig===sig)return;
+  el.dataset.sig=sig;
+  el.hidden=false;
+  document.documentElement.classList.add('lbx-on');
+  el.innerHTML=h`<figure class="lbx-card" role="dialog" aria-modal="true" aria-label="${'Picture of '+v.name}"><img src="${imgSrc(v.src)}" alt="${'Picture of '+v.name}"><figcaption><b>${v.name}</b><button class="btn sm" id="lbx-x" data-act="lbxx">Close</button></figcaption></figure>`.s;
+}
+function lbxOpen(k){
+  if(!lbxSrc(k))return;
+  S.ui.lbx=k;
+  lbxRender();
+  const b=$('#lbx-x');
+  if(b)b.focus({preventScroll:true});
+}
+function lbxClose(){
+  const k=S.ui.lbx;
+  S.ui.lbx=null;
+  lbxRender();
+  if(k){const b=document.querySelector('[data-act="lbx"][data-k="'+CSS.escape(k)+'"]');if(b)b.focus({preventScroll:true});}
 }
 /* writes the public copy only when it has changed. Hiding the NPC removes it. */
 function ntPublish(id){
@@ -3728,7 +3865,7 @@ function ntBody(id,nt){
       <div class="row evchips" role="group" aria-label="Also show">
         ${[['role','Role'],['place','Where you met'],['notes','Your notes'],['pic','Picture'],['cls','Level and class'],['stats','Stats'],['items','Items']].map(([k,l])=>h`<label class="chip chkc"><input type="checkbox" ${bd('gt',id,'rev.'+k)} ${num(r[k])?raw('checked'):''} ${on?'':raw('disabled')}><span>${l}</span></label>`)}</div>
       <p class="sub">Players now see: ${ntPreview(nt)}. It appears under <b>People</b>, in <b>Trainers you have met</b>. Their Pokémon appear there once you tick what to show for each one below.</p></div>
-    <div class="idrow"><div class="idimg">${pimg(nt.img,ntName(nt),'tall')}${imgPicker('gt',id,'img',nt,320,400,60000,false)}<span class="sub">${ntImgOk(nt.img)?(num(r.pic)&&on?'The table sees this picture.':'Only you see this picture. Tick Picture above to show it.'):'A portrait for this NPC. It stays hidden until you tick Picture.'}</span></div>
+    <div class="idrow"><div class="idimg">${ntImgOk(nt.img)?ntPortrait(nt.img,nt.imgc,'edit',h`data-id="${id}" tabindex="0" role="group" aria-label="Picture frame. Drag to move the picture, or use the arrow keys."`):pimg('',ntName(nt),'tall')}${imgPicker('gt',id,'img',nt,0,0,160000,false,900)}${ntImgOk(nt.img)?ntFramePanel(id,nt):''}<span class="sub">${ntImgOk(nt.img)?(num(r.pic)&&on?'The table sees this picture.':'Only you see this picture. Tick Picture above to show it.'):'A portrait for this NPC. It stays hidden until you tick Picture.'}</span></div>
     <div class="fgrid">
       ${fText('Name','gt',id,'name',nt,{cls:'wide'})}
       ${fText('Role or title','gt',id,'role',nt,{ph:'e.g. Gym Leader, Team Galactic grunt'})}
@@ -3754,7 +3891,7 @@ function ntCard(id){
   const pub=ntPub(id);
   const team=ntTeam(nt);
   return h`<article class="entry ntcard" data-id="${id}">
-    <div class="row sp"><div class="nthd">${pimg(nt.img,ntName(nt),'thumb')}<div><h3>${ntName(nt)}</h3><div class="meta">${nt.role?h`<span>${nt.role}</span>`:''}${nt.place?h`<span>${nt.place}</span>`:''}<span>${team.length} Pokémon</span></div></div></div>
+    <div class="row sp"><div class="nthd">${ntImgOk(nt.img)?ntPortrait(nt.img,nt.imgc,'thumb'):pimg('',ntName(nt),'thumb')}<div><h3>${ntName(nt)}</h3><div class="meta">${nt.role?h`<span>${nt.role}</span>`:''}${nt.place?h`<span>${nt.place}</span>`:''}<span>${team.length} Pokémon</span></div></div></div>
       <div class="row">${pub?h`<span class="pill good">Shown to players</span>`:h`<span class="pill">Hidden</span>`}<button class="btn sm" data-act="nt_open" data-id="${id}" aria-expanded="${String(open)}">${open?'Close':'Open'}</button></div></div>
     ${open?ntBody(id,nt):''}
   </article>`;
@@ -3778,7 +3915,7 @@ function ntPublicPanel(){
   const ids=Object.keys(n).sort((a,b)=>String(n[a].n).localeCompare(String(n[b].n)));
   if(!ids.length)return '';
   return h`<section class="panel ntpub"><div class="ph"><h2>Trainers you have met</h2>${S.me.admin?h`<span class="pill gm">What the players see</span>`:''}</div>
-    <div class="grid cards">${ids.map(id=>{const p=n[id],pic=ntPicOf(id);return h`<article class="entry pcard">${pic?pimg(pic,p.n,'tall'):''}<div class="pc-body">
+    <div class="grid cards">${ids.map(id=>{const p=n[id],pic=ntPicOf(id);return h`<article class="entry pcard">${pic?h`<div class="ptrcol"><button class="ptrbtn" data-act="lbx" data-k="${'npc|'+id}" aria-label="${'View the full picture of '+p.n}" title="View the full picture">${ntPortrait(pic,ntPicCrop(id),'')}</button><span class="ptrh">Tap to enlarge</span></div>`:''}<div class="pc-body">
       <h3>${p.n}</h3>
       <div class="meta">${p.r?h`<span>${p.r}</span>`:''}${p.pl?h`<span>Met at ${p.pl}</span>`:''}${p.lv!=null?h`<span>Level ${p.lv}</span>`:''}${p.cl?h`<span>${p.cl}</span>`:''}</div>
       ${p.st?h`<div class="ntst lcd">${[['HP',p.st.hp],['Atk',p.st.atk],['Def',p.st.def],['SpA',p.st.spa],['SpD',p.st.spd],['Spd',p.st.spe]].map(([l,v])=>h`<span><i>${l}</i><b>${v}</b></span>`)}</div>`:''}
@@ -3813,6 +3950,7 @@ function ntAct(b){
       edit('gt',d.id,'talents.'+d.key,(clamp(num((nt.talents||{})[d.key]),0,2)+1)%3);
       render();break;}
     case 'nt_roll':ntRoll(d.label,num(d.bonus),num(d.tal));break;
+    case 'nt_fr0':edit('gt',d.id,'imgc',{x:50,y:50,z:1});ntPublish(d.id);render();break;
     case 'nt_recharge':edit('gt',d.id,'megaUsed',false);render();break;
     case 'nt_mgadd':case 'nt_mgform':case 'nt_mgreset':case 'nt_mgdrop':case 'nt_mgready':mgAct('nt',d.act.slice(3),d);break;
     case 'nt_mon':S.ui.nt.mon[d.mid]=!S.ui.nt.mon[d.mid];render();break;
@@ -4805,6 +4943,7 @@ function positionPins(){
 function captureFocus(){
   const a=document.activeElement;
   if(!a||!a.dataset)return null;
+  if(a.classList&&(a.classList.contains('ptr')||a.classList.contains('ptz')))return{at:'fr',k:(a.classList.contains('ptz')?'ptz':'ptr')+'|'+a.dataset.id};
   const at=a.dataset.b!=null?'b':a.dataset.u!=null?'u':a.dataset.pq!=null?'pq':null;
   if(!at)return null;
   let s=null,en=null;
@@ -4813,6 +4952,11 @@ function captureFocus(){
 }
 function restoreFocus(fc){
   if(!fc)return;
+  if(fc.at==='fr'){
+    const p=fc.k.split('|'),el=document.querySelector((p[0]==='ptz'?'.ptz':'.ptr.edit')+'[data-id="'+CSS.escape(p[1])+'"]');
+    if(el)el.focus({preventScroll:true});
+    return;
+  }
   const el=document.querySelector('[data-'+fc.at+'="'+CSS.escape(fc.k)+'"]');
   if(!el||el.disabled)return;
   el.focus({preventScroll:true});
@@ -4838,6 +4982,7 @@ function render(){
   }
   $('#main').innerHTML=mainHtml().s;
   renderRoll();
+  lbxRender();
   restoreFocus(fc);
   positionPins();
   mapScrollAfterRender(mprev);
@@ -5016,11 +5161,13 @@ function act(b,e){
       edit('pin',d.id,'y',clamp(Math.round((num(p.y)+num(d.dy))*10000)/10000,0,1));
       render();break;}
     case 'pick':{
-      S.pick={spec:d.img,w:+d.w||0,h:+d.h||0,cap:+d.cap||60000};
+      S.pick={spec:d.img,w:+d.w||0,h:+d.h||0,max:+d.max||0,cap:+d.cap||60000};
       const fp=$('#filepick');
       if(fp){fp.value='';fp.click();}
       break;}
-    case 'rmImg':{const p=d.p.split('|');edit(p[0],p[1],p[2],'');if(p[0]==='gt')ntPublish(p[1]);render();break;}
+    case 'rmImg':{const p=d.p.split('|');edit(p[0],p[1],p[2],'');if(p[0]==='gt'&&p[2]==='img')edit('gt',p[1],'imgc',{x:50,y:50,z:1});if(p[0]==='gt')ntPublish(p[1]);render();break;}
+    case 'lbx':lbxOpen(d.k);break;
+    case 'lbxx':lbxClose();break;
     case 'rmMap':removeMap();break;
     case 'delTOpen':{
       if(!canEditT(d.uid))break;
@@ -5268,6 +5415,7 @@ function onBound(t){
 document.addEventListener('input',e=>{
   const t=e.target;
   if(!t||!t.dataset)return;
+  if(t.classList&&t.classList.contains('ptz')){ntFrameZoom(t,false);return;}
   if(t.dataset.pq!=null){S.ui.q.places=t.value;refreshPlaceList();return;}
   if(t.dataset.b!=null){onBound(t);if(e.inputType==='insertReplacementText')onSpeciesChange(t);return;}
   if(t.dataset.u!=null){
@@ -5288,6 +5436,7 @@ document.addEventListener('change',async e=>{
   const t=e.target;
   if(t&&t.dataset&&t.dataset.b&&onSpeciesChange(t))return;
   if(t&&t.dataset&&t.dataset.evot!=null){evoTarget(t.dataset.pid,t.value);return;}
+  if(t&&t.classList&&t.classList.contains('ptz')){ntFrameZoom(t,true);return;}
   if(t&&t.id==='ptafile'){
     const f=t.files&&t.files[0];
     try{t.value='';}catch(err){}
@@ -5305,7 +5454,7 @@ document.addEventListener('change',async e=>{
     setStatus('busy');
     let late='';
     if(parts[0]==='map'){if(!(await uploadMap(f)))late='Map saved. Its shape does not match the Sinnoh map, so hover highlights are off.';}
-    else{const r=await fileToImage(f,{w:pk.w,h:pk.h,cap:pk.cap});edit(parts[0],parts[1],parts[2],r.url);if(parts[0]==='gt')ntPublish(parts[1]);}
+    else{const r=await fileToImage(f,{w:pk.w,h:pk.h,max:pk.max||undefined,cap:pk.cap});edit(parts[0],parts[1],parts[2],r.url);if(parts[0]==='gt'&&parts[2]==='img'){edit('gt',parts[1],'imgc',{x:50,y:50,z:1});}if(parts[0]==='gt')ntPublish(parts[1]);}
     if(!Q.size)setStatus('saved');
     render();
     if(late)toast(late);
@@ -5314,11 +5463,23 @@ document.addEventListener('change',async e=>{
     else toast(err&&err.message==='too big'?'That picture is too large even after shrinking. Try another one.':'Could not read that picture');
   }
 });
+document.addEventListener('pointerdown',e=>{
+  const f=e.target.closest&&e.target.closest('.ptr.edit');
+  if(f&&(e.button==null||e.button===0))ntFrameStart(f,e);
+});
+document.addEventListener('pointermove',e=>{if(ntFrDrag)ntFrameMove(e);});
+document.addEventListener('pointerup',()=>{if(ntFrDrag)ntFrameEnd();});
+document.addEventListener('pointercancel',()=>{if(ntFrDrag)ntFrameEnd();});
 document.addEventListener('focusout',e=>{
   const t=e.target;
   if(t&&t.dataset&&t.dataset.b)onSpeciesChange(t);
 });
 document.addEventListener('keydown',e=>{
+  if(S.ui.lbx){
+    if(e.key==='Escape'){e.preventDefault();lbxClose();return;}
+    if(e.key==='Tab'){e.preventDefault();const b=$('#lbx-x');if(b)b.focus({preventScroll:true});return;}
+  }
+  if(e.target&&e.target.classList&&e.target.classList.contains('ptr')&&e.target.classList.contains('edit')&&ntFrameKey(e.target,e))return;
   if(e.key==='Escape'&&tipId)hideTip(true);
   if(e.key==='Escape'&&S.ui.navOpen){S.ui.navOpen=false;render();const m=$('.menu-btn');if(m)m.focus({preventScroll:true});}
 });
