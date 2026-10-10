@@ -522,6 +522,63 @@ input[type=search]{appearance:none}
 .panel.dz .ph h2{color:var(--bad)}
 .loading{padding:40px 0;text-align:center;font:600 18px var(--f-pix);color:var(--muted)}
 @media (prefers-reduced-motion:no-preference){.loading{animation:pulse 1.4s ease-in-out infinite}@keyframes pulse{50%{opacity:.45}}}
+/* battle, rolls and combat stages */
+.rollbox .two{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap}
+.rollbox .two .k{font:800 11px var(--f-body);color:var(--lcd-dim);letter-spacing:.06em}
+.rollbox .big.sm{font-size:44px}
+.rollbox .det.dim{font-weight:600;color:var(--lcd-dim)}
+.stgbox{display:flex;flex-direction:column;gap:6px}
+.stgrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:6px}
+.stg{display:flex;align-items:center;gap:4px;padding:3px 6px;border:2px solid var(--line);border-radius:8px;background:var(--raised)}
+.stg .sl{font:800 12px var(--f-body);color:var(--muted);min-width:3.1em}
+.stg .sv{flex:1;text-align:center;font:800 13px var(--f-body);letter-spacing:.05em;min-width:2.1em}
+.stg.up{border-color:var(--good)}.stg.up .sv{color:var(--good)}
+.stg.dn{border-color:var(--bad)}.stg.dn .sv{color:var(--bad)}
+.stg .btn.sm{padding:0 7px;min-width:26px}
+.pill.stg.up{color:var(--good);border-color:var(--good)}
+.pill.stg.dn{color:var(--bad);border-color:var(--bad)}
+.mvroll{margin-top:2px}
+.mrform{padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.mrform .fl,.mrform .sub{color:var(--lcd-dim)}
+.mrgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:8px}
+.bord{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.brow{border:2px solid var(--line);border-radius:12px;background:var(--raised);overflow:hidden}
+.brow.ally{border-left:6px solid var(--accent)}
+.brow.foe{border-left:6px solid var(--bad)}
+.brow.turn{box-shadow:0 0 0 3px var(--gold)}
+.brow.down .bmain{opacity:.6}
+.bmain{display:grid;grid-template-columns:auto auto minmax(0,1fr) minmax(96px,170px) auto;gap:8px 10px;align-items:center;padding:8px 10px}
+.bn{font:400 22px/1 var(--f-num);color:var(--muted);min-width:1.3ch;text-align:center}
+.spr.bs{--t1:#7B8296;--t2:#4E566B;width:56px;height:56px;border-radius:12px}
+.spr.bs .sp{width:50px;height:50px}
+.spr.bs .sp-ini{font-size:26px}
+.spr.bs::after{bottom:5px;height:6px}
+.bnm{font:800 15px var(--f-body)}
+.btx{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
+.btx .types{align-self:stretch}
+.btx .types{margin-top:3px}
+.bhp{min-width:0}
+.bhpw{display:flex;flex-direction:column;gap:3px}
+.bhpw .mono{font:600 12px var(--f-mono)}
+.bbody{display:flex;flex-direction:column;gap:10px;padding:4px 12px 12px;border-top:1px solid var(--line-soft)}
+.bamt{align-items:flex-end}
+.bamt .fld{width:92px}
+.lcdbtns{display:flex;gap:4px}
+.lcdbtns button{appearance:none;border:2px solid var(--line);background:var(--raised);color:var(--ink);border-radius:6px;font:800 12.5px var(--f-body);padding:2px 9px;cursor:pointer}
+.bnow{font:600 16px var(--f-body);margin:0}
+.bnow.mine{color:var(--good)}
+.chkc{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.fld.inl{flex-direction:row;align-items:center;gap:6px}
+.fsheet .fopt{margin-bottom:4px}
+.sp-ini.unk{color:#fff}
+.rlog{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.rlog li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 10px;align-items:start;padding:7px 0;border-bottom:1px solid var(--line-soft)}
+.rlog li:last-child{border-bottom:0}
+.rlog .rt{font:600 12px var(--f-mono);color:var(--muted);padding-top:2px}
+.rlog .rb{display:block;min-width:0;overflow-wrap:anywhere}
+.rlog .rv{display:block;margin-top:2px;font:800 15px var(--f-body)}
+.rlog .rd{display:block;margin-top:1px;font-size:12.5px}
+@media (max-width:620px){.bmain{grid-template-columns:auto auto minmax(0,1fr) auto}.bhp{grid-column:1/-1;order:5}}
 </style>
 <script>try{var __t=localStorage.getItem('stl.theme');if(__t==='light'||__t==='dark')document.documentElement.setAttribute('data-theme',__t);}catch(e){}</script>
 <div class="shell" id="shell">
@@ -550,5 +607,5 @@ input[type=search]{appearance:none}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-10-10-Evolution"></script>
+<script src="app.js?v=2026-10-10-Battle"></script>
 </body></html>

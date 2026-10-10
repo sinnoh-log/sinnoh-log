@@ -17,7 +17,10 @@ A shared campaign tracker for your table. Everyone creates an account, signs in,
 | Journal, timeline, map pins | add, and edit or delete their own | edit or delete anything |
 | Region map, place pages, banner, table settings | read | edit |
 | Honors and awards | see | give and revoke |
-| Loyalty scores, NPC secrets, GM place notes | never sent to players | read and edit |
+| Loyalty scores, NPC secrets, GM place notes, foe sheets | never sent to players | read and edit |
+| Battle page: turn order, health, stages, status | see the order and what the GM reveals; change their own Pokémon | run the whole battle, change anyone's |
+| Dice rolls and the table's roll log | roll for their own Pokémon and trainer; everyone sees the log | roll for foes, apply damage, clear the log |
+| Giving a Pokémon to a trainer | no | yes (GM Desk, or from a foe in a battle) |
 | Private notes | only they can read them | only they can read theirs |
 | Table code and player list | no access | change code, remove players |
 
@@ -97,11 +100,11 @@ In this folder run `python3 -m http.server 8000` and open <http://localhost:8000
 When you get a new version of these files:
 
 1. In your GitHub repository, choose **Add file → Upload files** and drag in the new files over the old ones (including the `vendor` folder if it is included; this release adds `vendor/fonts`). **Do not** replace your own `firebase-config.js` unless you re-enter your settings in the new one.
-2. If `firestore.rules` changed, open Firebase console → **Firestore → Rules**, paste in the new contents, and click **Publish**. Do this before players use the new version. The rules have not changed since the delete-your-own-trainer update, so if you already published those there is nothing to do for Mega Evolution or the handbook data: both are stored in documents the existing rules already limit to you.
+2. If `firestore.rules` changed, open Firebase console → **Firestore → Rules**, paste in the new contents, and click **Publish**. Do this before players use the new version. The rules have not changed since the delete-your-own-trainer update, so if you already published those there is nothing to do for Mega Evolution, the handbook data, evolution, or the Battle page: they are all stored in documents the existing rules already cover (the secret foe sheets go in `gm/battle`, which only you can read).
 3. GitHub Pages takes a minute or two to update (check the repository's **Actions** tab for a green tick). Each person should refresh the page once, holding Shift while clicking reload.
-4. **Check that the new version is running.** The very bottom of every page says **Version** followed by a date and a name (this release: `Version 2026-10-10 · Evolution`). If it is missing or shows something older, the browser is still using the old files. Reload with Shift held, or open the site in a private window. If a private window is also old, the upload did not replace the files: check that `app.js` and `index.html` are in the top level of the repository (not in a sub-folder) and that you pressed **Commit changes**.
+4. **Check that the new version is running.** The very bottom of every page says **Version** followed by a date and a name (this release: `Version 2026-10-10 · Battle`). If it is missing or shows something older, the browser is still using the old files. Reload with Shift held, or open the site in a private window. If a private window is also old, the upload did not replace the files: check that `app.js` and `index.html` are in the top level of the repository (not in a sub-folder) and that you pressed **Commit changes**.
 
-Nothing in your database changes when you update the files. The handbook data is a separate step (see **Handbook data** below). **This release comes with a new `pta-handbook-data.json`** that adds evolution lines and five species the first file missed (Bisharp, Heliolisk, Amoonguss, Stantler and Azumarill). Import it again once (**GM Desk → Handbook data → Import again**). Until you do, everything else keeps working, but Pokémon show no Evolution panel and the GM Desk says a re-import is needed.
+Nothing in your database changes when you update the files. The handbook data is a separate step (see **Handbook data** below). The handbook data is version 2 (`pta-handbook-data.json`): it adds evolution lines and five species the first file missed (Bisharp, Heliolisk, Amoonguss, Stantler and Azumarill). **If you have already imported that file, this release needs no new import.** If you have not, import it once (**GM Desk → Handbook data → Import again**). Until then everything else keeps working, but Pokémon show no Evolution panel, foes and gifts fall back to basic numbers, and the GM Desk says a re-import is needed.
 
 ## How it looks
 
@@ -172,6 +175,70 @@ A per-Pokémon approval **closes itself** the moment that Pokémon evolves, so t
 
 **Stat passives and the Adj boxes.** The stats printed in the Pokédex already include the effect of passives such as Power Up (+1 Attack) or Mighty (+2 Attack), so the app does **not** add them again. Because of that, if a player adds, removes or changes one of those passives by hand, the shown stats do not move by themselves. The app notices and offers a note on the card, **Passives changed**, with the stat change the passive implies. **Add to Adj** applies it to the Adj boxes, and **Leave it** dismisses it. The same prompt appears after an evolution if the new species' passives differ from the old. Situational passives (such as Guts) are not part of the printed numbers and are never counted.
 
+## Battle
+
+**Table → Battle** runs a fight. Everyone sees the turn order, the round, and whose turn it is, and the page updates for everyone as you change it. The menu shows **LIVE** next to Battle while one is running.
+
+**Setting up (GM).** Under **Who is fighting**, add a whole party, single Pokémon, and foes. Then tap **Roll initiative**. Two ways to decide the order, switchable any time:
+
+- **Highest Speed first** (the default): each one's Speed, with ties settled by a hidden d20.
+- **d20 + Speed**: each rolls a d20 and adds Speed.
+
+**Next turn** moves on and counts the rounds. A Pokémon at 0 HP is marked **Down** and skipped. If someone's Speed changes mid-fight (a Speed ▲ is +5 Speed per step), **Re-sort by Speed** puts everyone back in order. On any row, **Acts now** jumps the turn there, ↑ and ↓ move it in the order, and **Remove from battle** (two taps) takes it out. Only the GM adds or removes Pokémon.
+
+**Health, stages and status.** Open a row with **Details**. Players can do this for their own Pokémon, and you can for anyone. You can change HP with the −5 / −1 / +1 / +5 buttons or by typing an **Amount** and tapping **Damage** or **Heal**. HP is capped between 0 and the maximum. Under it are the status chips (Bound, Burned, Confused, Dazed, Disabled, Drowsy, Entranced, Frostbitten, Paralyzed, Poisoned, Toxified) and the **combat stages**: each of Atk, Def, SpAtk, SpDef and Spd goes from −3 to +3 and shows as ▲ or ▼. These are saved on the Pokémon's own card too (Pokémon page → Combat stages), so the two stay the same. Stages change rolls like this:
+
+- Each Attack or Sp. Attack ▲ on the attacker adds **1 die** to the damage, and each ▼ removes one.
+- Each Defense or Sp. Defense ▼ on the target adds 1 die, and each ▲ removes one.
+- Speed ▲ and ▼ move Speed by 5 per step (for initiative and for Effect-move accuracy).
+
+**End battle** (two taps) clears the order and every foe, and also does what **End battle** on the Pokémon page does for each trainer: Mega forms revert, Key Stones recharge, and stages reset to zero.
+
+### Foes the players cannot see
+
+A foe has its own sheet (species, types, HP, stats, moves, passives, your notes). It is filled in from the handbook data when the species is listed, otherwise it starts from basic numbers (you can edit every field). Add several of the same species at once with **How many** (up to 8).
+
+**The sheet is stored in `gm/battle`, a document that Firestore's rules let only you read.** A player's browser never receives it, so there is nothing hidden "behind" the screen to find. What the table sees is a separate, smaller document (`meta/battle`) that holds only what you have chosen to show:
+
+- By default a foe is just **Foe A**, **Foe B**… with a question-mark picture, **Types unknown**, and **Health hidden**.
+- Open the foe and use **GM only · what the players see**: tick **Name**, **Picture**, **Types**, and **Status and stages** as you like, and set **Health** to **Hidden**, **Bar only** (a bar with no numbers), or **Numbers**. **Show everything** and **Hide everything** do the lot at once. **Name while hidden** lets you rename "Foe A" to something like "Shadow in the grass". A line under the controls spells out exactly what players now see.
+- A foe's initiative number and Speed are never shared. Players just see where it stands in the order.
+- Your **Notes** on a foe are yours only.
+- A foe at 0 HP shows as **Down** to everyone, even if its health is hidden. (Otherwise the order would stall with no reason given.)
+
+**Moves and rolling for a foe.** Each move on the sheet has **Roll attack** (accuracy and damage) and **Damage only**. Pick a **Target** among the Pokémon in the fight first, and the roll compares against that Pokémon's Defense and types. Typing a move's name into an empty row fills in the rest from the handbook. The table log shows a foe's roll as **totals only** (accuracy 14, hit, damage 21), never its dice or its stats. Tick **Roll in secret** to keep a roll off the shared log.
+
+**Caught.** On a foe's sheet, pick a trainer under **Caught by** and tap **Give to trainer**: its sheet and current HP are copied into that trainer's party (or box if the party is full) and it leaves the fight.
+
+## Dice and the roll log
+
+**Rolling a move.** Every move on a Pokémon card has a **Roll …** button (players do not get it on another player's Pokémon, which they can only read). It opens a small form:
+
+- **Target:** the others in the battle, by the names the table can see. Optional.
+- **Type advantage:** **Automatic** uses the PTA type chart when the target's types are known (a player's Pokémon, or a foe whose types you have shown), and treats it as neutral otherwise. Or pick Neutral, Super effective (+1 die), Extremely effective (+2), Resisted (−1), Shielded (−2) or No effect yourself, for example once the GM tells you.
+- **Accuracy bonus** and **Damage bonus**, for anything the handbook gives you.
+- **Normal / Advantage / Disadvantage** (the same switch as the skill checks): two d20s, taking the higher or lower.
+- **Critical hit (damage only)**, for when you rolled the 20 yourself or the GM says so.
+
+**Roll attack** makes the accuracy check and the damage roll together, following the PTA 3.5 handbook:
+
+- **Accuracy:** d20 + the modifier of Attack (Physical), Sp. Attack (Special), or Speed (Effect moves). When the target's Defense (or Sp. Defense, or Speed) is visible, as with another player's Pokémon, it says **Hit** or **Miss**. Against a hidden foe it does not say, because that would reveal its Defense: the GM calls it.
+- **Damage:** the move's dice (for example 3d8), plus 1 die per step of type advantage or stage, minus 1 per step of resistance, then plus the stat modifier and **+4 if the move's type matches one of the Pokémon's types**. **No effect** deals 0.
+- **Critical hit:** a natural 20 on the accuracy roll. Every die then counts as its highest face.
+- **Effect moves** roll accuracy only. A move with no dice listed also rolls accuracy only.
+
+**Damage only** rolls just the damage (use the critical box when it applies).
+
+**Where results go.** The Pokétch box at the corner shows the full working. The same roll is saved on the player's trainer sheet and shows in **Battle → Table rolls** for everyone, with its working. Skill and stat checks from the Trainer sheet go there too. The newest 20 rolls per player (and 20 of the GM's) are kept, and the log shows the newest 30 overall. As GM you can **Clear the log** (two taps) and tick **Roll in secret** so your next rolls stay on your screen only.
+
+**Apply.** When a logged attack has a target and damage, you see a button such as **Apply 22 to Foe A** (or to a player's Pokémon). Tapping it subtracts that damage from the target's HP and marks the roll as applied. Nothing is subtracted automatically.
+
+## Giving Pokémon and the evolution log
+
+**GM Desk → Give a Pokémon.** Pick a trainer, type a species (and optionally a nickname and where they got it) and tap **Give it**. The sheet is filled in from the handbook data (stats, types, passives, moves). It goes to the party, or to the box if the party already has six. A species the data does not know is still given, with basic numbers to edit.
+
+**GM Desk → Evolution log.** Every evolution, by a player or by you, is listed with the trainer, the Pokémon, "from → to", and the date. Undoing an evolution removes its line. The list starts with evolutions made on this version; earlier ones were not recorded.
+
 ## Deleting trainers and Pokémon
 
 - **A Pokémon:** open its card on the **Pokémon** page and tap **Delete Pokémon** twice.
@@ -183,6 +250,7 @@ A per-Pokémon approval **closes itself** the moment that Pokémon evolves, so t
 
 - **The repository contains** the app and the player-facing text for each place on the map. Nothing secret lives in it: no GM notes, no NPC secrets, no passwords, no map image. Those are in Firebase, and the rules keep players out of the GM-only parts.
 - **Cost.** The Spark plan has daily limits (about 50,000 reads and 20,000 writes). They reset around midnight Pacific time. A table of a handful of players should stay far below them. If a limit is ever hit, the app stops loading data until the next day. Nothing is charged on the Spark plan.
+- **What the Battle page keeps secret, and what it does not.** Foe sheets are protected by the database itself (`gm/battle`), so players cannot read them even if they try. The roll log and the Mega and evolution approvals are different: they are stored where a determined player editing their own sheet could tamper with them, so they rely on trust at the table, as the Mega approvals already did.
 - **Backups.** Every player has **Download my backup**. As GM, your backup contains the whole table. Do one now and then.
 - **Removing someone.** **GM Desk → Table access → Remove** ends their access. Anyone who still knows the table code can join again, so change the code too if you want to keep someone out.
 - **Forgotten passwords.** Players use **Forgot your password?** on the sign-in screen. The email comes from Firebase.

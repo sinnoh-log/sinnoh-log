@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-10 · Evolution';
+const BUILD='2026-10-10 · Battle';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -39,10 +39,10 @@ const DEF_META={campaign:'Sinnoh Trainer Log',subtitle:'Post-game Sinnoh · ten 
 const NAV=[
   ['Narrative',[['overview','Overview'],['journal','Journal'],['timeline','Timeline']]],
   ['World',[['people','People'],['leads','Leads'],['map','Map']]],
-  ['Table',[['trainer','Trainer'],['pokemon','Pokémon']]]
+  ['Table',[['trainer','Trainer'],['pokemon','Pokémon'],['battle','Battle']]]
 ];
 const GM_NAV=['Game Master',[['gm','GM Desk']]];
-const PAGE_LABEL={overview:'Overview',journal:'Journal',timeline:'Timeline',people:'People',leads:'Leads',map:'Map',place:'Place',trainer:'Trainer sheet',pokemon:'Pokémon',gm:'GM Desk',account:'Account'};
+const PAGE_LABEL={overview:'Overview',journal:'Journal',timeline:'Timeline',people:'People',leads:'Leads',map:'Map',place:'Place',trainer:'Trainer sheet',pokemon:'Pokémon',battle:'Battle',gm:'GM Desk',account:'Account'};
 const PIN_KINDS=[['place','Place'],['party','Party'],['danger','Danger'],['lead','Lead']];
 const AWARD_TYPES=['Gym Badge','Trial Medal','Frontier Symbol','Contest Ribbon','Certificate','Emblem of Recognition','Loyal Partner','Moment of Destiny','Other'];
 
@@ -88,7 +88,7 @@ const S={
   ready:false,noDb:false,db:null,user:null,dl:null,
   me:{id:null,admin:false,canWrite:true},
   tab:'overview',viewUid:null,
-  megaOk:{},trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},
+  megaOk:{},battle:{},battleGm:{},trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},
   awards:{},timeline:{},pins:{},banner:{},places:{},gmPl:{},placeId:null,members:{},invite:null,mapChunks:{},mapSrc:'',room:null,peers:[],avatars:{},
   pick:null,names:{},save:{cls:'',text:'Saved'},rolls:[],_tsig:'',
   ui:{open:{},adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},pop:null,megaPop:null,
@@ -147,7 +147,7 @@ const PD_BY={};PD.forEach(f=>{PD_BY[f.id]=f;});
 const PLACES=PD.map(f=>f.name).sort();
 
 /* ---------- store: refs, local copies, write queue ---------- */
-const SET_ALWAYS=new Set(['meta','gl','gn','bn','pl','gp','mg']);
+const SET_ALWAYS=new Set(['meta','gl','gn','bn','pl','gp','mg','bt','gb']);
 function refFor(sc,id){
   const db=S.db;
   switch(sc){
@@ -165,6 +165,8 @@ function refFor(sc,id){
     case 'aw':return db.collection('awards').doc(id);
     case 'bn':return db.collection('meta').doc('banner');
     case 'mg':return db.collection('meta').doc('mega');
+    case 'bt':return db.collection('meta').doc('battle');
+    case 'gb':return db.collection('gm').doc('battle');
     case 'pl':return db.collection('places').doc(id);
     case 'gp':return db.collection('gm').doc('place_'+id);
   }
@@ -185,6 +187,8 @@ function getLocal(sc,id){
     case 'aw':return S.awards[id];
     case 'bn':return S.banner;
     case 'mg':return S.megaOk;
+    case 'bt':return S.battle;
+    case 'gb':return S.battleGm;
     case 'pl':return S.places[id];
     case 'gp':return S.gmPl[id];
   }
@@ -205,6 +209,8 @@ function putLocal(sc,id,d){
     case 'aw':S.awards[id]=d;break;
     case 'bn':S.banner=d;break;
     case 'mg':S.megaOk=d;break;
+    case 'bt':S.battle=d;break;
+    case 'gb':S.battleGm=d;break;
     case 'pl':S.places[id]=d;break;
     case 'gp':S.gmPl[id]=d;break;
   }
@@ -284,7 +290,7 @@ function withPending(sc,id,d){
 function edit(sc,id,path,v){
   let doc=getLocal(sc,id);
   if(!doc){
-    if(sc==='gl'||sc==='gn'||sc==='pl'||sc==='gp'||sc==='mg'){doc={};putLocal(sc,id,doc);}
+    if(sc==='gl'||sc==='gn'||sc==='pl'||sc==='gp'||sc==='mg'||sc==='bt'||sc==='gb'){doc={};putLocal(sc,id,doc);}
     else return;
   }
   const parts=path.split('.');
@@ -355,6 +361,10 @@ function startWatches(){
     if(s.exists)S.megaOk=withPending('mg','mega',s.data());
     else if(!Q.has('mg|mega'))S.megaOk={};
   },'mega');
+  watch(db.collection('meta').doc('battle'),s=>{
+    if(s.exists)S.battle=withPending('bt','battle',s.data());
+    else if(!Q.has('bt|battle'))S.battle={};
+  },'battle');
   watch(db.collection('meta').doc('pta_idx'),s=>{ptaSetIdx(s.exists?s.data():null);},'pta');
   watch(db.collection('mapimg'),s=>{
     const o={};
@@ -369,8 +379,10 @@ function startWatches(){
   if(S.me.admin){
     watch(db.collection('gm'),s=>{
       const loy={},npc={},gpl={};
+      let gbat=null;
       s.docs.forEach(d=>{
-        if(d.id.indexOf('loy_')===0)loy[d.id.slice(4)]=withPending('gl',d.id.slice(4),d.data());
+        if(d.id==='battle')gbat=withPending('gb','battle',d.data());
+        else if(d.id.indexOf('loy_')===0)loy[d.id.slice(4)]=withPending('gl',d.id.slice(4),d.data());
         else if(d.id.indexOf('npc_')===0)npc[d.id.slice(4)]=withPending('gn',d.id.slice(4),d.data());
         else if(d.id.indexOf('place_')===0)gpl[d.id.slice(6)]=withPending('gp',d.id.slice(6),d.data());
       });
@@ -378,6 +390,7 @@ function startWatches(){
       Object.keys(S.gmLoy).forEach(id=>{if(!(id in loy)&&Q.has('gl|'+id))loy[id]=S.gmLoy[id];});
       Object.keys(S.gmNpc).forEach(id=>{if(!(id in npc)&&Q.has('gn|'+id))npc[id]=S.gmNpc[id];});
       S.gmLoy=loy;S.gmNpc=npc;S.gmPl=gpl;
+      if(gbat)S.battleGm=gbat;else if(!Q.has('gb|battle'))S.battleGm={};
     },'gm');
   }
   if(CFG&&S.me.admin){
@@ -854,6 +867,7 @@ function renderSoon(){
 /* the species box was picked from the list, changed, or left: fill in the rest */
 function onSpeciesChange(t){
   if(ptaRowFill(t))return true;
+  if(foeRowFill(t))return true;
   const m=/^p\|([^|]+)\/([^|]+)\|species$/.exec(t.dataset.b||'');
   if(!m)return false;
   if(!getLocal('p',m[1]+'/'+m[2]))return true;
@@ -1001,7 +1015,10 @@ function endBattle(uid){
   let n=0;
   const t=S.trainers[uid];
   if(t&&t.megaUsed){edit('t',uid,'megaUsed',false);n++;}
-  monsOf(uid).forEach(m=>{if(m.megaOn){edit('p',uid+'/'+m.id,'megaOn',false);n++;}});
+  monsOf(uid).forEach(m=>{
+    if(m.megaOn){edit('p',uid+'/'+m.id,'megaOn',false);n++;}
+    if(STATS.some(s=>stg(m,s[0])))edit('p',uid+'/'+m.id,'stages',{atk:0,def:0,spa:0,spd:0,spe:0});
+  });
   return n;
 }
 function endBattleAll(){
@@ -1584,6 +1601,7 @@ async function evoGo(uid,pid){
   if(si)edit('p',id,'autoSid',si.sid);
   edit('p',id,'psRef',psEffect(p.passives));
   edit('p',id,'evoUndo',undo);
+  edit('p',id,'evoLog',(Array.isArray(m.evoLog)?m.evoLog:[]).concat([{at:undo.at,from:undo.from,to:rec.n}]).slice(-12));
   const mf=syncMega(uid,pid);
   S.ui.evo=null;
   const pop={uid,pid};
@@ -1607,6 +1625,7 @@ function evoUndo(uid,pid){
     if(it&&dexKey(it.name).indexOf(dexKey(U.stone.name))>=0)edit('t',uid,'items.'+U.stone.i+'.qty',U.stone.qty);
   }
   edit('p',id,'evoUndo',null);
+  edit('p',id,'evoLog',(Array.isArray(m.evoLog)?m.evoLog:[]).filter(x=>x&&x.at!==U.at));
   toast('Back to '+U.from+'.',true);
   render();
 }
@@ -1715,6 +1734,989 @@ function evoDesk(){
             <span class="seg" role="group" aria-label="Allow ${mName(m)} to evolve"><button data-act="evoGate" data-pid="${m.id}" data-v="1" aria-pressed="${String(on||free)}">Allowed</button><button data-act="evoGate" data-pid="${m.id}" data-v="0" aria-pressed="${String(!on&&!free)}">Not allowed</button></span></span></div></li>`;})}</ul></div>`)
         :h`<p class="sub">No Pokémon that can still evolve yet.</p>`)}
   </section>`;
+}
+
+/* ---------- Rolls: type chart, combat stages, attack rolls and the table's shared roll log ----------
+   The rules come from the PTA 3.5 Players Handbook (Making an Accuracy Check, Calculating Damage, Stat Ups and Downs).
+   Accuracy:  1d20 + the attacker's stat modifier, against the target's Defense, Sp. Defense or Speed (Effect moves).
+   Damage:    the move's dice, +1 die per step of type advantage, -1 per step of resistance, +1 per Attack stage up and per
+              Defense stage down (the reverse for stages the other way), then the stat modifier and +4 for a same-type move.
+              A natural 20 on the accuracy roll is a critical hit: every die counts as its highest face. */
+S.ui.mr=S.ui.mr||{};
+
+/* the book's type chart: "+" super effective, "-" resisted, "0" no effect. One line per attacking type. */
+const TCH_SRC={
+  Bug:'+Dark,Grass,Psychic|-Fairy,Fighting,Fire,Flying,Ghost,Poison,Steel|',
+  Dark:'+Ghost,Psychic|-Dark,Fairy,Fighting|',
+  Dragon:'+Dragon|-Steel|Fairy',
+  Electric:'+Flying,Water|-Dragon,Electric,Grass|Ground',
+  Fairy:'+Dark,Dragon,Fighting|-Fire,Poison,Steel|',
+  Fighting:'+Dark,Ice,Normal,Rock,Steel|-Bug,Fairy,Flying,Poison,Psychic|Ghost',
+  Fire:'+Bug,Grass,Ice,Steel|-Dragon,Fire,Rock,Water|',
+  Flying:'+Bug,Fighting,Grass|-Electric,Rock,Steel|',
+  Ghost:'+Ghost,Psychic|-Dark|Normal',
+  Grass:'+Ground,Rock,Water|-Bug,Dragon,Fire,Flying,Grass,Poison,Steel|',
+  Ground:'+Electric,Fire,Poison,Rock,Steel|-Bug,Grass|Flying',
+  Ice:'+Dragon,Flying,Grass,Ground|-Fire,Ice,Steel,Water|',
+  Normal:'|-Rock,Steel|Ghost',
+  Poison:'+Fairy,Grass|-Ghost,Ground,Poison,Rock|Steel',
+  Psychic:'+Fighting,Poison|-Psychic,Steel|Dark',
+  Rock:'+Bug,Fire,Flying,Ice|-Fighting,Ground,Steel|',
+  Steel:'+Fairy,Ice,Rock|-Electric,Fire,Steel,Water|',
+  Water:'+Fire,Ground,Rock|-Dragon,Grass,Water|'
+};
+const TCH={};
+Object.keys(TCH_SRC).forEach(a=>{
+  const parts=TCH_SRC[a].split('|'),o={};
+  (parts[0]||'').replace(/^\+/,'').split(',').filter(Boolean).forEach(t=>{o[t]=1;});
+  (parts[1]||'').replace(/^-/,'').split(',').filter(Boolean).forEach(t=>{o[t]=-1;});
+  (parts[2]||'').split(',').filter(Boolean).forEach(t=>{o[t]='i';});
+  TCH[a]=o;
+});
+/* how a move of one type lands on a target of one or two types: c is a code, d is the number of dice added or removed */
+function effOf(mvType,types){
+  const row=TCH[mvType];
+  const ts=(types||[]).filter(Boolean);
+  if(!row||!ts.length)return {c:'n',d:0};
+  let d=0;
+  for(let i=0;i<ts.length;i++){
+    const v=row[ts[i]];
+    if(v==='i')return {c:'i',d:0};
+    d+=v||0;
+  }
+  d=clamp(d,-2,2);
+  return {c:['h','r','n','s','x'][d+2],d};
+}
+const EFF_CODES={n:{c:'n',d:0},s:{c:'s',d:1},x:{c:'x',d:2},r:{c:'r',d:-1},h:{c:'h',d:-2},i:{c:'i',d:0}};
+const EFF_LBL={n:'Neutral',s:'Super effective',x:'Extremely effective',r:'Resisted',h:'Shielded',i:'No effect'};
+const EFF_PICK=[['auto','Automatic'],['n','Neutral'],['s','Super effective (+1 die)'],['x','Extremely effective (+2 dice)'],['r','Resisted (−1 die)'],['h','Shielded (−2 dice)'],['i','No effect']];
+
+/* ----- combat stages: -3 to +3 per stat, shown as ▲ and ▼ ----- */
+const STG_MAX=3;
+const stg=(o,k)=>clamp(Math.round(num(o&&o.stages&&o.stages[k])),-STG_MAX,STG_MAX);
+const stgTxt=n=>n>0?'▲'.repeat(n):n<0?'▼'.repeat(-n):'–';
+/* Speed ▲ and ▼ move the Speed stat itself, by 5 for each step */
+const spdOf=m=>effStat(m,'spe')+5*stg(m,'spe');
+const stgPills=o=>STATS.filter(s=>stg(o,s[0])).map(s=>h`<span class="pill stg ${stg(o,s[0])>0?'up':'dn'}">${s[2]}${stgTxt(stg(o,s[0]))}</span>`);
+/* the five steppers. sc/id/path say where the stages are stored: a Pokémon's own sheet or a foe's secret sheet. */
+function stagePanel(sc,id,path,o,ro,cid){
+  return h`<div class="stgrow" role="group" aria-label="Combat stages">${STATS.map(s=>{
+    const v=stg(o,s[0]);
+    return h`<div class="stg ${v>0?'up':v<0?'dn':''}"><span class="sl">${s[2]}</span>
+      ${ro?'':h`<button class="btn sm ghost" data-act="b_stg" data-sc="${sc}" data-id="${id}" data-path="${path}" data-k="${s[0]}" data-d="-1" data-cid="${cid||''}" aria-label="Lower ${s[1]} stage" ${v<=-STG_MAX?raw('disabled'):''}>−</button>`}
+      <b class="sv" aria-label="${s[1]} stage ${v}">${stgTxt(v)}</b>
+      ${ro?'':h`<button class="btn sm ghost" data-act="b_stg" data-sc="${sc}" data-id="${id}" data-path="${path}" data-k="${s[0]}" data-d="1" data-cid="${cid||''}" aria-label="Raise ${s[1]} stage" ${v>=STG_MAX?raw('disabled'):''}>+</button>`}</div>`;
+  })}</div>`;
+}
+
+/* ----- afflictions ----- */
+const AFFL=['Bound','Burned','Confused','Dazed','Disabled','Drowsy','Entranced','Frostbitten','Paralyzed','Poisoned','Toxified'];
+const afflList=s=>String(s||'').split(/\s*[,;/]\s*/).map(x=>x.trim()).filter(Boolean);
+const afflHas=(s,a)=>afflList(s).some(x=>dexKey(x)===dexKey(a));
+const afflToggle=(s,a)=>{
+  const l=afflList(s);
+  return (afflHas(s,a)?l.filter(x=>dexKey(x)!==dexKey(a)):l.concat([a])).join(', ');
+};
+function afflChips(sc,id,path,cur,ro,cid){
+  return h`<div class="row evchips" role="group" aria-label="Status">${AFFL.map(a=>h`<button class="btn sm chk" data-act="b_aff" data-sc="${sc}" data-id="${id}" data-path="${path}" data-a="${a}" data-cid="${cid||''}" aria-pressed="${String(afflHas(cur,a))}" ${dis(ro)}>${a}</button>`)}</div>`;
+}
+
+/* ----- dice ----- */
+const rnd=n=>1+Math.floor(Math.random()*n);
+function parseDice(s){
+  const m=/^\s*(\d+)\s*d\s*(\d+)\s*(?:([+\-−])\s*(\d+))?\s*$/i.exec(String(s==null?'':s));
+  if(!m)return null;
+  return {n:+m[1],s:+m[2],f:m[3]?(m[3]==='+'?1:-1)*(+m[4]):0};
+}
+function d20adv(mode){
+  const a=rnd(20);
+  if(mode!=='adv'&&mode!=='dis')return {v:a,all:[a]};
+  const b=rnd(20);
+  return {v:mode==='adv'?Math.max(a,b):Math.min(a,b),all:[a,b]};
+}
+const kindStat=k=>k==='Special'?{acc:'spa',dmg:'spa',def:'spd',ab:'SpA',dab:'SpDef'}:k==='Effect'?{acc:'spe',dmg:null,def:'spe',ab:'Spe',dab:'Spe'}:{acc:'atk',dmg:'atk',def:'def',ab:'Atk',dab:'Def'};
+
+/* One attack, worked out in full. o:
+   mv {name,kind,type,dice}  aTypes  aAcc (the accuracy stat)  aDmg (the damage stat)  aStage (Attack or Sp. Attack stage)
+   tTypes (null when the target's types are not known)  tDef (null when unknown)  tStage (null when unknown)
+   eff ('auto' or a code)  accBonus  dmgBonus  adv  onlyDmg  crit
+   Nothing here touches the database. */
+function atkCalc(o){
+  const mv=o.mv||{};
+  const k=KINDS.indexOf(mv.kind)>=0?mv.kind:'Physical';
+  const ks=kindStat(k);
+  const out={k,mv:mv.name||'Move',type:mv.type||''};
+  let crit=!!o.crit;
+  if(!o.onlyDmg){
+    const r=d20adv(o.adv);
+    const mm=mod(o.aAcc);
+    const bonus=num(o.accBonus);
+    const tot=r.v+mm+bonus;
+    out.ac={tot,d:r.v,all:r.all,mod:mm,bonus,adv:o.adv==='adv'||o.adv==='dis'?o.adv:'normal',ab:ks.ab};
+    crit=r.v===20;
+    if(o.tDef!=null){out.vs=num(o.tDef);out.vsAb=ks.dab;out.hit=tot>=num(o.tDef);}
+  }
+  out.crit=crit;
+  const dc=parseDice(mv.dice);
+  if(!dc)return out;
+  const plain=k==='Effect';
+  let eff=EFF_CODES.n;
+  if(!plain){
+    if(o.eff&&o.eff!=='auto'&&EFF_CODES[o.eff])eff=EFF_CODES[o.eff];
+    else if(o.tTypes)eff=effOf(mv.type,o.tTypes);
+  }
+  out.ef=eff.c;
+  if(eff.c==='i'){out.dm={tot:0,imm:true,base:dc.n,s:dc.s,rolled:[],n:0,ef:'i'};return out;}
+  const stageD=plain?0:num(o.aStage)-num(o.tStage);
+  const n=Math.max(0,dc.n+(plain?0:eff.d)+stageD);
+  const rolled=[];
+  for(let i=0;i<n;i++)rolled.push(crit?dc.s:rnd(dc.s));
+  const sum=rolled.reduce((a,b)=>a+b,0);
+  const stab=!plain&&mv.type&&(o.aTypes||[]).indexOf(mv.type)>=0?4:0;
+  const stat=plain||!ks.dmg?0:mod(o.aDmg);
+  const extra=num(o.dmgBonus);
+  const tot=Math.max(0,sum+dc.f+stat+stab+extra);
+  out.dm={tot,base:dc.n,n,s:dc.s,rolled,eff:eff.d,stageD,fixed:dc.f,stat,stab,extra,ef:eff.c,ab:ks.ab};
+  return out;
+}
+const dieWord=n=>Math.abs(n)+(Math.abs(n)===1?' die':' dice');
+function acText(c){
+  const a=c.ac;
+  if(!a)return '';
+  const d=a.adv==='adv'?'advantage '+a.all.join(' / ')+' → '+a.d:a.adv==='dis'?'disadvantage '+a.all.join(' / ')+' → '+a.d:String(a.d);
+  let s='d20 '+d+(a.mod?' + '+a.ab+' '+a.mod:'')+(a.bonus?' '+sgn(a.bonus):'')+' = '+a.tot;
+  if(c.crit)s+=' · natural 20!';
+  if(c.vs!=null)s+=' vs '+c.vsAb+' '+c.vs+(c.hit?' · hit':' · miss');
+  return s;
+}
+function dmText(c){
+  const m=c.dm;
+  if(!m)return '';
+  if(m.imm)return EFF_LBL.i+': no damage.';
+  const bits=[];
+  if(m.eff)bits.push((m.eff>0?'+':'−')+dieWord(m.eff)+' '+EFF_LBL[m.ef].toLowerCase());
+  if(m.stageD)bits.push((m.stageD>0?'+':'−')+dieWord(m.stageD)+' from stages');
+  const dice=m.base+'d'+m.s+(bits.length?' ('+bits.join(', ')+') = '+m.n+'d'+m.s:'');
+  let s=dice+(c.crit?' · critical, every die at its top face':'')+': ['+m.rolled.join(', ')+']';
+  const add=[];
+  if(m.fixed)add.push(sgn(m.fixed));
+  if(m.stat)add.push('+'+m.stat+' '+m.ab);
+  if(m.stab)add.push('+4 same-type');
+  if(m.extra)add.push(sgn(m.extra));
+  return s+(add.length?' '+add.join(' '):'')+' = '+m.tot;
+}
+
+/* ----- the roll log ----- */
+function rollWho(){
+  const uid=S.me.id,t=uid&&S.trainers[uid];
+  return t&&t.name?t.name:(S.me.admin?(S.meta.gm||'GM'):'Someone');
+}
+/* Local box first (full detail), then the table's log. e.gm marks a roll the GM makes for a foe. */
+function logRoll(e,local){
+  e.id=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  e.at=Date.now();
+  S.rolls.unshift(local||e);
+  S.rolls=S.rolls.slice(0,6);
+  S.ui.rollHidden=false;
+  if(S.ui.secret&&S.me.admin)return;
+  const uid=S.me.id;
+  if(e.gm&&S.me.admin){
+    e.who=S.meta.gm||'GM';
+    edit('bt','battle','rolls',[e].concat((S.battle&&S.battle.rolls)||[]).slice(0,20));
+  }else if(uid&&S.trainers[uid]&&canEditT(uid)){
+    e.who=tName(S.trainers[uid]);
+    edit('t',uid,'rolls',[e].concat(S.trainers[uid].rolls||[]).slice(0,20));
+  }else if(S.me.admin){
+    e.who=S.meta.gm||'GM';
+    edit('bt','battle','rolls',[e].concat((S.battle&&S.battle.rolls)||[]).slice(0,20));
+  }
+}
+/* the box and the log get the same facts. A foe's attack shows only its totals, never the foe's own numbers. */
+function atkEntry(c,who,tgt,foe){
+  const e={kind:'atk',label:c.mv,type:c.type,pk:who||'',tgt:tgt&&tgt.cid||'',tn:tgt&&tgt.name||''};
+  if(c.ac)e.ac=c.ac.tot;
+  if(c.crit)e.crit=true;
+  if(c.hit!=null)e.hit=!!c.hit;
+  if(c.dm){e.dm=c.dm.tot;e.ef=c.dm.ef;}
+  const local=Object.assign({},e,{acd:acText(c),dmd:dmText(c)});
+  if(!foe){e.acd=local.acd;e.dmd=local.dmd;}
+  if(foe)e.gm=true;
+  return {e,local};
+}
+/* Attack-only text from the old Pokétch box also reads fine for a check */
+function chkEntry(label,total,detail){
+  return {kind:'chk',label,total,detail};
+}
+function allRolls(){
+  const out=[];
+  Object.keys(S.trainers).forEach(uid=>{(S.trainers[uid].rolls||[]).forEach((r,i)=>out.push(Object.assign({src:uid,i},r)));});
+  ((S.battle&&S.battle.rolls)||[]).forEach((r,i)=>out.push(Object.assign({src:'gm',i},r)));
+  return out.filter(r=>r&&r.at).sort((a,b)=>num(b.at)-num(a.at));
+}
+const hhmm=ts=>new Date(ts).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+function rollRowText(r){
+  if(r.kind==='atk'){
+    const bits=[];
+    if(r.ac!=null)bits.push('Accuracy '+r.ac+(r.crit?' (natural 20)':''));
+    if(r.dm!=null)bits.push('Damage '+r.dm);
+    return bits.join(' · ')||'Used';
+  }
+  return String(r.total);
+}
+function rollLogView(limit,gm){
+  const rows=allRolls().slice(0,limit||30);
+  if(!rows.length)return h`<p class="sub">Nothing rolled yet. Rolls from the Trainer sheet and the Pokémon cards appear here for everyone.</p>`;
+  return h`<ol class="rlog">${rows.map(r=>{
+    const ap=r.kind==='atk'&&r.dm!=null&&r.tgt&&gm&&btC(r.tgt);
+    return h`<li class="${r.kind==='atk'?'atk':''}"><span class="rt">${hhmm(r.at)}</span>
+      <span class="rb"><b>${r.who||'Someone'}</b>${r.pk?h` · ${r.pk}`:''} · ${r.label}${r.tn?h` <span class="sub">→ ${r.tn}</span>`:''}
+        <span class="rv">${rollRowText(r)}${r.hit===true?h` <span class="pill good">Hit</span>`:r.hit===false?h` <span class="pill">Miss</span>`:''}${r.crit?h` <span class="pill gm">Crit</span>`:''}${r.ef&&r.ef!=='n'?h` <span class="pill">${EFF_LBL[r.ef]}</span>`:''}</span>
+        ${r.acd||r.dmd?h`<span class="sub rd">${[r.acd,r.dmd].filter(Boolean).join(' · ')}</span>`:(r.detail?h`<span class="sub rd">${r.detail}</span>`:'')}</span>
+      ${ap?(r.ap?h`<span class="pill">Applied</span>`:h`<button class="btn sm" data-act="b_apply" data-src="${r.src}" data-id="${r.id}">Apply ${r.dm} to ${r.tn||'target'}</button>`):''}</li>`;
+  })}</ol>`;
+}
+
+/* ----- rolling a move from a Pokémon card ----- */
+const mrKey=(uid,pid,i)=>uid+'/'+pid+'#'+i;
+/* the targets a player may pick: the others in the battle, by the name everyone can see */
+function btTargets(exceptRef){
+  const b=S.battle||{};
+  if(!b.on)return [];
+  return (b.order||[]).filter(cid=>b.c&&b.c[cid]&&b.c[cid].r!==exceptRef).map(cid=>{
+    const v=btInfo(cid,false);
+    return v?{cid,name:v.name+(v.side==='a'?' ('+v.owner+')':'')}:null;
+  }).filter(Boolean);
+}
+function moveForm(uid,pid,i,x){
+  const key=mrKey(uid,pid,i);
+  const f=S.ui.mr;
+  if(f.key!==key)return '';
+  const tg=btTargets(uid+'/'+pid);
+  const info=f.tgt?btInfo(f.tgt,false):null;
+  const known=info&&info.types;
+  const plain=x.kind==='Effect';
+  return h`<div class="mrform lcd" role="group" aria-label="Roll ${x.name||'move'}">
+    <div class="mrgrid">
+      ${tg.length?h`<label class="fld"><span class="fl">Target</span><select data-u="mr.tgt"><option value="">No target</option>${tg.map(t=>h`<option value="${t.cid}" ${f.tgt===t.cid?raw('selected'):''}>${t.name}</option>`)}</select></label>`:''}
+      ${plain?'':h`<label class="fld"><span class="fl">Type advantage</span><select data-u="mr.eff">${EFF_PICK.map(([v,l])=>h`<option value="${v}" ${(f.eff||'auto')===v?raw('selected'):''}>${l}</option>`)}</select></label>`}
+      <label class="fld"><span class="fl">Accuracy bonus</span><input type="number" inputmode="numeric" data-u="mr.acc" data-nr value="${f.acc||''}" placeholder="0"></label>
+      <label class="fld"><span class="fl">Damage bonus</span><input type="number" inputmode="numeric" data-u="mr.dmg" data-nr value="${f.dmg||''}" placeholder="0"></label>
+    </div>
+    ${plain?'':h`<p class="sub">${known?'Automatic uses '+info.name+'’s types, which the GM has shown.':(f.tgt?'This target’s types are hidden, so pick the advantage yourself once the GM tells you.':'Automatic treats it as neutral unless you pick a target whose types are shown.')}</p>`}
+    <div class="row"><div class="seg" role="group" aria-label="Roll mode">${[['normal','Normal'],['adv','Advantage'],['dis','Disadvantage']].map(([v,l])=>h`<button data-act="adv" data-v="${v}" aria-pressed="${String(S.ui.adv===v)}">${l}</button>`)}</div>
+      <label class="row"><input type="checkbox" data-u="mr.crit" data-nr ${f.crit?raw('checked'):''}><span>Critical hit (damage only)</span></label></div>
+    <div class="row"><button class="btn primary sm" data-act="b_mroll" data-uid="${uid}" data-pid="${pid}" data-i="${i}">Roll attack</button>
+      <button class="btn sm" data-act="b_mdmg" data-uid="${uid}" data-pid="${pid}" data-i="${i}">Damage only</button>
+      <button class="btn sm ghost" data-act="b_mclose">Close</button></div>
+  </div>`;
+}
+function moveRoll(uid,pid,i,onlyDmg){
+  const m0=getLocal('p',uid+'/'+pid);
+  if(!m0||!canEditT(uid))return;
+  const m=Object.assign({id:pid},m0);
+  const x=(m.moves||[])[i];
+  if(!x)return;
+  const f=S.ui.mr;
+  const k=KINDS.indexOf(x.kind)>=0?x.kind:'Physical';
+  const ks=kindStat(k);
+  const info=f.tgt?btInfo(f.tgt,false):null;
+  const tgtBit=info?{cid:f.tgt,name:info.name}:null;
+  /* a target's Defense and stages are used only when everyone can see them (a player's Pokémon always can) */
+  const c=atkCalc({
+    mv:x,aTypes:effTypes(m),aAcc:k==='Effect'?spdOf(m):effStat(m,ks.acc),aDmg:ks.dmg?effStat(m,ks.dmg):0,aStage:ks.dmg?stg(m,ks.dmg):0,
+    tTypes:info?info.types:null,tDef:info&&info.stat?(k==='Effect'?info.stat.spe:info.stat[ks.def]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
+    eff:f.eff||'auto',accBonus:num(f.acc),dmgBonus:num(f.dmg),adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:!!onlyDmg&&!!f.crit
+  });
+  if(!c.ac&&!c.dm){toast('That move has no damage listed, so there is nothing to roll. Use Roll attack for the accuracy check.');return;}
+  const who=mName(m);
+  const {e,local}=atkEntry(c,who,tgtBit,false);
+  logRoll(e,local);
+  renderRoll();
+  render();
+}
+
+/* the old Pokétch box, now with attack rolls */
+function renderRoll(){
+  const el=$('#rollbox');
+  const r=S.rolls[0];
+  if(!r||S.ui.rollHidden){el.hidden=true;el.innerHTML='';return;}
+  el.hidden=false;
+  const head=r.kind==='atk'?(r.pk?r.pk+' · ':'')+r.label:r.label;
+  const more=S.rolls.length>1?h`<ul>${S.rolls.slice(1,5).map(x=>h`<li>${x.kind==='atk'?(x.pk?x.pk+' · ':'')+x.label+': '+rollRowText(x):x.label+': '+x.total}</li>`)}</ul>`:'';
+  if(r.kind==='atk'){
+    el.innerHTML=h`<div class="rh"><span>Pokétch · ${head}</span><button data-act="closeRoll" aria-label="Close roll panel">×</button></div>
+      <div class="two">${r.ac!=null?h`<div><span class="k">ACCURACY</span><div class="big sm">${r.ac}</div></div>`:''}${r.dm!=null?h`<div><span class="k">DAMAGE</span><div class="big sm">${r.dm}</div></div>`:''}</div>
+      ${r.tn?h`<div class="det">Target: ${r.tn}${r.hit===true?' · hit':r.hit===false?' · miss':''}${r.crit?' · critical':''}</div>`:(r.crit?h`<div class="det">Critical hit</div>`:'')}
+      ${r.acd?h`<div class="det dim">${r.acd}</div>`:''}${r.dmd?h`<div class="det dim">${r.dmd}</div>`:''}${more}`.s;
+    return;
+  }
+  el.innerHTML=h`<div class="rh"><span>Pokétch · ${r.label}</span><button data-act="closeRoll" aria-label="Close roll panel">×</button></div><div class="big">${r.total}</div><div class="det">${r.detail}</div>${more}`.s;
+}
+
+/* skill and stat checks from the Trainer sheet: same roll as before, and now shared */
+function doRoll(label,m,tal){
+  const r1=rollOnce();
+  let pick=r1,note='';
+  if(S.ui.adv!=='normal'){
+    const r2=rollOnce();
+    const better=S.ui.adv==='adv';
+    pick=(better?r2.base>r1.base:r2.base<r1.base)?r2:r1;
+    note=' ('+(better?'advantage':'disadvantage')+': '+r1.base+' / '+r2.base+')';
+  }
+  const total=pick.base+m+tal;
+  const e=chkEntry(label,total,'d20 '+pick.txt+' = '+pick.base+' + mod '+m+(tal?' + talent '+tal:'')+note);
+  logRoll(e);
+}
+
+/* ---------- Battle: turn order, health, stages and status, foes the GM keeps hidden, giving Pokémon, evolution log ----------
+   Two documents hold a battle:
+     meta/battle  what everyone at the table can see (the order, round, whose turn, the GM's public rolls, and for each
+                  foe only the parts the GM has chosen to show). Only the GM can write it.
+     gm/battle    the foes themselves: health, stats, moves, notes. Firestore's rules let only the GM read it, so a
+                  player's browser never receives it. Hiding a foe is therefore done by the database, not by the screen. */
+S.ui.bt=S.ui.bt||{amt:'',foeSp:'',foeNick:'',foeN:1,tgt:'',eff:'auto',open:{},giveTo:''};
+S.ui.give=S.ui.give||{uid:'',sp:'',nick:'',caught:''};
+
+const BT=()=>S.battle||{};
+const btC=cid=>(BT().c||{})[cid]||null;
+const foesOf=()=>(S.battleGm&&S.battleGm.foes)||{};
+const foeOf=cid=>foesOf()[cid]||null;
+const fStat=(f,k)=>num(f&&f.base&&f.base[k])+num(f&&f.bonus&&f.bonus[k]);
+const fSpd=f=>fStat(f,'spe')+5*stg(f,'spe');
+const newCid=()=>'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const stgObj=o=>({atk:stg(o,'atk'),def:stg(o,'def'),spa:stg(o,'spa'),spd:stg(o,'spd'),spe:stg(o,'spe')});
+const SHOW_ALL={name:1,pic:1,types:1,hp:2,st:1};
+const SHOW_NONE={name:0,pic:0,types:0,hp:0,st:0};
+const zeroStats=()=>({atk:0,def:0,spa:0,spd:0,spe:0});
+
+/* what the table sees of a foe, worked out from its secret sheet and the GM's choices. No empty values: the database refuses them. */
+function foePub(f){
+  const sh=f.sh||{};
+  const hp=f.hp||{cur:0,max:0};
+  const mx=Math.max(1,num(hp.max));
+  const p=Math.round(clamp(num(hp.cur)/mx,0,1)*100)/100;
+  const hv=num(sh.hp);
+  return {
+    n:sh.name?(f.nick||f.sp||'Foe'):(f.pn||'Foe'),
+    sp:sh.pic?(f.sp||''):'',
+    ty:sh.types?(f.ty||[]).filter(Boolean):null,
+    hp:hv>=2?{p,c:num(hp.cur),m:num(hp.max)}:hv===1?{p}:null,
+    st:sh.st?String(f.st||''):null,
+    sg:sh.st?stgObj(f):null,
+    down:num(hp.cur)<=0
+  };
+}
+function foePublish(cid){
+  const f=foeOf(cid);
+  if(!f||!btC(cid))return;
+  edit('bt','battle','c.'+cid+'.pub',foePub(f));
+}
+const foeLabel=f=>f.nick||f.sp||'Foe';
+
+/* Everything the viewer may know about one combatant. full is true only for the GM looking at a foe. */
+function btInfo(cid,full){
+  const c=btC(cid);
+  if(!c)return null;
+  if(c.s==='a'){
+    const ref=String(c.r||'');
+    const k=ref.indexOf('/');
+    const uid=ref.slice(0,k),pid=ref.slice(k+1);
+    const m0=getLocal('p',ref);
+    if(!m0)return null;
+    const m=Object.assign({id:pid},m0);
+    return {cid,side:'a',uid,pid,ref,m,name:mName(m),owner:tName(S.trainers[uid]),types:effTypes(m),
+      stat:{def:effStat(m,'def'),spd:effStat(m,'spd'),spe:spdOf(m)},stage:{def:stg(m,'def'),spd:stg(m,'spd')},
+      hp:m.hp||{cur:0,max:0},down:num(m.hp&&m.hp.cur)<=0,status:m.status||'',stages:stgObj(m),showHp:2,pic:true};
+  }
+  const f=full&&S.me.admin?foeOf(cid):null;
+  if(f){
+    return {cid,side:'f',f,name:foeLabel(f),pubName:foePub(f).n,types:(f.ty||[]).filter(Boolean),
+      stat:{def:fStat(f,'def'),spd:fStat(f,'spd'),spe:fSpd(f)},stage:{def:stg(f,'def'),spd:stg(f,'spd')},
+      hp:f.hp||{cur:0,max:0},down:num(f.hp&&f.hp.cur)<=0,status:f.st||'',stages:stgObj(f),showHp:2,pic:true};
+  }
+  const p=c.pub||{};
+  return {cid,side:'f',name:p.n||'Unknown foe',types:p.ty&&p.ty.length?p.ty:null,stat:null,
+    stage:p.sg?{def:num(p.sg.def),spd:num(p.sg.spd)}:null,
+    hp:p.hp?{cur:num(p.hp.c!=null?p.hp.c:Math.round(num(p.hp.p)*100)),max:p.hp.m!=null?num(p.hp.m):100,p:num(p.hp.p),exact:p.hp.c!=null}:null,
+    down:!!p.down,status:p.st||'',stages:p.sg||null,showHp:p.hp?(p.hp.c!=null?2:1):0,pub:p,pic:!!p.sp,sp:p.sp||''};
+}
+
+/* ----- order and turns ----- */
+function btOrder(){
+  const b=BT();
+  return (b.order||[]).filter(cid=>{
+    const c=b.c&&b.c[cid];
+    if(!c)return false;
+    return c.s==='a'?!!getLocal('p',c.r):true;
+  });
+}
+const btIsDown=cid=>{
+  const v=btInfo(cid,!!S.me.admin);
+  return !v||v.down;
+};
+function btSpeed(cid){
+  const c=btC(cid);
+  if(!c)return 0;
+  if(c.s==='a'){const m=getLocal('p',c.r);return m?spdOf(Object.assign({id:''},m)):0;}
+  const f=foeOf(cid);
+  return f?fSpd(f):0;
+}
+/* an ally's number is public; a foe's stays in the GM's secret sheet, because it would give away its Speed */
+function btIni(cid){
+  const c=btC(cid);
+  if(!c)return 0;
+  if(c.s==='a')return num(c.ini);
+  const f=foeOf(cid);
+  return f?num(f.ini):0;
+}
+function btSetIni(cid,ini,tb){
+  const c=btC(cid);
+  if(!c)return;
+  if(c.s==='a'){edit('bt','battle','c.'+cid+'.ini',ini);edit('bt','battle','c.'+cid+'.tb',tb);}
+  else{edit('gb','battle','foes.'+cid+'.ini',ini);edit('gb','battle','foes.'+cid+'.tb',tb);}
+}
+function btTb(cid){
+  const c=btC(cid);
+  if(!c)return 0;
+  if(c.s==='a')return num(c.tb);
+  const f=foeOf(cid);
+  return f?num(f.tb):0;
+}
+function btRollInit(){
+  if(!S.me.admin)return;
+  const b=BT();
+  const ids=Object.keys(b.c||{}).filter(cid=>btInfo(cid,true));
+  if(!ids.length){toast('Add some Pokémon or foes first.');return;}
+  const d20m=b.mode==='d20';
+  const rows=ids.map(cid=>({cid,ini:btSpeed(cid)+(d20m?rnd(20):0),tb:rnd(20)}));
+  rows.sort((a,z)=>z.ini-a.ini||z.tb-a.tb);
+  rows.forEach(r=>btSetIni(r.cid,r.ini,r.tb));
+  edit('bt','battle','order',rows.map(r=>r.cid));
+  const first=rows.find(r=>!btIsDown(r.cid))||rows[0];
+  edit('bt','battle','turn',first.cid);
+  edit('bt','battle','round',1);
+  edit('bt','battle','on',true);
+  toast(d20m?'Initiative rolled: d20 plus Speed.':'Turn order set by Speed.',true);
+  render();
+}
+/* Speed went up or down mid-fight: put everyone back in Speed order, keeping whose turn it is */
+function btResort(){
+  if(!S.me.admin)return;
+  const b=BT();
+  const ids=btOrder();
+  const rows=ids.map(cid=>({cid,ini:btSpeed(cid),tb:btTb(cid)||rnd(20)}));
+  rows.sort((a,z)=>z.ini-a.ini||z.tb-a.tb);
+  rows.forEach(r=>btSetIni(r.cid,r.ini,r.tb));
+  edit('bt','battle','order',rows.map(r=>r.cid));
+  render();
+}
+function btNext(){
+  if(!S.me.admin)return;
+  const b=BT();
+  if(!b.on)return;
+  const ord=btOrder();
+  if(!ord.length)return;
+  let i=ord.indexOf(b.turn),round=num(b.round)||1,cand=null;
+  for(let s=0;s<ord.length;s++){
+    i++;
+    if(i>=ord.length){i=0;round++;}
+    if(!btIsDown(ord[i])){cand=ord[i];break;}
+  }
+  if(!cand){toast('Everyone is down.');return;}
+  edit('bt','battle','turn',cand);
+  edit('bt','battle','round',round);
+  render();
+}
+function btTurnTo(cid){
+  if(!S.me.admin||!btC(cid))return;
+  edit('bt','battle','turn',cid);
+  render();
+}
+function btMove(cid,d){
+  if(!S.me.admin)return;
+  const ord=(BT().order||[]).slice();
+  const i=ord.indexOf(cid),j=i+d;
+  if(i<0||j<0||j>=ord.length)return;
+  const t=ord[i];ord[i]=ord[j];ord[j]=t;
+  edit('bt','battle','order',ord);
+  render();
+}
+function btSetMode(v){
+  if(!S.me.admin)return;
+  edit('bt','battle','mode',v==='d20'?'d20':'speed');
+  render();
+}
+
+/* ----- adding and removing combatants ----- */
+function btInsert(cid,obj,ini,tb){
+  const b=BT();
+  edit('bt','battle','c.'+cid,obj);
+  const ord=(b.order||[]).filter(x=>b.c&&b.c[x]&&x!==cid);
+  let at=ord.length;
+  for(let i=0;i<ord.length;i++){
+    const oi=btIni(ord[i]),ot=btTb(ord[i]);
+    if(ini>oi||(ini===oi&&tb>ot)){at=i;break;}
+  }
+  ord.splice(at,0,cid);
+  edit('bt','battle','order',ord);
+  btSetIni(cid,ini,tb);
+}
+function btAddAlly(uid,pid,quiet){
+  if(!S.me.admin)return;
+  const ref=uid+'/'+pid;
+  const m=getLocal('p',ref);
+  if(!m)return;
+  const b=BT();
+  if(Object.keys(b.c||{}).some(k=>b.c[k].s==='a'&&b.c[k].r===ref))return;
+  const cid=newCid();
+  const sp=spdOf(Object.assign({id:pid},m));
+  btInsert(cid,{s:'a',r:ref},sp+(b.mode==='d20'?rnd(20):0),rnd(20));
+  if(!quiet)render();
+}
+function btAddParty(uid){
+  if(!S.me.admin)return;
+  partyOf(uid).forEach(m=>btAddAlly(uid,m.id,true));
+  render();
+}
+function foeFromRec(rec,si,sp){
+  if(rec){
+    const F=ptaFields(rec);
+    return {sp:rec.n,ty:F.types,sz:F.size,wt:F.weight,hp:{cur:F.hp,max:F.hp},base:F.base,sk:F.skills,ps:F.passives,mv:F.moves};
+  }
+  if(si)return {sp:si.name,ty:si.types.slice(),sz:'Medium',wt:'Medium',hp:{cur:20,max:20},base:Object.assign({},si.base),sk:'',ps:[],mv:[]};
+  return {sp,ty:['',''],sz:'Medium',wt:'Medium',hp:{cur:20,max:20},base:{atk:3,def:3,spa:3,spd:3,spe:3},sk:'',ps:[],mv:[]};
+}
+function foeLetter(){
+  const used=new Set(Object.keys(foesOf()).map(k=>foesOf()[k].pn));
+  for(let i=0;i<26;i++){const n='Foe '+String.fromCharCode(65+i);if(!used.has(n))return n;}
+  return 'Foe '+(used.size+1);
+}
+async function btAddFoe(){
+  if(!S.me.admin)return;
+  const u=S.ui.bt;
+  const sp=String(u.foeSp||'').trim();
+  if(!sp){toast('Type a species first.');return;}
+  const n=clamp(Math.round(num(u.foeN))||1,1,8);
+  const pr=ptaResolve(sp);
+  let rec=null;
+  if(pr)rec=ptaRec(pr)||await ptaChunk(ptaLetter(ptaKey(pr))).then(()=>ptaRec(pr));
+  const si=rec?null:speciesInfo(sp);
+  const b=BT();
+  for(let i=0;i<n;i++){
+    const cid=newCid();
+    const base=foeFromRec(rec,si,sp);
+    const f=Object.assign({nick:n===1?String(u.foeNick||'').trim():'',bonus:zeroStats(),stages:zeroStats(),st:'',notes:'',sh:Object.assign({},SHOW_NONE),pn:foeLetter()},base);
+    edit('gb','battle','foes.'+cid,f);
+    btInsert(cid,{s:'f',pub:foePub(f)},fSpd(f)+(b.mode==='d20'?rnd(20):0),rnd(20));
+  }
+  u.foeSp='';u.foeNick='';u.foeN=1;
+  toast(n+(n===1?' foe':' foes')+' added'+(rec||si?'':'. That species is not in the data, so fill in its numbers by hand.'),true);
+  render();
+}
+function btRemove(cid){
+  if(!S.me.admin)return;
+  const b=BT();
+  const c=b.c&&b.c[cid];
+  if(!c)return;
+  const ord=(b.order||[]).slice();
+  const i=ord.indexOf(cid);
+  if(b.turn===cid){
+    const rest=ord.filter(x=>x!==cid);
+    edit('bt','battle','turn',rest.length?(rest[i]||rest[0]):'');
+  }
+  if(i>=0)ord.splice(i,1);
+  const nc=Object.assign({},b.c);delete nc[cid];
+  edit('bt','battle','c',nc);
+  edit('bt','battle','order',ord);
+  if(c.s==='f'){const nf=Object.assign({},foesOf());delete nf[cid];edit('gb','battle','foes',nf);}
+  delete S.ui.bt.open[cid];
+  render();
+}
+function btEnd(){
+  if(!S.me.admin)return;
+  edit('bt','battle','on',false);
+  edit('bt','battle','c',{});
+  edit('bt','battle','order',[]);
+  edit('bt','battle','turn','');
+  edit('bt','battle','round',0);
+  edit('gb','battle','foes',{});
+  S.ui.bt.open={};
+  endBattleAll();
+}
+
+/* ----- health, stages and status, for a Pokémon on the table or a foe in the GM's sheet ----- */
+function canTouch(sc,id){
+  if(sc==='p')return canEditT(String(id).split('/')[0]);
+  if(sc==='gb')return !!S.me.admin;
+  return false;
+}
+function btHp(cid,delta){
+  const c=btC(cid);
+  if(!c)return;
+  if(c.s==='a'){
+    const m=getLocal('p',c.r);
+    if(!m||!canEditT(String(c.r).split('/')[0]))return;
+    const hp=m.hp||{cur:0,max:0};
+    edit('p',c.r,'hp.cur',clamp(num(hp.cur)+delta,0,Math.max(0,num(hp.max))));
+  }else{
+    const f=foeOf(cid);
+    if(!f||!S.me.admin)return;
+    const hp=f.hp||{cur:0,max:0};
+    edit('gb','battle','foes.'+cid+'.hp.cur',clamp(num(hp.cur)+delta,0,Math.max(0,num(hp.max))));
+    foePublish(cid);
+  }
+  render();
+}
+function btStage(sc,id,path,k,d,cid){
+  if(!canTouch(sc,id))return;
+  const doc=getLocal(sc,id);
+  if(!doc)return;
+  edit(sc,id,path+'.'+k,clamp(num(getIn(doc,path+'.'+k))+d,-STG_MAX,STG_MAX));
+  if(cid&&sc==='gb')foePublish(cid);
+  render();
+}
+function btAffl(sc,id,path,a,cid){
+  if(!canTouch(sc,id))return;
+  const doc=getLocal(sc,id);
+  if(!doc)return;
+  edit(sc,id,path,afflToggle(getIn(doc,path),a));
+  if(cid&&sc==='gb')foePublish(cid);
+  render();
+}
+function applyRoll(src,id){
+  if(!S.me.admin)return;
+  const list=src==='gm'?(BT().rolls||[]):((S.trainers[src]&&S.trainers[src].rolls)||[]);
+  const i=list.findIndex(r=>r.id===id);
+  if(i<0)return;
+  const r=list[i];
+  if(r.ap||r.dm==null||!r.tgt||!btC(r.tgt))return;
+  btHp(r.tgt,-num(r.dm));
+  const arr=list.map((x,j)=>j===i?Object.assign({},x,{ap:true}):x);
+  if(src==='gm')edit('bt','battle','rolls',arr);else edit('t',src,'rolls',arr);
+  toast((r.tn||'The target')+' takes '+r.dm+'.',true);
+  render();
+}
+
+/* ----- the GM rolls for a foe ----- */
+function foeRoll(cid,i,onlyDmg){
+  if(!S.me.admin)return;
+  const f=foeOf(cid);
+  const x=f&&(f.mv||[])[i];
+  if(!x)return;
+  const k=KINDS.indexOf(x.kind)>=0?x.kind:'Physical';
+  const ks=kindStat(k);
+  const u=S.ui.bt;
+  const info=u.tgt&&btC(u.tgt)?btInfo(u.tgt,true):null;
+  const c=atkCalc({
+    mv:x,aTypes:(f.ty||[]).filter(Boolean),aAcc:k==='Effect'?fSpd(f):fStat(f,ks.acc),aDmg:ks.dmg?fStat(f,ks.dmg):0,aStage:ks.dmg?stg(f,ks.dmg):0,
+    tTypes:info?info.types:null,tDef:info&&info.stat?(k==='Effect'?info.stat.spe:info.stat[ks.def]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
+    eff:u.eff||'auto',adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:false
+  });
+  if(!c.ac&&!c.dm){toast('That move has no damage listed. Use Roll attack for the accuracy check.');return;}
+  const {e,local}=atkEntry(c,foePub(f).n,info?{cid:u.tgt,name:info.name}:null,true);
+  logRoll(e,local);
+  renderRoll();
+  render();
+}
+
+/* typing a move's name in a foe's sheet fills in the rest of the row from the handbook, when the row is still empty */
+const FOE_MV_RE=/^gb\|battle\|foes\.([^.]+)\.mv\.(\d+)\.name$/;
+function foeRowFill(t){
+  const mt=FOE_MV_RE.exec(t.dataset.b||'');
+  if(!mt)return false;
+  const cid=mt[1],i=+mt[2];
+  const go=()=>{
+    const f=foeOf(cid);
+    const row=f&&(f.mv||[])[i];
+    const L=PTA.lists;
+    if(!row||!L)return;
+    const def=L.moveMap.get(dexKey(row.name));
+    if(!def)return;
+    if(String(row.text||'').trim()||String(row.dice||'').trim())return;
+    const next=Object.assign({},row,{name:def.n,freq:def.f||row.freq,kind:def.k||row.kind,range:def.r||row.range,type:def.t||row.type,dice:def.d||'',text:def.x||''});
+    edit('gb','battle','foes.'+cid+'.mv',f.mv.map((x,j)=>j===i?next:x));
+    toast('Filled in '+def.n+' from the handbook.',true);
+    renderSoon();
+  };
+  if(PTA.lists)go();else ptaLists().then(go);
+  return true;
+}
+
+/* ----- a foe the party catches, or a Pokémon the GM hands out ----- */
+function blankMon(uid,over){
+  return Object.assign({owner:uid,nick:'',species:'',types:['',''],size:'Medium',weight:'Medium',die:'d6',hp:{cur:20,max:20},base:{atk:3,def:3,spa:3,spd:3,spe:3},bonus:zeroStats(),up:'',down:'',natureName:'',skills:'',passives:[],moves:[],item:'',status:'',caught:'',notes:'',slot:partyOf(uid).length<6?'party':'box',order:Date.now(),createdAt:Date.now()},over||{});
+}
+async function giveMon(){
+  if(!S.me.admin)return;
+  const g=S.ui.give;
+  const uid=g.uid&&S.trainers[g.uid]?g.uid:tids()[0];
+  const sp=String(g.sp||'').trim();
+  const nick=String(g.nick||'').trim(),caught=String(g.caught||'').trim();
+  if(!uid){toast('There are no trainers yet.');return;}
+  if(!sp){toast('Type a species first.');return;}
+  g.sp='';g.nick='';g.caught='';
+  /* load the handbook page for this species first, so the sheet fills in at once and the note below is the last word */
+  const pr=ptaResolve(sp);
+  if(pr&&!ptaRec(pr)){try{await ptaChunk(ptaLetter(ptaKey(pr)));}catch(e){}}
+  const id=S.db.collection('trainers').doc(uid).collection('pokemon').doc().id;
+  newDoc('p',uid+'/'+id,blankMon(uid,{nick,species:sp,caught}));
+  const known=!!(ptaResolve(sp)||speciesInfo(sp));
+  if(known)applySpecies(uid,id,true);
+  const slot=(getLocal('p',uid+'/'+id)||{}).slot;
+  toast('Gave '+sp+' to '+tName(S.trainers[uid])+(slot==='box'?' (their party is full, so it went to the box)':'')+(known?'. Its numbers were filled in from the data':'. That species is not in the data, so fill in its numbers by hand')+'.',true);
+  render();
+}
+function foeGive(cid){
+  if(!S.me.admin)return;
+  const f=foeOf(cid);
+  const uid=S.ui.bt.giveTo&&S.trainers[S.ui.bt.giveTo]?S.ui.bt.giveTo:tids()[0];
+  if(!f||!uid)return;
+  const id=S.db.collection('trainers').doc(uid).collection('pokemon').doc().id;
+  const hp=f.hp||{cur:20,max:20};
+  newDoc('p',uid+'/'+id,blankMon(uid,{
+    nick:f.nick||'',species:f.sp||'',types:[(f.ty||[])[0]||'',(f.ty||[])[1]||''],size:f.sz||'Medium',weight:f.wt||'Medium',
+    hp:{cur:Math.max(1,num(hp.cur)),max:Math.max(1,num(hp.max))},base:Object.assign({atk:3,def:3,spa:3,spd:3,spe:3},f.base),
+    skills:f.sk||'',passives:(f.ps||[]).map(x=>Object.assign({},x)),moves:(f.mv||[]).map(x=>Object.assign({},x,{used:0})),
+    caught:'Caught in the wild, session '+(num(S.meta.session)||1)
+  }));
+  toast((f.sp||'The foe')+' now belongs to '+tName(S.trainers[uid])+'.',true);
+  btRemove(cid);
+}
+
+/* =================== views =================== */
+function foePic(v){
+  if(v.pic&&(v.sp||(v.f&&v.f.sp)))return monPic({species:v.sp||(v.f&&v.f.sp),nick:v.name,img:''});
+  return h`<span class="sp-ini unk" aria-hidden="true">?</span>`;
+}
+function btHpView(v){
+  if(!v.hp)return h`<span class="sub">Health hidden</span>`;
+  if(v.side==='f'&&!v.f&&v.showHp===1){
+    return h`<span class="bhpw">${hpBar({cur:Math.round(num(v.hp.p)*100),max:100})}</span>`;
+  }
+  return h`<span class="bhpw">${hpBar(v.hp)}<span class="mono">${num(v.hp.cur)}/${num(v.hp.max)}</span></span>`;
+}
+function btRow(cid,idx,gm,turn){
+  const v=btInfo(cid,gm);
+  if(!v)return '';
+  const open=!!S.ui.bt.open[cid];
+  const mine=v.side==='a'&&canEditT(v.uid);
+  const canOpen=gm||mine;
+  const secret=v.side==='f'&&gm&&v.f;
+  const ini=v.side==='a'?num(btC(cid).ini):(gm?btIni(cid):null);
+  const sub=v.side==='a'?v.owner:(secret?'Foe · players see “'+v.pubName+'”':'Foe');
+  const types=v.types&&v.types.length?chipsOf(v.types):'';
+  const hidden=v.side==='f'&&!secret&&!v.types;
+  return h`<li class="brow ${v.side==='a'?'ally':'foe'} ${turn?'turn':''} ${v.down?'down':''}" data-cid="${cid}">
+    <div class="bmain">
+      <span class="bn" aria-label="Position ${idx+1}">${idx+1}</span>
+      <span class="bpic"><span class="spr bs ${v.side==='f'&&!v.pic?'unk':''}" ${v.side==='a'?typeVars(v.m):typeVars({types:v.types||[]})}>${v.side==='a'?monPic(v.m):foePic(v)}</span></span>
+      <div class="btx"><b class="bnm">${v.name}</b>${turn?h` <span class="pill good">Acting</span>`:''}${v.down?h` <span class="pill">Down</span>`:''}
+        <span class="sub">${sub}${ini!=null&&ini!==0?' · initiative '+ini:''}</span>
+        <div class="types">${types}${hidden?h`<span class="pill">Types unknown</span>`:''}${v.status?h`<span class="pill status">${v.status}</span>`:''}${v.stages?stgPills({stages:v.stages}):''}${secret?h`<span class="pill gm">GM sheet</span>`:''}</div></div>
+      <div class="bhp">${btHpView(v)}</div>
+      ${canOpen?h`<button class="btn sm" data-act="b_open" data-cid="${cid}" aria-expanded="${String(open)}">${open?'Close':'Details'}</button>`:''}
+    </div>
+    ${open&&canOpen?(v.side==='a'?btAllyBody(cid,v,gm,idx):btFoeBody(cid,v,idx)):''}
+  </li>`;
+}
+function btAmt(cid,canHeal){
+  return h`<div class="row bamt"><div class="hpbtns lcdbtns">${[-5,-1,1,5].map(d=>h`<button data-act="b_hp" data-cid="${cid}" data-d="${d}">${d>0?'+'+d:'−'+Math.abs(d)}</button>`)}</div>
+    <label class="fld"><span class="fl">Amount</span><input type="number" inputmode="numeric" data-u="bt.amt" data-nr value="${S.ui.bt.amt}" placeholder="0"></label>
+    <button class="btn sm danger" data-act="b_dmg" data-cid="${cid}">Damage</button><button class="btn sm" data-act="b_heal" data-cid="${cid}">Heal</button></div>`;
+}
+function btOrderBtns(cid,idx){
+  const n=btOrder().length;
+  return h`<div class="row"><button class="btn sm" data-act="b_turn" data-cid="${cid}">Acts now</button>
+    <button class="btn sm ghost" data-act="b_ord" data-cid="${cid}" data-d="-1" ${idx===0?raw('disabled'):''} aria-label="Move earlier in the order">↑</button>
+    <button class="btn sm ghost" data-act="b_ord" data-cid="${cid}" data-d="1" ${idx===n-1?raw('disabled'):''} aria-label="Move later in the order">↓</button>
+    <button class="btn sm danger ${S.ui.confirm==='bt|'+cid?'armed':''}" data-act="b_rm" data-cid="${cid}">${S.ui.confirm==='bt|'+cid?'Tap again to remove':'Remove from battle'}</button></div>`;
+}
+function btAllyBody(cid,v,gm,idx){
+  const id=v.ref;
+  return h`<div class="bbody">
+    ${btAmt(cid)}
+    <div class="fl">Status</div>${afflChips('p',id,'status',v.status,false,'')}
+    <div class="fl">Combat stages</div>${stagePanel('p',id,'stages',v.m,false,'')}
+    <div class="row"><button class="btn sm" data-act="b_card" data-uid="${v.uid}" data-pid="${v.pid}">Open the card</button></div>
+    ${gm?btOrderBtns(cid,idx):''}
+  </div>`;
+}
+function btFoeBody(cid,v,idx){
+  const f=v.f;
+  if(PTA.idx)ptaLists();
+  if(!f)return h`<div class="bbody"><p class="sub">This foe’s sheet is missing from your secret notes.</p>${btOrderBtns(cid,idx)}</div>`;
+  const P='foes.'+cid+'.';
+  const sh=f.sh||{};
+  const allies=btOrder().map(x=>btInfo(x,true)).filter(x=>x&&x.side==='a');
+  const pub=foePub(f);
+  const tr=tids();
+  const mvs=f.mv||[];
+  return h`<div class="bbody fsheet">
+    <div class="mgate secret"><span class="fl">GM only · what the players see</span>
+      <div class="row evchips" role="group" aria-label="Show players">
+        ${[['name','Name'],['pic','Picture'],['types','Types'],['st','Status and stages']].map(([k,l])=>h`<label class="chip chkc"><input type="checkbox" ${bd('gb','battle',P+'sh.'+k)} ${num(sh[k])?raw('checked'):''}><span>${l}</span></label>`)}
+        <label class="fld inl"><span class="fl">Health</span><select ${bd('gb','battle',P+'sh.hp')}>${[[0,'Hidden'],[1,'Bar only'],[2,'Numbers']].map(([n,l])=>h`<option value="${n}" ${num(sh.hp)===n?raw('selected'):''}>${l}</option>`)}</select></label></div>
+      <div class="row"><button class="btn sm" data-act="b_reveal" data-cid="${cid}" data-v="all">Show everything</button><button class="btn sm ghost" data-act="b_reveal" data-cid="${cid}" data-v="none">Hide everything</button>
+        ${fText('Name while hidden','gb','battle',P+'pn',S.battleGm,{})}</div>
+      <p class="sub">Players now see: <b>${pub.n}</b>${pub.sp?'':' (no picture)'}${pub.ty?' · '+(pub.ty.join(' / ')||'types'):' · types hidden'}${pub.hp?(pub.hp.c!=null?' · health '+pub.hp.c+'/'+pub.hp.m:' · health bar'):' · health hidden'}${pub.down?' · Down':''}. Their phones never receive the numbers you keep hidden.</p></div>
+    ${btAmt(cid)}
+    <div class="fgrid">
+      ${fText('Name','gb','battle',P+'nick',S.battleGm,{})}
+      ${fText('Species','gb','battle',P+'sp',S.battleGm,{list:'dl-species'})}
+      ${fSel('Type 1','gb','battle',P+'ty.0',S.battleGm,TYPES,{blank:'None'})}
+      ${fSel('Type 2','gb','battle',P+'ty.1',S.battleGm,TYPES,{blank:'None'})}
+      ${fNum('HP now','gb','battle',P+'hp.cur',S.battleGm,{min:0})}
+      ${fNum('HP max','gb','battle',P+'hp.max',S.battleGm,{min:1})}
+    </div>
+    <div class="stats">${STATS.map(s=>h`<div class="stat lcd"><span class="sl">${s[2]}</span><span class="sv">${fStat(f,s[0])}</span><span class="sm"><span>mod ${sgn(mod(fStat(f,s[0])))}</span></span>
+      <div class="mini"><label>Base<input type="number" ${bd('gb','battle',P+'base.'+s[0])} value="${num(f.base&&f.base[s[0]])}"></label><label>Adj<input type="number" ${bd('gb','battle',P+'bonus.'+s[0])} value="${num(f.bonus&&f.bonus[s[0]])}"></label></div></div>`)}</div>
+    <div class="fl">Status</div>${afflChips('gb','battle',P+'st',f.st,false,cid)}
+    <div class="fl">Combat stages</div>${stagePanel('gb','battle',P+'stages',f,false,cid)}
+    <div class="list"><div class="ph"><h3>Moves</h3><button class="btn sm" data-act="add" ${bp('gb','battle',P+'mv')} data-tpl="move">Add move</button></div>
+      <div class="mrgrid fopt"><label class="fld"><span class="fl">Target</span><select data-u="bt.tgt"><option value="">No target</option>${allies.map(a=>h`<option value="${a.cid}" ${S.ui.bt.tgt===a.cid?raw('selected'):''}>${a.name} (${a.owner})</option>`)}</select></label>
+        <label class="fld"><span class="fl">Type advantage</span><select data-u="bt.eff">${EFF_PICK.map(([k,l])=>h`<option value="${k}" ${(S.ui.bt.eff||'auto')===k?raw('selected'):''}>${l}</option>`)}</select></label></div>
+      <div class="row"><div class="seg" role="group" aria-label="Roll mode">${[['normal','Normal'],['adv','Advantage'],['dis','Disadvantage']].map(([k,l])=>h`<button data-act="adv" data-v="${k}" aria-pressed="${String(S.ui.adv===k)}">${l}</button>`)}</div>
+        <label class="row"><input type="checkbox" data-act="b_secret" ${S.ui.secret?raw('checked'):''}><span>Roll in secret (not shared)</span></label></div>
+      ${mvs.length?mvs.map((x,i)=>h`<div class="move"><div class="mv1">${fText('Move','gb','battle',P+'mv.'+i+'.name',S.battleGm,{list:'dl-moves'})}${fText('Uses','gb','battle',P+'mv.'+i+'.freq',S.battleGm,{})}<span></span>${rowBtns('gb','battle',P+'mv',i,mvs.length,false)}</div>
+        <div class="mv2">${fSel('Kind','gb','battle',P+'mv.'+i+'.kind',S.battleGm,KINDS,{})}${fSel('Type','gb','battle',P+'mv.'+i+'.type',S.battleGm,TYPES,{})}${fText('Range','gb','battle',P+'mv.'+i+'.range',S.battleGm,{})}${fText('Damage','gb','battle',P+'mv.'+i+'.dice',S.battleGm,{ph:'e.g. 3d8'})}</div>
+        ${fArea('Effect','gb','battle',P+'mv.'+i+'.text',S.battleGm,{rows:2})}
+        <div class="row"><button class="btn primary sm" data-act="b_fmroll" data-cid="${cid}" data-i="${i}">Roll attack</button><button class="btn sm" data-act="b_fmdmg" data-cid="${cid}" data-i="${i}">Damage only</button></div></div>`):h`<p class="sub">No moves yet. Add one, or type a move name to fill it in from the handbook.</p>`}
+    </div>
+    ${(f.ps||[]).length?h`<div class="list"><div class="ph"><h3>Passives</h3></div><ul class="mini-list">${f.ps.map(x=>h`<li><b>${x.name}</b><br><span class="sub">${x.text}</span></li>`)}</ul></div>`:''}
+    ${fArea('Notes (only you see these)','gb','battle',P+'notes',S.battleGm,{rows:2})}
+    ${tr.length?h`<div class="row"><label class="fld inl"><span class="fl">Caught by</span><select data-u="bt.giveTo">${tr.map(u=>h`<option value="${u}" ${(S.ui.bt.giveTo||tr[0])===u?raw('selected'):''}>${tName(S.trainers[u])}</option>`)}</select></label>
+      <button class="btn sm" data-act="b_give" data-cid="${cid}">Give to trainer</button><span class="sub">Copies its sheet and health to their party or box, then removes it here.</span></div>`:''}
+    ${btOrderBtns(cid,idx)}
+  </div>`;
+}
+function btAddPanel(){
+  const ids=tids();
+  const b=BT();
+  const inB=ref=>Object.keys(b.c||{}).some(k=>b.c[k].s==='a'&&b.c[k].r===ref);
+  const u=S.ui.bt;
+  return h`<section class="panel"><div class="ph"><h2>Who is fighting</h2><span class="pill gm">GM only</span></div>
+    ${ids.length?ids.map(uid=>{
+      const pt=partyOf(uid);
+      return h`<div class="mgd"><div class="row sp"><b>${tName(S.trainers[uid])}</b><button class="btn sm" data-act="b_addparty" data-uid="${uid}" ${pt.length&&!pt.every(m=>inB(uid+'/'+m.id))?'':raw('disabled')}>Add whole party</button></div>
+        ${pt.length?h`<div class="row evchips">${pt.map(m=>h`<button class="btn sm chk" data-act="b_addally" data-uid="${uid}" data-pid="${m.id}" aria-pressed="${String(inB(uid+'/'+m.id))}" ${inB(uid+'/'+m.id)?raw('disabled'):''}>${monIcon(m)}${mName(m)}</button>`)}</div>`:h`<p class="sub">No Pokémon in the party.</p>`}</div>`;
+    }):h`<p class="sub">No trainers yet.</p>`}
+    <div class="mgd"><b>Add a foe</b>
+      <p class="sub">A foe has its own sheet that only you can read. Players see only what you choose to show: by default a name like “Foe A”, no picture, no types and no health.</p>
+      <div class="fgrid">
+        <label class="fld"><span class="fl">Species</span><input type="text" list="dl-species" data-u="bt.foeSp" data-nr value="${u.foeSp}" placeholder="e.g. Houndoom"></label>
+        <label class="fld"><span class="fl">Name (optional)</span><input type="text" data-u="bt.foeNick" data-nr value="${u.foeNick}"></label>
+        <label class="fld"><span class="fl">How many</span><input type="number" inputmode="numeric" min="1" max="8" data-u="bt.foeN" data-nr value="${u.foeN}"></label>
+      </div>
+      <div class="row"><button class="btn primary sm" data-act="b_addfoe">Add foe</button></div></div>
+  </section>`;
+}
+function battleTab(){
+  const b=BT(),gm=!!S.me.admin;
+  const ord=btOrder();
+  const cur=b.turn&&ord.indexOf(b.turn)>=0?b.turn:'';
+  const cv=cur?btInfo(cur,gm):null;
+  const ask=S.ui.confirm==='bt|end';
+  const mineNow=cv&&cv.side==='a'&&canEditT(cv.uid);
+  return h`<section class="panel btl"><div class="ph"><h2>Battle</h2>${b.on?h`<span class="pill good">Round ${num(b.round)||1}</span>`:h`<span class="pill">${ord.length?'Setting up':'No battle'}</span>`}
+      ${gm?h`<div class="acts"><button class="btn primary sm" data-act="b_init" ${ord.length?'':raw('disabled')}>${b.on?'Roll initiative again':'Roll initiative'}</button><button class="btn sm" data-act="b_next" ${b.on?'':raw('disabled')}>Next turn</button>${b.on&&b.mode!=='d20'?h`<button class="btn sm" data-act="b_resort">Re-sort by Speed</button>`:''}<button class="btn sm danger ${ask?'armed':''}" data-act="b_end">${ask?'Tap again to end it for everyone':'End battle'}</button></div>`:''}</div>
+    ${gm?h`<div class="row"><div class="seg" role="group" aria-label="How turn order is decided"><button data-act="b_mode" data-v="speed" aria-pressed="${String(b.mode!=='d20')}">Highest Speed first</button><button data-act="b_mode" data-v="d20" aria-pressed="${String(b.mode==='d20')}">d20 + Speed</button></div></div>`:''}
+    ${b.on&&cv?h`<p class="bnow ${mineNow?'mine':''}">${mineNow?'Your turn: ':''}<b>${cv.name}</b> is acting${cv.side==='a'?' · '+cv.owner:''}.</p>`:(ord.length?h`<p class="sub">${b.on?'':(gm?'Add everyone, then roll initiative.':'The GM is setting up the battle.')}</p>`:h`<p class="sub">${gm?'Nothing here yet. Add your players’ Pokémon and any foes below.':'No battle is running. When the GM starts one, the turn order shows up here.'}</p>`)}
+    ${ord.length?h`<ol class="bord">${ord.map((cid,i)=>btRow(cid,i,gm,cur===cid))}</ol>`:''}
+  </section>
+  ${gm?btAddPanel():''}
+  <section class="panel"><div class="ph"><h2>Table rolls</h2>${gm?h`<div class="acts"><label class="row"><input type="checkbox" data-act="b_secret" ${S.ui.secret?raw('checked'):''}><span>Roll in secret</span></label><button class="btn sm danger ${S.ui.confirm==='bt|clr'?'armed':''}" data-act="b_clear">${S.ui.confirm==='bt|clr'?'Tap again to clear':'Clear the log'}</button></div>`:''}</div>
+    ${rollLogView(30,gm)}</section>`;
+}
+
+/* ----- GM Desk: give a Pokémon, evolution log ----- */
+function giveDesk(){
+  const ids=tids();
+  const g=S.ui.give;
+  const uid=g.uid&&S.trainers[g.uid]?g.uid:ids[0];
+  return h`<section class="panel"><div class="ph"><h2>Give a Pokémon</h2><span class="pill gm">GM only</span></div>
+    <p class="sub">Pick a trainer and a species. Stats, passives and moves fill in from the handbook, and it goes to their party (or the box if the party is full).</p>
+    ${ids.length?h`<div class="fgrid">
+      <label class="fld"><span class="fl">Trainer</span><select data-u="give.uid">${ids.map(u=>h`<option value="${u}" ${uid===u?raw('selected'):''}>${tName(S.trainers[u])}</option>`)}</select></label>
+      <label class="fld"><span class="fl">Species</span><input type="text" list="dl-species" data-u="give.sp" data-nr value="${g.sp}" placeholder="e.g. Riolu"></label>
+      <label class="fld"><span class="fl">Nickname (optional)</span><input type="text" data-u="give.nick" data-nr value="${g.nick}"></label>
+      <label class="fld wide"><span class="fl">Where or how they got it (optional)</span><input type="text" list="dl-places" data-u="give.caught" data-nr value="${g.caught}"></label>
+    </div>
+    <div class="row"><button class="btn primary sm" data-act="b_giveMon">Give it</button></div>`:h`<p class="sub">No trainers yet. Players appear here once they create a sheet.</p>`}
+  </section>`;
+}
+function evoLogRows(){
+  const rows=[];
+  tids().forEach(uid=>{
+    monsOf(uid).forEach(m=>{(m.evoLog||[]).forEach(x=>{if(x&&x.at)rows.push({uid,m,at:num(x.at),from:x.from,to:x.to});});});
+  });
+  return rows.sort((a,b)=>b.at-a.at);
+}
+function evoLogDesk(){
+  const rows=evoLogRows().slice(0,40);
+  return h`<section class="panel"><div class="ph"><h2>Evolution log</h2><span class="pill gm">GM only</span></div>
+    ${rows.length?h`<ul class="mini-list">${rows.map(r=>h`<li><div class="row sp"><span><span class="mgn">${monIcon(r.m)}<span><b>${mName(r.m)}</b> <span class="sub">${tName(S.trainers[r.uid])}</span><br>${r.from} → <b>${r.to}</b></span></span></span><span class="sub">${new Date(r.at).toLocaleDateString(undefined,{month:'short',day:'numeric'})} · ${hhmm(r.at)}</span></div></li>`)}</ul>
+      <p class="sub">Shows evolutions made since this version. An undone evolution is removed from the list.</p>`
+      :h`<p class="sub">No evolutions recorded yet. Each one, by a player or by you, is listed here with the date.</p>`}
+  </section>`;
+}
+
+/* ----- actions ----- */
+function batAct(b,e){
+  const d=b.dataset;
+  switch(d.act){
+    case 'b_open':S.ui.bt.open[d.cid]=!S.ui.bt.open[d.cid];render();break;
+    case 'b_hp':btHp(d.cid,num(d.d));break;
+    case 'b_dmg':{const n=Math.abs(num(S.ui.bt.amt));if(n)btHp(d.cid,-n);else toast('Type an amount first.');break;}
+    case 'b_heal':{const n=Math.abs(num(S.ui.bt.amt));if(n)btHp(d.cid,n);else toast('Type an amount first.');break;}
+    case 'b_stg':btStage(d.sc,d.id,d.path,d.k,num(d.d),d.cid);break;
+    case 'b_aff':btAffl(d.sc,d.id,d.path,d.a,d.cid);break;
+    case 'b_init':btRollInit();break;
+    case 'b_next':btNext();break;
+    case 'b_resort':btResort();break;
+    case 'b_mode':btSetMode(d.v);break;
+    case 'b_turn':btTurnTo(d.cid);break;
+    case 'b_ord':btMove(d.cid,num(d.d));break;
+    case 'b_addally':btAddAlly(d.uid,d.pid);break;
+    case 'b_addparty':btAddParty(d.uid);break;
+    case 'b_addfoe':btAddFoe();break;
+    case 'b_rm':{
+      const key='bt|'+d.cid;
+      if(S.ui.confirm===key){S.ui.confirm=null;btRemove(d.cid);}
+      else{S.ui.confirm=key;render();setTimeout(()=>{if(S.ui.confirm===key){S.ui.confirm=null;render();}},4000);}
+      break;}
+    case 'b_end':{
+      if(S.ui.confirm==='bt|end'){S.ui.confirm=null;btEnd();}
+      else{S.ui.confirm='bt|end';render();setTimeout(()=>{if(S.ui.confirm==='bt|end'){S.ui.confirm=null;render();}},4000);}
+      break;}
+    case 'b_clear':{
+      if(!S.me.admin)break;
+      if(S.ui.confirm==='bt|clr'){
+        S.ui.confirm=null;
+        tids().forEach(u=>{if((S.trainers[u].rolls||[]).length)edit('t',u,'rolls',[]);});
+        edit('bt','battle','rolls',[]);
+        S.rolls=[];renderRoll();render();
+      }else{S.ui.confirm='bt|clr';render();setTimeout(()=>{if(S.ui.confirm==='bt|clr'){S.ui.confirm=null;render();}},4000);}
+      break;}
+    case 'b_secret':S.ui.secret=!!b.checked;render();break;
+    case 'b_reveal':{
+      if(!S.me.admin)break;
+      edit('gb','battle','foes.'+d.cid+'.sh',Object.assign({},d.v==='all'?SHOW_ALL:SHOW_NONE));
+      foePublish(d.cid);render();break;}
+    case 'b_give':foeGive(d.cid);break;
+    case 'b_giveMon':giveMon();break;
+    case 'b_apply':applyRoll(d.src,d.id);break;
+    case 'b_fmroll':foeRoll(d.cid,num(d.i),false);break;
+    case 'b_fmdmg':foeRoll(d.cid,num(d.i),true);break;
+    case 'b_mopen':{
+      const key=mrKey(d.uid,d.pid,d.i);
+      S.ui.mr=S.ui.mr.key===key?{}:{key,tgt:'',eff:'auto',acc:'',dmg:'',crit:false};
+      render();break;}
+    case 'b_mclose':S.ui.mr={};render();break;
+    case 'b_mroll':moveRoll(d.uid,d.pid,num(d.i),false);break;
+    case 'b_mdmg':moveRoll(d.uid,d.pid,num(d.i),true);break;
+    case 'b_card':
+      S.viewUid=d.uid;S.ui.open['p'+d.uid+'/'+d.pid]=true;setTab('pokemon');break;
+  }
 }
 
 /* ---------- overview ---------- */
@@ -1925,6 +2927,8 @@ function moveRow(id,m,x,i,ro){
       ${n?h`<span class="pips" role="group" aria-label="Daily uses">${Array.from({length:n},(_,j)=>h`<button class="pip ${j<used?'spent':''}" data-act="pip" ${bp('p',id,'moves.'+i+'.used')} data-j="${j}" aria-label="Use ${j+1}" ${dis(ro)}></button>`)}</span>`:h`<span></span>`}
       ${rowBtns('p',id,'moves',i,(m.moves||[]).length,ro)}
     </div>
+    ${ro||!String(x.name||'').trim()?'':h`<div class="row mvroll"><button class="btn sm ${S.ui.mr.key===mrKey(id.split('/')[0],id.split('/')[1],i)?'primary':''}" data-act="b_mopen" data-uid="${id.split('/')[0]}" data-pid="${id.split('/')[1]}" data-i="${i}" aria-expanded="${String(S.ui.mr.key===mrKey(id.split('/')[0],id.split('/')[1],i))}">Roll ${x.name}</button></div>`}
+    ${ro?'':moveForm(id.split('/')[0],id.split('/')[1],i,x)}
     <div class="mv2">
       ${fSel('Kind','p',id,p+'kind',m,KINDS,{ro})}
       ${fSel('Type','p',id,p+'type',m,TYPES,{ro})}
@@ -1967,6 +2971,7 @@ function monBody(uid,m,ro,pos,len){
     </div></div>
     <div class="stats">${hpTile('p',id,m.hp,ro)}${tiles}</div>
     <div class="lcd acc"><span>Attack ${sgn(mod(effStat(m,'atk')))}</span><span>Sp. Attack ${sgn(mod(effStat(m,'spa')))}</span><span>Effect ${sgn(mod(effStat(m,'spe')))}</span></div>
+    <div class="stgbox"><div class="row sp"><span class="fl">Combat stages</span>${STATS.some(s=>stg(m,s[0]))?'':h`<span class="sub">none right now</span>`}</div>${stagePanel('p',id,'stages',m,ro,'')}</div>
     ${megaPanel(uid,m,ro)}
     ${evoPanel(uid,m,ro)}
     ${fText('Skills','p',id,'skills',m,{ro,ph:'Short list, separated by commas'})}
@@ -1999,7 +3004,7 @@ function monCard(uid,m,ro,pos,len){
     <div class="mh">
       <div class="mt"><div class="spr">${monPic(m)}</div><div class="mtx"><h3>${mName(m)}</h3>
         <p class="sub">${m.nick&&spLabel?spLabel:''}${m.item?h`${m.nick&&spLabel?' · ':''}${itemMini(m.item)}holding ${m.item}`:''}</p>
-        <div class="types">${typeChips(m)}${mon?h`<span class="pill mega">Mega</span>`:''}${m.status?h`<span class="pill status">${m.status}</span>`:''}${loy!==null?h`<span class="pill gm">Loyalty ${loy}</span>`:''}</div></div>
+        <div class="types">${typeChips(m)}${mon?h`<span class="pill mega">Mega</span>`:''}${m.status?h`<span class="pill status">${m.status}</span>`:''}${stgPills(m)}${loy!==null?h`<span class="pill gm">Loyalty ${loy}</span>`:''}</div></div>
         <button class="btn sm" data-act="toggle" data-key="${key}" aria-expanded="${String(open)}">${open?'Close':'Open'}</button></div>
       <div class="hpline">${hpBar(m.hp)}<span class="mono">${num(m.hp&&m.hp.cur)}/${num(m.hp&&m.hp.max)}</span></div>
       ${open?'':h`<p class="movesum">${(m.moves||[]).map(x=>x.name).filter(Boolean).join(' · ')||'No moves listed yet'}</p>`}
@@ -2245,7 +3250,8 @@ function gmTab(){
   ${CFG?tableAccess():''}
   ${awardForm()}${awardHistory()}
   ${megaDesk()}
-  ${evoDesk()}${ptaDesk()}
+  ${giveDesk()}
+  ${evoDesk()}${evoLogDesk()}${ptaDesk()}
   <section class="panel"><div class="ph"><h2>Party snapshot</h2></div>
     <p>${top?h`Highest badge count: <b class="mono">${top[1]}</b> (${tName(S.trainers[top[0]])}).`:'No trainers yet.'}</p>
     <p class="sub">Loyalty and NPC secrets are stored where only editors can read them. Players never receive that data.</p></section>
@@ -2619,32 +3625,12 @@ function rollOnce(){
   if(a===20){const b=d20();return{base:20+b,txt:'20, then '+b+' (+20)'};}
   return{base:a,txt:String(a)};
 }
-function doRoll(label,m,tal){
-  const r1=rollOnce();
-  let pick=r1,note='';
-  if(S.ui.adv!=='normal'){
-    const r2=rollOnce();
-    const better=S.ui.adv==='adv';
-    pick=(better?r2.base>r1.base:r2.base<r1.base)?r2:r1;
-    note=' ('+(better?'advantage':'disadvantage')+': '+r1.base+' / '+r2.base+')';
-  }
-  const total=pick.base+m+tal;
-  S.rolls.unshift({label,total,detail:'d20 '+pick.txt+' = '+pick.base+' + mod '+m+(tal?' + talent '+tal:'')+note});
-  S.rolls=S.rolls.slice(0,6);
-  S.ui.rollHidden=false;
-}
-function renderRoll(){
-  const el=$('#rollbox');
-  const r=S.rolls[0];
-  if(!r||S.ui.rollHidden){el.hidden=true;el.innerHTML='';return;}
-  el.hidden=false;
-  el.innerHTML=h`<div class="rh"><span>Pokétch · ${r.label}</span><button data-act="closeRoll" aria-label="Close roll panel">×</button></div><div class="big">${r.total}</div><div class="det">${r.detail}</div>${S.rolls.length>1?h`<ul>${S.rolls.slice(1,5).map(x=>h`<li>${x.label}: ${x.total}</li>`)}</ul>`:''}`.s;
-}
 
 /* ---------- page chrome ---------- */
 const navGroups=()=>{const g=S.me.admin?NAV.concat([GM_NAV]):NAV;return CFG?g.concat([['You',[['account','Account']]]]):g;};
 function tabCount(k){
   if(k==='people')return Object.keys(S.people).length;
+  if(k==='battle')return S.battle&&S.battle.on?'LIVE':0;
   if(k==='leads')return entriesOf(S.leads).filter(l=>!l.status||l.status==='open'||l.status==='chasing').length;
   return 0;
 }
@@ -2672,7 +3658,7 @@ function footer(){
 function mainHtml(){
   if(S.noDb)return emptyState('This tracker needs a signed-in view','Open it from your claude.ai link while signed in. The shared table is stored with the page, so it cannot load anywhere else.');
   if(!S.ready)return h`<p class="loading">OPENING THE TABLE…</p>`;
-  const views={overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,gm:gmTab,account:accountTab};
+  const views={overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,battle:battleTab,gm:gmTab,account:accountTab};
   let tab=S.tab;
   if(tab==='gm'&&!S.me.admin)tab='overview';
   if(tab==='account'&&!CFG)tab='overview';
@@ -2868,6 +3854,7 @@ async function removeMap(){
 }
 function act(b,e){
   const d=b.dataset;
+  if(d.act&&d.act.indexOf('b_')===0){batAct(b,e);return;}
   switch(d.act){
     case 'tab':S.ui.navOpen=false;setTab(d.tab);break;
     case 'menu':{
@@ -3149,6 +4136,7 @@ function onBound(t){
   if(sc==='t'&&path==='cls')edit('t',id,'adv','');
   if(sc==='t'&&/^items\.\d+\.name$/.test(path)){liveItemIcon(t);liveKeyLine(t,id);}
   if(sc==='p'&&/^mega\.(?!auto)/.test(path))edit(sc,id,'mega.auto',false);
+  if(sc==='gb'&&/^foes\.[^.]+\./.test(path))foePublish(path.split('.')[1]);
   if(!('nr' in t.dataset))render();
 }
 document.addEventListener('input',e=>{
@@ -3158,7 +4146,7 @@ document.addEventListener('input',e=>{
   if(t.dataset.b!=null){onBound(t);if(e.inputType==='insertReplacementText')onSpeciesChange(t);return;}
   if(t.dataset.u!=null){
     const k=t.dataset.u.split('.');
-    S.ui[k[0]][k[1]]=t.value;
+    S.ui[k[0]][k[1]]=t.type==='checkbox'?t.checked:t.value;
     if(!('nr' in t.dataset))render();
   }
 });
