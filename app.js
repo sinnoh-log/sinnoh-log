@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-09 · Handbook data';
+const BUILD='2026-10-10 · Evolution';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -1085,7 +1085,7 @@ function ptaSetIdx(d){
     if(!base.has(b))base.set(b,[]);
     base.get(b).push(n);
   });
-  PTA.idx={names,byKey,base,t:num(d.t)};
+  PTA.idx={names,byKey,base,t:num(d.t),ver:num(d.v)};
   ptaFillLists();
 }
 /* "Pikachu", "shiny pikachu" and "Zigzagoon (Urban)" find an entry; regional forms are left to the basic list */
@@ -1243,6 +1243,7 @@ function ptaApply(uid,pid,rec,force){
   if(ok.ps){edit('p',id,'passives',F.passives.map(x=>Object.assign({},x)));sig.ps=sigPs(F.passives);}else kept.push('passives');
   if(ok.mv){edit('p',id,'moves',F.moves.map(x=>Object.assign({},x)));sig.mv=sigMv(F.moves);}else kept.push('moves');
   edit('p',id,'autoSig',sig);
+  edit('p',id,'psRef',psEffect(ok.ps?F.passives:ps));
   edit('p',id,'autoPta',ptaKey(rec.n));
   if(si&&num(m.autoSid)!==si.sid)edit('p',id,'autoSid',si.sid);
   const mf=syncMega(uid,pid);
@@ -1291,7 +1292,7 @@ function ptaDesk(){
   const when=I&&I.t?new Date(I.t).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}):'';
   return h`<section class="panel"><div class="ph"><h2>Handbook data</h2><span class="pill gm">GM only</span>
       <div class="acts"><button class="btn sm" data-act="ptaPick" ${im.busy?raw('disabled'):''}>${I?'Import again':'Import handbook data'}</button></div></div>
-    ${I?h`<p class="sub">${I.names.length} Pokémon from the PTA 3 Pokédex are in your database${when?', imported '+when:''}. Type a species and its stats, passives and moves fill in. Type a move or passive name and its details fill in.</p>`
+    ${I?h`<p class="sub">${I.names.length} Pokémon from the PTA 3 Pokédex are in your database${when?', imported '+when:''}. Type a species and its stats, passives and moves fill in. Type a move or passive name and its details fill in.${I.ver>=2?' Evolution lines are included.':' This copy has no evolution lines. Import again with the newest file to turn evolution on.'}</p>`
       :h`<p class="sub">Not imported yet. Choose <b>pta-handbook-data.json</b> from the update download. This fills in stats, passives and moves when someone types a species. The handbook text goes into your database, not into the public site.</p>`}
     ${im.busy?h`<progress class="ptaprog" max="${num(im.total)}" value="${num(im.done)}" aria-label="Import progress"></progress>`:''}
     ${im.msg?h`<p class="sub ${im.bad?'bad':''}" role="status">${im.msg}</p>`:''}
@@ -1314,10 +1315,406 @@ async function ptaImport(file){
     }
     await S.db.collection('meta').doc('pta_lists').set({v:1,j:JSON.stringify({moves:d.moves||[],passives:d.passives||[],skills:d.skills||[],megas:d.megas||[]})});
     im.done++;
-    await S.db.collection('meta').doc('pta_idx').set({v:1,t:Date.now(),j:JSON.stringify(d.species.map(s=>s.n))});
+    await S.db.collection('meta').doc('pta_idx').set({v:num(d.v)||1,t:Date.now(),j:JSON.stringify(d.species.map(s=>s.n))});
     im.done++;
   }catch(e){say('The import stopped ('+((e&&e.code)||'error')+'). Some of it may be saved. Run it again to finish.',true);return;}
   say('Imported '+d.species.length+' Pokémon, '+(d.moves||[]).length+' moves, '+(d.passives||[]).length+' passives and '+(d.megas||[]).length+' Mega forms.',false);
+}
+
+/* ---------- Evolution, and stat passives ----------
+   The Pokédex lists what each species evolves into and what that needs: a stone, a place or time, or nothing
+   for a natural evolution. The GM approves an evolution the way a Mega Evolution is approved. Approval is tied to
+   the species the Pokémon is today, so it closes by itself once the Pokémon has evolved.
+   The Pokédex stat blocks already include their stat passives (Power Up, Agility +2 Speed, and so on), so a passive
+   never adds to the stats shown. When a passive that changes stats is added or removed by hand, the card offers
+   to move that difference into the Adj boxes. */
+
+/* ----- stat passives ----- */
+const EVO_FLAT=(()=>{
+  const o={};
+  [['Power Up',{atk:1}],['Thick Hide',{def:1}],['Focused',{spa:1}],['Vigilant',{spd:1}],['Nimble',{spe:1}],
+   ['Mighty',{atk:2}],['Fortified',{def:2}],['Amplified',{spa:2}],['Invulnerable',{spd:2}],['Volant',{spe:2}]]
+    .forEach(a=>{o[dexKey(a[0])]=a[1];});
+  return o;
+})();
+const PS_WORD={'special attack':'spa','special defense':'spd','attack':'atk','defense':'def','speed':'spe'};
+/* "+2 Speed" and "+1 Attack, +1 Defense" are stat passives. Anything else is left to the players. */
+function psParse(text){
+  const t=String(text==null?'':text).trim().replace(/\.$/,'');
+  if(!t)return null;
+  const e={};
+  const parts=t.split(/\s*,\s*/);
+  for(let i=0;i<parts.length;i++){
+    const m=/^\+(\d)\s+(special attack|special defense|attack|defense|speed)$/i.exec(parts[i].trim());
+    if(!m)return null;
+    const k=PS_WORD[m[2].toLowerCase()];
+    e[k]=(e[k]||0)+(+m[1]);
+  }
+  return e;
+}
+function psEffect(list){
+  const out={atk:0,def:0,spa:0,spd:0,spe:0};
+  (list||[]).forEach(p=>{
+    const k=dexKey(p&&p.name);
+    if(!k)return;
+    let e=EVO_FLAT[k]||psParse(p.text);
+    if(!e&&!String(p.text||'').trim()&&PTA.lists){const d=PTA.lists.passMap.get(k);if(d)e=psParse(d.t);}
+    if(e)STAT_KEYS.forEach(s=>{out[s]+=num(e[s]);});
+  });
+  return out;
+}
+/* what the passives added the last time the Pokémon was filled in from the handbook or evolved */
+function psRefOf(m){
+  if(m.psRef&&typeof m.psRef==='object')return m.psRef;
+  if(m.autoPta&&ptaKey(m.species)===m.autoPta){
+    const r=ptaRec(m.autoPta);
+    if(r)return psEffect((r.ps||[]).map(x=>({name:x.n,text:x.t||''})));
+  }
+  return null;
+}
+function psDelta(m){
+  const ref=psRefOf(m);
+  if(!ref)return null;
+  const cur=psEffect(m.passives);
+  const d={};let any=false;
+  STAT_KEYS.forEach(k=>{d[k]=cur[k]-num(ref[k]);if(d[k])any=true;});
+  return any?d:null;
+}
+function psHint(uid,m){
+  const d=psDelta(m);
+  if(!d)return '';
+  const bits=STAT_KEYS.filter(k=>d[k]).map(k=>sgn(d[k])+' '+STATS.find(s=>s[0]===k)[1]);
+  return h`<div class="pshint" role="status"><span>Passives changed: <b>${bits.join(', ')}</b>. The stat boxes already count the passives the handbook lists, so this difference is not in them yet.</span>
+    <span class="row"><button class="btn sm" data-act="psAdj" data-uid="${uid}" data-pid="${m.id}">Add to Adj</button><button class="btn sm ghost" data-act="psKeep" data-uid="${uid}" data-pid="${m.id}">Leave it</button></span></div>`;
+}
+function psAdj(uid,pid){
+  const id=uid+'/'+pid;
+  const m=getLocal('p',id);
+  const d=m&&psDelta(m);
+  if(!d)return;
+  STAT_KEYS.forEach(k=>{if(d[k])edit('p',id,'bonus.'+k,num(m.bonus&&m.bonus[k])+d[k]);});
+  edit('p',id,'psRef',psEffect(m.passives));
+  toast('Added the passive change to the Adj boxes.',true);
+  render();
+}
+function psKeep(uid,pid){
+  const id=uid+'/'+pid;
+  const m=getLocal('p',id);
+  if(!m)return;
+  edit('p',id,'psRef',psEffect(m.passives));
+  render();
+}
+
+/* ----- approval ----- */
+const evoGate=m=>{const v=S.megaOk&&S.megaOk['e_'+m.id];return typeof v==='string'?v:'';};
+const evoFree=()=>!!(S.megaOk&&S.megaOk.e_open===true);
+function evoOk(m,to){
+  if(S.me.admin||evoFree())return true;
+  const g=evoGate(m).split('|');
+  if(!g[0]||g[0]!==ptaKey(m.species))return false;
+  return !g[1]||g[1]===ptaKey(to);
+}
+function monById(pid){
+  const ids=tids();
+  for(let i=0;i<ids.length;i++){
+    const m=monsOf(ids[i]).find(x=>x.id===pid);
+    if(m)return {uid:ids[i],m};
+  }
+  return null;
+}
+function evoGateSet(pid,on,target){
+  if(!S.me.admin)return;
+  const f=monById(pid);
+  if(!f)return;
+  const k=ptaKey(f.m.species);
+  edit('mg','mega','e_'+pid,on?(target?k+'|'+ptaKey(target):k):'');
+  render();
+}
+function evoTarget(pid,val){
+  if(!S.me.admin)return;
+  evoGateSet(pid,true,val);
+}
+function evoOpenSet(on){
+  if(!S.me.admin)return;
+  edit('mg','mega','e_open',!!on);
+  render();
+}
+
+/* ----- what a Pokémon can become ----- */
+const evoRecOf=m=>{const pr=ptaResolve(m.species);return pr?ptaRec(pr):null;};
+const stoneOf=c=>{const x=/\b([A-Za-z]+) Stone\b/.exec(c||'');return x?x[1]+' Stone':'';};
+function bagStone(uid,name){
+  const t=S.trainers[uid];
+  if(!t||!name)return -1;
+  const k=dexKey(name);
+  return (t.items||[]).findIndex(x=>x&&dexKey(x.name).indexOf(k)>=0&&(x.qty==null||x.qty===''||num(x.qty)>0));
+}
+const splitTop=s=>{
+  const out=[];let d=0,cur='';
+  String(s==null?'':s).split('').forEach(ch=>{
+    if(ch==='(')d++;
+    if(ch===')')d=Math.max(0,d-1);
+    if(ch===','&&!d){if(cur.trim())out.push(cur.trim());cur='';}else cur+=ch;
+  });
+  if(cur.trim())out.push(cur.trim());
+  return out;
+};
+const skillKey=t=>dexKey(String(t).replace(/\s*\(.*$/,''));
+
+/* the whole change, worked out before anything is written */
+function evoPlan(uid,pid,m,toRec,cond){
+  const F=ptaFields(toRec);
+  const oldRec=evoRecOf(m);
+  const oldF=oldRec?ptaFields(oldRec):null;
+  /* passives: the new entry's list; the player's own rows win where both have the passive; passives they added themselves stay */
+  const curPs=(m.passives||[]).filter(x=>x&&String(x.name||'').trim());
+  const oldPs=new Set((oldRec?oldRec.ps:[]).map(x=>dexKey(x.n)));
+  const newPs=new Set((toRec.ps||[]).map(x=>dexKey(x.n)));
+  const own=curPs.filter(x=>{const k=dexKey(x.name);return !newPs.has(k)&&(!oldRec||!oldPs.has(k));});
+  const passives=F.passives.map(x=>{
+    const mine=curPs.find(c=>dexKey(c.name)===dexKey(x.name));
+    return Object.assign({},mine||x);
+  }).concat(own.map(x=>Object.assign({},x))).slice(0,TPL_MAX.passives);
+  const gained=F.passives.filter(x=>!curPs.some(c=>dexKey(c.name)===dexKey(x.name))).map(x=>x.name);
+  const dropped=curPs.filter(x=>{const k=dexKey(x.name);return !newPs.has(k)&&oldRec&&oldPs.has(k);}).map(x=>x.name);
+  /* skills */
+  const oldSk=new Set(splitTop(oldF?oldF.skills:'').map(skillKey));
+  const newSk=new Set(splitTop(F.skills).map(skillKey));
+  const ownSk=splitTop(m.skills).filter(t=>{const k=skillKey(t);return k&&!newSk.has(k)&&(!oldF||!oldSk.has(k));});
+  const skills=splitTop(F.skills).concat(ownSk).join(', ');
+  /* moves: everything the Pokémon knows is kept, and free slots take the new entry's moves */
+  const cur=(m.moves||[]).filter(x=>x&&String(x.name||'').trim());
+  const have=new Set(cur.map(x=>dexKey(x.name)));
+  const inNew=new Set(F.moves.map(x=>dexKey(x.name)));
+  const cands=cur.map(x=>({row:Object.assign({},x),isNew:false,inNew:inNew.has(dexKey(x.name)),sel:true}));
+  F.moves.forEach(x=>{if(!have.has(dexKey(x.name)))cands.push({row:Object.assign({},x),isNew:true,inNew:true,sel:false});});
+  let free=TPL_MAX.moves-cands.filter(c=>c.sel).length;
+  cands.forEach(c=>{if(c.isNew&&free>0){c.sel=true;free--;}});
+  const st=stoneOf(cond);
+  const stone=st?{name:st,i:bagStone(uid,st)}:null;
+  const oldB=baseList(m.base);
+  const hp=m.hp||{};
+  const rows=[{ab:'HP',o:num(hp.max),n:F.hp}].concat(STATS.map((s,i)=>({ab:s[2],o:oldB[i],n:num(F.base[s[0]])})));
+  return {uid,pid,from:m.species,to:toRec.n,F,cands,passives,gained,dropped,own:own.map(x=>x.name),skills,stone,rows,cond:cond||''};
+}
+const evoMoveCount=p=>p.cands.filter(c=>c.sel).length;
+
+async function evoPick(uid,pid,to){
+  const id=uid+'/'+pid;
+  const m0=getLocal('p',id);
+  const m=m0&&Object.assign({id:pid},m0);
+  if(!m||!canEditT(uid))return;
+  if(megaOn(m)){toast('Revert the Mega form first.');return;}
+  if(!evoOk(m,to)){toast('The GM has not approved this evolution yet.');return;}
+  const k=ptaKey(to);
+  const rec=ptaRec(to)||await ptaChunk(ptaLetter(k)).then(()=>ptaRec(to));
+  if(!rec){toast('That species is not in the handbook data.');return;}
+  const m2=getLocal('p',id);
+  if(!m2)return;
+  const from=evoRecOf(m2);
+  const opt=((from&&from.ev)||[]).find(o=>ptaKey(o.n)===ptaKey(rec.n));
+  S.ui.evo=evoPlan(uid,pid,m2,rec,opt&&opt.c);
+  render();
+}
+function evoMv(n){
+  const p=S.ui.evo;
+  if(!p||!p.cands[n])return;
+  p.cands[n].sel=!p.cands[n].sel;
+  render();
+}
+function evoMvBook(){
+  const p=S.ui.evo;
+  if(!p)return;
+  let left=TPL_MAX.moves;
+  p.cands.forEach(c=>{c.sel=c.inNew&&left>0;if(c.sel)left--;});
+  render();
+}
+function evoCancel(){S.ui.evo=null;render();}
+
+const EVO_KEEP=['species','types','base','hp','size','weight','skills','passives','moves','autoSig','autoPta','autoSid','psRef','mega','megaOn'];
+async function evoGo(uid,pid){
+  const p=S.ui.evo;
+  const id=uid+'/'+pid;
+  if(!p||p.uid!==uid||p.pid!==pid)return;
+  const m0=getLocal('p',id);
+  const m=m0&&Object.assign({id:pid},m0);
+  if(!m||!canEditT(uid))return;
+  if(megaOn(m)){toast('Revert the Mega form first.');return;}
+  if(!evoOk(m,p.to)){toast('The GM has not approved this evolution yet.');return;}
+  const rec=ptaRec(p.to);
+  if(!rec){toast('That species is not in the handbook data.');return;}
+  const mv=p.cands.filter(c=>c.sel);
+  if(mv.length>TPL_MAX.moves){toast('A Pokémon can know '+TPL_MAX.moves+' moves. Untick '+(mv.length-TPL_MAX.moves)+'.');return;}
+  const F=p.F;
+  const nm=mName(m);
+  /* a copy of the old sheet, so a wrong pick can be undone */
+  const snap={};
+  EVO_KEEP.forEach(k=>{snap[k]=m[k]===undefined?null:JSON.parse(JSON.stringify(m[k]));});
+  const undo={from:m.species,to:rec.n,at:Date.now(),snap};
+  if(p.stone&&p.stone.i>=0){
+    const t=S.trainers[uid];
+    const it=t&&(t.items||[])[p.stone.i];
+    if(it&&dexKey(it.name).indexOf(dexKey(p.stone.name))>=0){
+      const q=it.qty;
+      undo.stone={i:p.stone.i,qty:q==null?'':q,name:p.stone.name};
+      edit('t',uid,'items.'+p.stone.i+'.qty',q==null||q===''?0:Math.max(0,num(q)-1));
+    }
+  }
+  edit('p',id,'species',rec.n);
+  edit('p',id,'types',F.types.slice());
+  edit('p',id,'base',Object.assign({},m.base||{},F.base));
+  const hp=m.hp||{};
+  const oldMax=num(hp.max),oldCur=num(hp.cur);
+  const cur=!oldMax?F.hp:(oldCur<=0?0:clamp(F.hp-(oldMax-oldCur),1,F.hp));
+  edit('p',id,'hp',Object.assign({},hp,{cur,max:F.hp}));
+  edit('p',id,'size',F.size);
+  edit('p',id,'weight',F.weight);
+  edit('p',id,'skills',p.skills);
+  edit('p',id,'passives',p.passives.map(x=>Object.assign({},x)));
+  const moves=mv.map(c=>Object.assign({},c.row));
+  edit('p',id,'moves',moves);
+  const sig=Object.assign({},m.autoSig||{});
+  sig.ty=hsh(F.types.join('/'));sig.ba=hsh(baseList(F.base).join(','));sig.hp=hsh(String(F.hp));sig.sz=hsh(F.size);sig.wt=hsh(F.weight);
+  sig.sk=p.skills===F.skills?hsh(F.skills):'';
+  sig.ps=sigPs(p.passives)===sigPs(F.passives)?sigPs(F.passives):'';
+  sig.mv=sigMv(moves)===sigMv(F.moves)?sigMv(F.moves):'';
+  edit('p',id,'autoSig',sig);
+  edit('p',id,'autoPta',ptaKey(rec.n));
+  const si=speciesInfo(rec.n);
+  if(si)edit('p',id,'autoSid',si.sid);
+  edit('p',id,'psRef',psEffect(p.passives));
+  edit('p',id,'evoUndo',undo);
+  const mf=syncMega(uid,pid);
+  S.ui.evo=null;
+  const pop={uid,pid};
+  S.ui.evoPop=pop;
+  setTimeout(()=>{if(S.ui.evoPop===pop){S.ui.evoPop=null;scheduleRender();}},1800);
+  const bits=[nm+' evolved into '+rec.n+'!'];
+  if(undo.stone)bits.push('Used up 1 '+undo.stone.name+'.');
+  if(mf)bits.push(mf+' details added.');
+  toast(bits.join(' '),true);
+  render();
+}
+function evoUndo(uid,pid){
+  const id=uid+'/'+pid;
+  const m=getLocal('p',id);
+  const U=m&&m.evoUndo;
+  if(!U||!U.snap)return;
+  EVO_KEEP.forEach(k=>{if(k in U.snap)edit('p',id,k,U.snap[k]);});
+  if(U.stone&&U.stone.i>=0){
+    const t=S.trainers[uid];
+    const it=t&&(t.items||[])[U.stone.i];
+    if(it&&dexKey(it.name).indexOf(dexKey(U.stone.name))>=0)edit('t',uid,'items.'+U.stone.i+'.qty',U.stone.qty);
+  }
+  edit('p',id,'evoUndo',null);
+  toast('Back to '+U.from+'.',true);
+  render();
+}
+function evoKeep(uid,pid){
+  if(!getLocal('p',uid+'/'+pid))return;
+  edit('p',uid+'/'+pid,'evoUndo',null);
+  render();
+}
+async function evoAny(uid,pid){
+  if(!S.me.admin)return;
+  const inp=document.querySelector('input[data-evoany="'+pid+'"]');
+  const v=inp&&inp.value;
+  const pr=ptaResolve(v);
+  if(!pr){toast(v&&String(v).trim()?'That species is not in the handbook data.':'Type a species first.');return;}
+  evoPick(uid,pid,pr);
+}
+
+/* ----- the card ----- */
+function condText(o,uid){
+  if(!o.c)return 'Natural: it evolves on its own when it feels ready. Training and a good bond help.';
+  const st=stoneOf(o.c);
+  let s='Needs: '+o.c;
+  if(st)s+=bagStone(uid,st)>=0?' (you have one in your bag)':' (none in your bag)';
+  return s;
+}
+function evoPlanView(uid,m,p){
+  const n=evoMoveCount(p);
+  const over=n>TPL_MAX.moves;
+  const F=p.F;
+  const oldT=[(m.types||[])[0]||'',(m.types||[])[1]||''].filter(Boolean);
+  const typesSame=sameArr(oldT,F.types.filter(Boolean));
+  return h`<div class="evplan">
+    <div class="mgsum lcd"><b class="mgf">${p.from} → ${p.to}</b>
+      <span class="mgt">${chipsOf(F.types.filter(Boolean))}</span>
+      <span class="mgb">${typesSame?'Same type':'New type'} · ${F.size} · ${F.weight}</span></div>
+    <div class="evstats lcd" role="group" aria-label="Stat changes">${p.rows.map(r=>h`<div class="evs"><span class="sl">${r.ab}</span><span class="evv">${r.o} → <b>${r.n}</b></span><span class="evd ${r.n>r.o?'up':r.n<r.o?'dn':''}">${r.n===r.o?'same':sgn(r.n-r.o)}</span></div>`)}</div>
+    <p class="sub">Base stats, HP, size, weight and type come from the new entry. Your nature and Adj boxes stay as they are. Damage already taken carries over.</p>
+    ${p.gained.length||p.dropped.length||p.own.length?h`<p class="sub evpass"><b>Passives.</b>${p.gained.length?h` New: ${p.gained.join(', ')}.`:''}${p.dropped.length?h` Gone: ${p.dropped.join(', ')}.`:''}${p.own.length?h` Yours, kept: ${p.own.join(', ')}.`:''}</p>`:h`<p class="sub evpass"><b>Passives.</b> Same as the new entry.</p>`}
+    <div class="evmv"><div class="row sp"><span class="fl">Moves</span><span class="sub ${over?'bad':''}">${n} of ${TPL_MAX.moves}</span></div>
+      <p class="sub">Your current moves stay unless you untick them. Tap a move to include or leave it out.</p>
+      <div class="row evchips">${p.cands.map((c,i)=>h`<button class="btn sm chk" data-act="evoMv" data-n="${i}" aria-pressed="${String(c.sel)}">${c.row.name}${c.isNew?' (new)':''}</button>`)}</div>
+      <div class="row"><button class="btn sm ghost" data-act="evoMvBook">Use the handbook’s moves</button></div></div>
+    ${p.stone?h`<p class="sub">${p.stone.i>=0?'Uses up 1 '+p.stone.name+' from the bag.':'No '+p.stone.name+' in the bag. The GM can still allow it.'}</p>`:''}
+    <div class="row"><button class="btn primary sm" data-act="evoGo" data-uid="${uid}" data-pid="${m.id}" ${over?raw('disabled'):''}>Evolve into ${p.to}</button>
+      <button class="btn sm ghost" data-act="evoCancel">Cancel</button>
+      ${over?h`<span class="sub bad">Untick ${n-TPL_MAX.moves} move${n-TPL_MAX.moves===1?'':'s'} first.</span>`:''}</div>
+  </div>`;
+}
+function evoPanel(uid,m,ro){
+  if(ro||!PTA.idx)return '';
+  const pr=ptaResolve(m.species);
+  const rec=pr?ptaRec(pr):null;
+  if(pr&&!rec)ptaWarm(pr);
+  const opts=(rec&&rec.ev)||[];
+  const U=m.evoUndo;
+  if(!opts.length&&!(U&&U.snap))return '';
+  const pid=m.id,id=uid+'/'+pid;
+  let plan=S.ui.evo&&S.ui.evo.uid===uid&&S.ui.evo.pid===pid?S.ui.evo:null;
+  if(plan&&plan.from!==m.species)plan=null;
+  const gm=!!S.me.admin;
+  const key=ptaKey(m.species);
+  const g=evoGate(m).split('|');
+  const gateOn=g[0]===key;
+  const free=evoFree();
+  const blocked=megaOn(m);
+  const okFor=o=>!blocked&&evoOk(m,o.n);
+  const anyOk=opts.some(okFor);
+  const pill=!opts.length?'':(anyOk?h`<span class="pill good">Ready</span>`:h`<span class="pill">Waiting for the GM</span>`);
+  return h`<section class="megap evop"><div class="mph"><h4><i class="egem" aria-hidden="true">»</i>Evolution</h4>${pill}</div>
+    ${U&&U.snap?h`<div class="row evundo"><span class="sub">Evolved from ${U.from}.</span><button class="btn sm" data-act="evoUndo" data-uid="${uid}" data-pid="${pid}">Undo evolution</button><button class="btn sm ghost" data-act="evoKeep" data-uid="${uid}" data-pid="${pid}">Keep it</button></div>`:''}
+    ${plan?evoPlanView(uid,m,plan):(opts.length?h`
+      <ul class="evopts">${opts.map(o=>h`<li><div class="eo-t"><b>${o.n}</b><span class="sub">${condText(o,uid)}</span></div>
+        <button class="btn sm primary" data-act="evoPick" data-uid="${uid}" data-pid="${pid}" data-to="${o.n}" ${okFor(o)?'':raw('disabled')}>Evolve</button></li>`)}</ul>
+      ${blocked?h`<p class="sub">Revert the Mega form before evolving.</p>`:(!anyOk?h`<p class="sub">Ask your GM to approve an evolution for this Pokémon.</p>`:'')}`:'')}
+    ${gm&&!plan?h`<div class="mgate secret"><span class="fl">GM only · Evolution</span>
+      ${opts.length?h`<div class="row"><div class="seg" role="group" aria-label="Allow evolution"><button data-act="evoGate" data-pid="${pid}" data-v="1" aria-pressed="${String(gateOn||free)}">Allowed</button><button data-act="evoGate" data-pid="${pid}" data-v="0" aria-pressed="${String(!gateOn&&!free)}">Not allowed</button></div>
+        ${opts.length>1?h`<label class="evsel"><span class="sr">Form the player may pick</span><select data-evot="1" data-pid="${pid}"><option value="">Any form</option>${opts.map(o=>h`<option value="${ptaKey(o.n)}" ${gateOn&&g[1]===ptaKey(o.n)?raw('selected'):''}>${o.n} only</option>`)}</select></label>`:''}
+        <span class="sub">${free?'Everyone may evolve freely (set in the GM Desk).':gateOn?'The player can evolve this Pokémon'+(g[1]?' into the form you picked':'')+'.':'The player cannot evolve it yet.'}</span></div>`:''}
+      <div class="row"><label class="evany"><span class="sr">Evolve into any other species</span><input type="text" list="dl-species" data-evoany="${pid}" placeholder="Any other species, for a special case"></label><button class="btn sm" data-act="evoAny" data-uid="${uid}" data-pid="${pid}">Evolve into it</button></div></div>`:''}
+  </section>`;
+}
+
+/* ----- GM Desk ----- */
+function evoDesk(){
+  const I=PTA.idx;
+  if(!I)return '';
+  const free=evoFree();
+  const rows=tids().map(uid=>({uid,t:S.trainers[uid],mons:monsOf(uid).map(m=>{
+    const pr=ptaResolve(m.species);
+    const rec=pr?ptaRec(pr):null;
+    if(pr&&!rec)ptaWarm(pr);
+    return {m,rec};
+  }).filter(x=>x.rec&&x.rec.ev&&x.rec.ev.length)}));
+  const any=rows.some(r=>r.mons.length);
+  return h`<section class="panel"><div class="ph"><h2>Evolution</h2><span class="pill gm">GM only</span></div>
+    <p class="sub">A player can evolve a Pokémon only after you allow it, and only into the form you pick (or any form it can become). Allowing it is tied to the species the Pokémon is today, so it closes by itself after the evolution. You can always evolve any Pokémon from its own card.</p>
+    <div class="row"><div class="seg" role="group" aria-label="Approval for evolution"><button data-act="evoOpen" data-v="0" aria-pressed="${String(!free)}">I approve each one</button><button data-act="evoOpen" data-v="1" aria-pressed="${String(free)}">Players may evolve freely</button></div></div>
+    ${I.ver<2?h`<p class="sub bad">The handbook data in your database has no evolution lines yet. Import the newest pta-handbook-data.json below.</p>`:
+      (any?rows.filter(r=>r.mons.length).map(r=>h`<div class="mgd"><div class="row sp"><b>${tName(r.t)}</b></div>
+        <ul class="mini-list">${r.mons.map(x=>{
+          const m=x.m,opts=x.rec.ev;
+          const g=evoGate(m).split('|');
+          const on=g[0]===ptaKey(m.species);
+          return h`<li><div class="row sp"><span class="mgn">${monIcon(m)}<span><b>${mName(m)}</b><br><span class="sub">${m.species} → ${opts.map(o=>o.n).join(', ')}</span></span></span>
+            <span class="row">${opts.length>1?h`<label class="evsel"><span class="sr">Form for ${mName(m)}</span><select data-evot="1" data-pid="${m.id}"><option value="">Any form</option>${opts.map(o=>h`<option value="${ptaKey(o.n)}" ${on&&g[1]===ptaKey(o.n)?raw('selected'):''}>${o.n} only</option>`)}</select></label>`:''}
+            <span class="seg" role="group" aria-label="Allow ${mName(m)} to evolve"><button data-act="evoGate" data-pid="${m.id}" data-v="1" aria-pressed="${String(on||free)}">Allowed</button><button data-act="evoGate" data-pid="${m.id}" data-v="0" aria-pressed="${String(!on&&!free)}">Not allowed</button></span></span></div></li>`;})}</ul></div>`)
+        :h`<p class="sub">No Pokémon that can still evolve yet.</p>`)}
+  </section>`;
 }
 
 /* ---------- overview ---------- */
@@ -1571,7 +1968,9 @@ function monBody(uid,m,ro,pos,len){
     <div class="stats">${hpTile('p',id,m.hp,ro)}${tiles}</div>
     <div class="lcd acc"><span>Attack ${sgn(mod(effStat(m,'atk')))}</span><span>Sp. Attack ${sgn(mod(effStat(m,'spa')))}</span><span>Effect ${sgn(mod(effStat(m,'spe')))}</span></div>
     ${megaPanel(uid,m,ro)}
+    ${evoPanel(uid,m,ro)}
     ${fText('Skills','p',id,'skills',m,{ro,ph:'Short list, separated by commas'})}
+    ${ro?'':psHint(uid,m)}
     <div class="list"><div class="ph"><h2>Passives</h2>${ro||ps.length>=TPL_MAX.passives?'':h`<button class="btn sm" data-act="add" ${bp('p',id,'passives')} data-tpl="passive">Add passive</button>`}<span class="sub">${ps.length} of ${TPL_MAX.passives}</span></div>
       ${ps.map((x,i)=>h`<div class="item"><div class="irow two">${fText('Passive','p',id,'passives.'+i+'.name',m,{ro,list:'dl-passives'})}${rowBtns('p',id,'passives',i,ps.length,ro)}</div>${fArea('Effect','p',id,'passives.'+i+'.text',m,{ro})}</div>`)}</div>
     <div class="list"><div class="ph"><h2>Moves</h2>${ro||mv.length>=TPL_MAX.moves?'':h`<button class="btn sm" data-act="add" ${bp('p',id,'moves')} data-tpl="move">Add move</button>`}<span class="sub">${mv.length} of ${TPL_MAX.moves}</span></div>
@@ -1595,7 +1994,8 @@ function monCard(uid,m,ro,pos,len){
   const mon=megaOn(m);
   const spLabel=mon?(m.mega.form||'Mega form'):m.species;
   const pop=S.ui.megaPop&&S.ui.megaPop.pid===m.id&&S.ui.megaPop.uid===uid;
-  return h`<article class="mon ${open?'open':''} ${mon?'mega':''} ${pop?'megapop':''}" ${typeVars(m)}>
+  const epop=S.ui.evoPop&&S.ui.evoPop.pid===m.id&&S.ui.evoPop.uid===uid;
+  return h`<article class="mon ${open?'open':''} ${mon?'mega':''} ${pop?'megapop':''} ${epop?'evopop':''}" ${typeVars(m)}>
     <div class="mh">
       <div class="mt"><div class="spr">${monPic(m)}</div><div class="mtx"><h3>${mName(m)}</h3>
         <p class="sub">${m.nick&&spLabel?spLabel:''}${m.item?h`${m.nick&&spLabel?' · ':''}${itemMini(m.item)}holding ${m.item}`:''}</p>
@@ -1845,7 +2245,7 @@ function gmTab(){
   ${CFG?tableAccess():''}
   ${awardForm()}${awardHistory()}
   ${megaDesk()}
-  ${ptaDesk()}
+  ${evoDesk()}${ptaDesk()}
   <section class="panel"><div class="ph"><h2>Party snapshot</h2></div>
     <p>${top?h`Highest badge count: <b class="mono">${top[1]}</b> (${tName(S.trainers[top[0]])}).`:'No trainers yet.'}</p>
     <p class="sub">Loyalty and NPC secrets are stored where only editors can read them. Players never receive that data.</p></section>
@@ -2674,6 +3074,18 @@ function act(b,e){
     case 'megaGo':megaGo(d.uid,d.pid);break;
     case 'megaRevert':megaRevert(d.uid,d.pid);break;
     case 'megaGate':megaGate(d.pid,d.v==='1');break;
+    case 'evoPick':if(canEditT(d.uid))evoPick(d.uid,d.pid,d.to);break;
+    case 'evoMv':evoMv(num(d.n));break;
+    case 'evoMvBook':evoMvBook();break;
+    case 'evoCancel':evoCancel();break;
+    case 'evoGo':evoGo(d.uid,d.pid);break;
+    case 'evoUndo':if(canEditT(d.uid))evoUndo(d.uid,d.pid);break;
+    case 'evoKeep':if(canEditT(d.uid))evoKeep(d.uid,d.pid);break;
+    case 'evoGate':evoGateSet(d.pid,d.v==='1');break;
+    case 'evoOpen':evoOpenSet(d.v==='1');break;
+    case 'evoAny':evoAny(d.uid,d.pid);break;
+    case 'psAdj':if(canEditT(d.uid))psAdj(d.uid,d.pid);break;
+    case 'psKeep':if(canEditT(d.uid))psKeep(d.uid,d.pid);break;
     case 'autofill':{
       if(!canEditT(d.uid))break;
       fillClick(d.uid,d.pid);
@@ -2760,6 +3172,7 @@ document.addEventListener('click',e=>{
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t&&t.dataset&&t.dataset.b&&onSpeciesChange(t))return;
+  if(t&&t.dataset&&t.dataset.evot!=null){evoTarget(t.dataset.pid,t.value);return;}
   if(t&&t.id==='ptafile'){
     const f=t.files&&t.files[0];
     try{t.value='';}catch(err){}

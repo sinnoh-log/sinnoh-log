@@ -329,6 +329,24 @@ progress.hp.bad::-moz-progress-bar{background:var(--bad)}
 .stat .sm{flex-wrap:wrap;gap:2px 8px}
 .stat .sm .mbn{white-space:nowrap;font:800 11px var(--f-body);padding:0 6px;border-radius:6px;background:var(--mega-lin);color:var(--mega-ink)}
 .fillrow{font-size:13px}
+.evop .egem{display:inline-grid;place-items:center;width:20px;height:20px;margin-right:7px;border-radius:6px;background:var(--accent);color:var(--accent-ink);font:900 13px/1 var(--f-body);font-style:normal}
+.evopts{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.evopts li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:2px solid var(--line-soft);border-radius:10px;background:var(--panel)}
+.evopts .eo-t{display:flex;flex-direction:column;gap:1px;min-width:0}
+.evplan{display:flex;flex-direction:column;gap:10px}
+.evstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:4px 14px;padding:8px 12px}
+.evs{display:flex;align-items:baseline;gap:8px;font:700 13px var(--f-body)}
+.evs .sl{min-width:3.4em;font-family:var(--f-pix)}
+.evs .evd{margin-left:auto;font-weight:800}
+.evs .evd.up{color:var(--good)}
+.evs .evd.dn{color:var(--bad)}
+.evchips{gap:6px}
+.evundo{align-items:center}
+.evsel select,.evany input{min-width:0}
+.evany{flex:1 1 200px}
+.evany input{width:100%}
+.pshint{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;padding:8px 10px;border:2px dashed var(--gold);border-radius:10px;background:var(--panel);font-size:13.5px}
+.pshint>span:first-child{flex:1 1 240px}
 progress.ptaprog{appearance:none;-webkit-appearance:none;width:100%;height:10px;border:2px solid var(--lcd-edge);border-radius:8px;background:var(--lcd-inset);overflow:hidden;margin:8px 0}
 progress.ptaprog::-webkit-progress-bar{background:var(--lcd-inset)}
 progress.ptaprog::-webkit-progress-value{background:var(--good);transition:width .25s ease}
@@ -344,7 +362,7 @@ progress.ptaprog::-moz-progress-bar{background:var(--good)}
 .mon.mega::after,.megap.on::after{content:'';position:absolute;inset:0;border-radius:inherit;padding:3px;background:var(--mega-g);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);pointer-events:none;z-index:2}
 @media (prefers-reduced-motion:no-preference){
   .mon.mega::after,.megap.on::after{animation:megaHue 7s linear infinite}
-  .mon.megapop{animation:megaFlash 1.5s ease-out both}
+  .mon.megapop,.mon.evopop{animation:megaFlash 1.5s ease-out both}
 }
 @keyframes megaHue{to{filter:hue-rotate(360deg)}}
 @keyframes megaFlash{0%{filter:brightness(2.6) saturate(1.7);transform:scale(.97)}30%{transform:scale(1.025)}100%{filter:none;transform:none}}
@@ -532,5 +550,5 @@ input[type=search]{appearance:none}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-10-09-Handbook-data"></script>
+<script src="app.js?v=2026-10-10-Evolution"></script>
 </body></html>

@@ -99,9 +99,9 @@ When you get a new version of these files:
 1. In your GitHub repository, choose **Add file → Upload files** and drag in the new files over the old ones (including the `vendor` folder if it is included; this release adds `vendor/fonts`). **Do not** replace your own `firebase-config.js` unless you re-enter your settings in the new one.
 2. If `firestore.rules` changed, open Firebase console → **Firestore → Rules**, paste in the new contents, and click **Publish**. Do this before players use the new version. The rules have not changed since the delete-your-own-trainer update, so if you already published those there is nothing to do for Mega Evolution or the handbook data: both are stored in documents the existing rules already limit to you.
 3. GitHub Pages takes a minute or two to update (check the repository's **Actions** tab for a green tick). Each person should refresh the page once, holding Shift while clicking reload.
-4. **Check that the new version is running.** The very bottom of every page says **Version** followed by a date and a name (this release: `Version 2026-10-09 · Handbook data`). If it is missing or shows something older, the browser is still using the old files. Reload with Shift held, or open the site in a private window. If a private window is also old, the upload did not replace the files: check that `app.js` and `index.html` are in the top level of the repository (not in a sub-folder) and that you pressed **Commit changes**.
+4. **Check that the new version is running.** The very bottom of every page says **Version** followed by a date and a name (this release: `Version 2026-10-10 · Evolution`). If it is missing or shows something older, the browser is still using the old files. Reload with Shift held, or open the site in a private window. If a private window is also old, the upload did not replace the files: check that `app.js` and `index.html` are in the top level of the repository (not in a sub-folder) and that you pressed **Commit changes**.
 
-Nothing in your database changes when you update the files. The handbook data is a separate one-time step (see **Handbook data** below).
+Nothing in your database changes when you update the files. The handbook data is a separate step (see **Handbook data** below). **This release comes with a new `pta-handbook-data.json`** that adds evolution lines and five species the first file missed (Bisharp, Heliolisk, Amoonguss, Stantler and Azumarill). Import it again once (**GM Desk → Handbook data → Import again**). Until you do, everything else keeps working, but Pokémon show no Evolution panel and the GM Desk says a re-import is needed.
 
 ## How it looks
 
@@ -148,6 +148,29 @@ When all four are met, the player taps **Mega Evolve**. The card gets a rainbow 
 **Ending a battle.** **End battle** on the Pokémon page reverts that trainer's Mega forms and recharges their Key Stone. **Pokémon Center** and **Rest 8h** do the same. On the GM Desk, **End battle for everyone** does it for the whole table.
 
 **Editing a Mega form.** **Edit details** on the panel lets you change the form's name, stone, types, ability and stat bonuses, or reset them to the official values. Once you edit a value, a later change of species leaves that Mega alone.
+
+## Evolution
+
+Once the new handbook data is imported (see above), every Pokémon whose species evolves in the PTA 3 Pokédex (471 species, 511 evolution links) gets an **Evolution** panel on its card. It lists what the book says it can become and the condition printed for each (level, stone, trade, time of day and so on).
+
+**Your approval.** Evolving works like Mega Evolution: nothing happens until you allow it. Two ways:
+
+- **Per Pokémon.** On the **GM Desk → Evolution** panel (or on the Pokémon's own card) switch a Pokémon to **Allowed**. If it has a branching line, such as Eevee, you can also pick which form it may become, or leave it open to all of them. Players never see these switches.
+- **Everyone.** At the top of the Desk's Evolution panel, choose **Players may evolve freely** (the other choice is **I approve each one**). Players can then evolve any Pokémon whose line allows it, with no approval.
+
+A per-Pokémon approval **closes itself** the moment that Pokémon evolves, so the next stage needs a new approval. You can always evolve a Pokémon yourself, and the GM's view of a card has a box for **any other species** with an **Evolve into it** button, for things the book does not cover (a regional form, a story evolution).
+
+**What the player sees.** Tapping an evolution shows a preview before anything changes: the new types, the old and new stat blocks side by side, the passives and skills that change, and the moves. Then **Evolve** applies it.
+
+- **Replaced:** types, base stats, HP, size and weight come from the new species.
+- **Kept:** the nickname, held item, notes, nature, and the **Adj** boxes (the stat adjustments the player or you have entered).
+- **HP:** the damage already taken is kept. A Pokémon that was at 10 HP below full is still 10 below full after evolving. A fainted Pokémon stays fainted.
+- **Passives and skills:** the new species' list is used. If the player had changed the text of a passive that also exists on the new species, their version is kept. Passives and skills the player wrote themselves are kept, up to the limit of 8 passives.
+- **Moves:** the Pokémon keeps its current moves, and the new species' moves fill any free slots up to the limit of 6. In the preview each move is a chip the player can switch on or off. If more than six are on, **Evolve** is disabled until some are switched off. **Use the handbook’s moves** instead picks only the new species' moves.
+- **Evolution stones.** If the condition names a stone (Fire Stone, Thunder Stone and so on) and the trainer has it in the bag, one is used up.
+- **Undo.** Right after evolving, the card offers **Undo evolution** (puts everything back exactly as it was) or **Keep it**.
+
+**Stat passives and the Adj boxes.** The stats printed in the Pokédex already include the effect of passives such as Power Up (+1 Attack) or Mighty (+2 Attack), so the app does **not** add them again. Because of that, if a player adds, removes or changes one of those passives by hand, the shown stats do not move by themselves. The app notices and offers a note on the card, **Passives changed**, with the stat change the passive implies. **Add to Adj** applies it to the Adj boxes, and **Leave it** dismisses it. The same prompt appears after an evolution if the new species' passives differ from the old. Situational passives (such as Guts) are not part of the printed numbers and are never counted.
 
 ## Deleting trainers and Pokémon
 
