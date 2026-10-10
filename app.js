@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-10 · NPC stats and Mega';
+const BUILD='2026-10-10 · NPC pictures';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -3406,6 +3406,28 @@ function ntPubOf(nt){
     })
   };
 }
+/* The portrait. The GM's copy sits in the NPC's own document (`img`), which only the GM can read. The table's copy is a
+   separate small document, mapimg/npc_<id>, that exists only while the NPC is shown and its Picture box is ticked. It rides in
+   the collection the map already uses, so the existing rules cover it. */
+const ntImgOk=v=>/^data:image\//.test(String(v||''));
+const ntPicDoc=id=>'npc_'+id;
+const ntPicOf=id=>{const c=S.mapChunks&&S.mapChunks[ntPicDoc(id)];return c&&ntImgOk(c.d)?c.d:'';};
+function ntPicSync(id){
+  if(!S.me.admin)return;
+  const nt=NTS()[id];
+  const r=(nt&&nt.rev)||{};
+  const want=nt&&num(r.on)&&num(r.pic)&&ntImgOk(nt.img)?String(nt.img):'';
+  const have=ntPicOf(id);
+  if(want===have)return;
+  const ref=S.db.collection('mapimg').doc(ntPicDoc(id));
+  if(want){
+    S.mapChunks[ntPicDoc(id)]={d:want,v:Date.now()};
+    ref.set({d:want,v:Date.now()}).catch(e=>fail(e));
+  }else{
+    delete S.mapChunks[ntPicDoc(id)];
+    ref.delete().catch(e=>fail(e));
+  }
+}
 /* writes the public copy only when it has changed. Hiding the NPC removes it. */
 function ntPublish(id){
   if(!S.me.admin)return;
@@ -3421,6 +3443,7 @@ function ntPublish(id){
   /* foes of this NPC carry the trainer's name once it is shown, and lose it when it is hidden again */
   const fo=foesOf();
   Object.keys(fo).forEach(cid=>{if(fo[cid].nt===id&&btC(cid))foePublish(cid);});
+  ntPicSync(id);
 }
 function ntPreview(nt){
   const p=ntPubOf(nt);
@@ -3428,6 +3451,7 @@ function ntPreview(nt){
   const bits=['the name “'+p.n+'”'];
   if(p.r)bits.push('the role');
   if(p.pl)bits.push('where you met');
+  if(num(nt.rev&&nt.rev.pic)&&ntImgOk(nt.img))bits.push('the picture');
   if(p.b)bits.push('your notes');
   if(p.lv!=null||p.cl)bits.push('level and class');
   if(p.st)bits.push('stats');
@@ -3440,7 +3464,7 @@ function ntPreview(nt){
 function ntNew(){
   if(!S.me.admin)return;
   const id=S.db.collection('gm').doc().id;
-  newDoc('gt',id,{name:'',role:'',place:'',notes:'',secret:'',cls:'',adv:'',level:1,hp:{cur:20,max:20},stats:{atk:2,def:2,spa:2,spd:2,spe:2},talents:{},features:[],items:[],megaUsed:false,team:[],rev:{on:false,role:false,place:false,notes:false,cls:false,stats:false,items:false},order:Date.now(),createdAt:Date.now()});
+  newDoc('gt',id,{name:'',role:'',place:'',notes:'',secret:'',cls:'',adv:'',level:1,hp:{cur:20,max:20},stats:{atk:2,def:2,spa:2,spd:2,spe:2},talents:{},features:[],items:[],megaUsed:false,team:[],rev:{on:false,role:false,place:false,notes:false,pic:false,cls:false,stats:false,items:false},img:'',order:Date.now(),createdAt:Date.now()});
   S.ui.nt.open[id]=true;
   render();
 }
@@ -3450,7 +3474,7 @@ function ntEnsure(id){
   if(!nt)return;
   const d={cls:'',adv:'',level:1,hp:{cur:20,max:20},stats:{atk:2,def:2,spa:2,spd:2,spe:2},talents:{},features:[],items:[],megaUsed:false};
   Object.keys(d).forEach(k=>{if(nt[k]===undefined)edit('gt',id,k,d[k]);});
-  ['cls','stats','items'].forEach(k=>{if(!nt.rev||nt.rev[k]===undefined)edit('gt',id,'rev.'+k,false);});
+  ['cls','stats','items','pic'].forEach(k=>{if(!nt.rev||nt.rev[k]===undefined)edit('gt',id,'rev.'+k,false);});
 }
 /* a Pokémon whose species can Mega Evolve starts with the official details, ready to be switched on in a battle */
 function ntMegaAuto(mon){
@@ -3591,6 +3615,7 @@ function ntDelete(id){
   Object.keys(fo).forEach(cid=>{if(fo[cid].nt===id){edit('gb','battle','foes.'+cid+'.nt','');edit('gb','battle','foes.'+cid+'.ni','');foePublish(cid);}});
   delete S.ui.nt.open[id];
   removeDoc('gt',id);
+  ntPicSync(id);
   toast(ntName(nt)+' was deleted.',true);
 }
 function ntTwice(key,fn){
@@ -3701,15 +3726,16 @@ function ntBody(id,nt){
     <div class="mgate secret"><span class="fl">GM only · what the players see</span>
       <label class="row"><input type="checkbox" ${bd('gt',id,'rev.on')} ${on?raw('checked'):''}><span><b>Show this NPC to the table</b></span></label>
       <div class="row evchips" role="group" aria-label="Also show">
-        ${[['role','Role'],['place','Where you met'],['notes','Your notes'],['cls','Level and class'],['stats','Stats'],['items','Items']].map(([k,l])=>h`<label class="chip chkc"><input type="checkbox" ${bd('gt',id,'rev.'+k)} ${num(r[k])?raw('checked'):''} ${on?'':raw('disabled')}><span>${l}</span></label>`)}</div>
+        ${[['role','Role'],['place','Where you met'],['notes','Your notes'],['pic','Picture'],['cls','Level and class'],['stats','Stats'],['items','Items']].map(([k,l])=>h`<label class="chip chkc"><input type="checkbox" ${bd('gt',id,'rev.'+k)} ${num(r[k])?raw('checked'):''} ${on?'':raw('disabled')}><span>${l}</span></label>`)}</div>
       <p class="sub">Players now see: ${ntPreview(nt)}. It appears under <b>People</b>, in <b>Trainers you have met</b>. Their Pokémon appear there once you tick what to show for each one below.</p></div>
+    <div class="idrow"><div class="idimg">${pimg(nt.img,ntName(nt),'tall')}${imgPicker('gt',id,'img',nt,320,400,60000,false)}<span class="sub">${ntImgOk(nt.img)?(num(r.pic)&&on?'The table sees this picture.':'Only you see this picture. Tick Picture above to show it.'):'A portrait for this NPC. It stays hidden until you tick Picture.'}</span></div>
     <div class="fgrid">
       ${fText('Name','gt',id,'name',nt,{cls:'wide'})}
       ${fText('Role or title','gt',id,'role',nt,{ph:'e.g. Gym Leader, Team Galactic grunt'})}
       ${fText('Where you met','gt',id,'place',nt,{list:'dl-places'})}
       ${fArea('Notes the table learns once you show them','gt',id,'notes',nt,{rows:3,cls:'wide'})}
       ${fArea('Secret (only you see this)','gt',id,'secret',nt,{rows:3,cls:'wide'})}
-    </div>
+    </div></div>
     ${ntSheet(id,nt)}
     <div class="ph"><h3>Pokémon</h3><button class="btn sm primary" data-act="nt_team" data-id="${id}" ${left?'':raw('disabled')}>Add the whole team to the battle</button></div>
     ${team.length?h`<div class="ntteam">${team.map((m,i)=>ntMonRow(id,nt,m,i,team.length))}</div>`:h`<p class="sub">No Pokémon yet. Add one below: its stats, passives and moves fill in from the handbook.</p>`}
@@ -3728,7 +3754,7 @@ function ntCard(id){
   const pub=ntPub(id);
   const team=ntTeam(nt);
   return h`<article class="entry ntcard" data-id="${id}">
-    <div class="row sp"><div><h3>${ntName(nt)}</h3><div class="meta">${nt.role?h`<span>${nt.role}</span>`:''}${nt.place?h`<span>${nt.place}</span>`:''}<span>${team.length} Pokémon</span></div></div>
+    <div class="row sp"><div class="nthd">${pimg(nt.img,ntName(nt),'thumb')}<div><h3>${ntName(nt)}</h3><div class="meta">${nt.role?h`<span>${nt.role}</span>`:''}${nt.place?h`<span>${nt.place}</span>`:''}<span>${team.length} Pokémon</span></div></div></div>
       <div class="row">${pub?h`<span class="pill good">Shown to players</span>`:h`<span class="pill">Hidden</span>`}<button class="btn sm" data-act="nt_open" data-id="${id}" aria-expanded="${String(open)}">${open?'Close':'Open'}</button></div></div>
     ${open?ntBody(id,nt):''}
   </article>`;
@@ -3752,7 +3778,7 @@ function ntPublicPanel(){
   const ids=Object.keys(n).sort((a,b)=>String(n[a].n).localeCompare(String(n[b].n)));
   if(!ids.length)return '';
   return h`<section class="panel ntpub"><div class="ph"><h2>Trainers you have met</h2>${S.me.admin?h`<span class="pill gm">What the players see</span>`:''}</div>
-    <div class="grid cards">${ids.map(id=>{const p=n[id];return h`<article class="entry pcard"><div class="pc-body">
+    <div class="grid cards">${ids.map(id=>{const p=n[id],pic=ntPicOf(id);return h`<article class="entry pcard">${pic?pimg(pic,p.n,'tall'):''}<div class="pc-body">
       <h3>${p.n}</h3>
       <div class="meta">${p.r?h`<span>${p.r}</span>`:''}${p.pl?h`<span>Met at ${p.pl}</span>`:''}${p.lv!=null?h`<span>Level ${p.lv}</span>`:''}${p.cl?h`<span>${p.cl}</span>`:''}</div>
       ${p.st?h`<div class="ntst lcd">${[['HP',p.st.hp],['Atk',p.st.atk],['Def',p.st.def],['SpA',p.st.spa],['SpD',p.st.spd],['Spd',p.st.spe]].map(([l,v])=>h`<span><i>${l}</i><b>${v}</b></span>`)}</div>`:''}
@@ -4994,7 +5020,7 @@ function act(b,e){
       const fp=$('#filepick');
       if(fp){fp.value='';fp.click();}
       break;}
-    case 'rmImg':{const p=d.p.split('|');edit(p[0],p[1],p[2],'');render();break;}
+    case 'rmImg':{const p=d.p.split('|');edit(p[0],p[1],p[2],'');if(p[0]==='gt')ntPublish(p[1]);render();break;}
     case 'rmMap':removeMap();break;
     case 'delTOpen':{
       if(!canEditT(d.uid))break;
@@ -5279,7 +5305,7 @@ document.addEventListener('change',async e=>{
     setStatus('busy');
     let late='';
     if(parts[0]==='map'){if(!(await uploadMap(f)))late='Map saved. Its shape does not match the Sinnoh map, so hover highlights are off.';}
-    else{const r=await fileToImage(f,{w:pk.w,h:pk.h,cap:pk.cap});edit(parts[0],parts[1],parts[2],r.url);}
+    else{const r=await fileToImage(f,{w:pk.w,h:pk.h,cap:pk.cap});edit(parts[0],parts[1],parts[2],r.url);if(parts[0]==='gt')ntPublish(parts[1]);}
     if(!Q.size)setStatus('saved');
     render();
     if(late)toast(late);
