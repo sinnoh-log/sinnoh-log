@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-11 · Battle map fog of war';
+const BUILD='2026-10-24 · Contest moves';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -39,10 +39,10 @@ const DEF_META={campaign:'Sinnoh Trainer Log',subtitle:'Post-game Sinnoh · ten 
 const NAV=[
   ['Narrative',[['overview','Overview'],['journal','Journal'],['timeline','Timeline']]],
   ['World',[['people','People'],['leads','Leads'],['map','Map']]],
-  ['Table',[['trainer','Trainer'],['pokemon','Pokémon'],['dex','Pokédex'],['battle','Battle']]]
+  ['Table',[['trainer','Trainer'],['pokemon','Pokémon'],['dex','Pokédex'],['battle','Battle'],['contest','Contests']]]
 ];
 const GM_NAV=['Game Master',[['gm','GM Desk'],['npc','NPC Trainers']]];
-const PAGE_LABEL={overview:'Overview',journal:'Journal',timeline:'Timeline',people:'People',leads:'Leads',map:'Map',place:'Place',trainer:'Trainer sheet',pokemon:'Pokémon',dex:'Pokédex',battle:'Battle',gm:'GM Desk',npc:'NPC Trainers',account:'Account'};
+const PAGE_LABEL={overview:'Overview',journal:'Journal',timeline:'Timeline',people:'People',leads:'Leads',map:'Map',place:'Place',trainer:'Trainer sheet',pokemon:'Pokémon',dex:'Pokédex',battle:'Battle',contest:'Contests',gm:'GM Desk',npc:'NPC Trainers',account:'Account'};
 const PIN_KINDS=[['place','Place'],['party','Party'],['danger','Danger'],['lead','Lead']];
 const AWARD_TYPES=['Gym Badge','Trial Medal','Frontier Symbol','Contest Ribbon','Certificate','Emblem of Recognition','Loyal Partner','Moment of Destiny','Other'];
 
@@ -1472,7 +1472,7 @@ function ptaDesk(){
   const when=I&&I.t?new Date(I.t).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}):'';
   return h`<section class="panel"><div class="ph"><h2>Handbook data</h2><span class="pill gm">GM only</span>
       <div class="acts"><button class="btn sm" data-act="ptaPick" ${im.busy?raw('disabled'):''}>${I?'Import again':'Import handbook data'}</button></div></div>
-    ${I?h`<p class="sub">${I.names.length} Pokémon from the PTA 3 Pokédex are in your database${when?', imported '+when:''}. Type a species and its stats, passives and moves fill in. Type a move or passive name and its details fill in.${I.ver>=2?' Evolution lines are included.':' This copy has no evolution lines. Import again with the newest file to turn evolution on.'}</p>`
+    ${I?h`<p class="sub">${I.names.length} Pokémon from the PTA 3 Pokédex are in your database${when?', imported '+when:''}. Type a species and its stats, passives and moves fill in. Type a move or passive name and its details fill in.${I.ver>=2?' Evolution lines are included.':' This copy has no evolution lines. Import again with the newest file to turn evolution on.'}${I.ver>=3?' Contest moves are included.':' This copy has no contest moves. Import again with the newest file to add them.'}</p>`
       :h`<p class="sub">Not imported yet. Choose <b>pta-handbook-data.json</b> from the update download. This fills in stats, passives and moves when someone types a species. The handbook text goes into your database, not into the public site.</p>`}
     ${im.busy?h`<progress class="ptaprog" max="${num(im.total)}" value="${num(im.done)}" aria-label="Import progress"></progress>`:''}
     ${im.msg?h`<p class="sub ${im.bad?'bad':''}" role="status">${im.msg}</p>`:''}
@@ -1487,7 +1487,8 @@ async function ptaImport(file){
   const groups={};
   d.species.forEach(s=>{const k=ptaKey(s&&s.n);if(!k)return;const L=ptaLetter(k);(groups[L]||(groups[L]={}))[k]=s;});
   const letters=Object.keys(groups).sort();
-  im.busy=true;im.done=0;im.total=letters.length+2;im.msg='Importing…';im.bad=false;scheduleRender();
+  const cm=Array.isArray(d.contest)&&d.contest.length?d.contest:null;
+  im.busy=true;im.done=0;im.total=letters.length+2+(cm?1:0);im.msg='Importing…';im.bad=false;scheduleRender();
   try{
     for(const L of letters){
       await S.db.collection('meta').doc('pta_'+L).set({v:1,j:JSON.stringify(groups[L])});
@@ -1495,10 +1496,11 @@ async function ptaImport(file){
     }
     await S.db.collection('meta').doc('pta_lists').set({v:1,j:JSON.stringify({moves:d.moves||[],passives:d.passives||[],skills:d.skills||[],megas:d.megas||[]})});
     im.done++;
+    if(cm){await S.db.collection('meta').doc('pta_contest').set({v:1,j:JSON.stringify(cm)});im.done++;}
     await S.db.collection('meta').doc('pta_idx').set({v:num(d.v)||1,t:Date.now(),j:JSON.stringify(d.species.map(s=>s.n))});
     im.done++;
   }catch(e){say('The import stopped ('+((e&&e.code)||'error')+'). Some of it may be saved. Run it again to finish.',true);return;}
-  say('Imported '+d.species.length+' Pokémon, '+(d.moves||[]).length+' moves, '+(d.passives||[]).length+' passives and '+(d.megas||[]).length+' Mega forms.',false);
+  say('Imported '+d.species.length+' Pokémon, '+(d.moves||[]).length+' moves, '+(d.passives||[]).length+(cm?' passives, ':' passives and ')+(d.megas||[]).length+' Mega forms'+(cm?' and '+cm.length+' contest moves':'')+'.',false);
 }
 
 /* ---------- Evolution, and stat passives ----------
@@ -3389,6 +3391,462 @@ function dxAct(b){
       if(!S.me.admin)break;
       edit('mg','mega','dx_lock',!!b.checked);
       render();break;
+  }
+}
+/* ---------- Contests: contest types, keywords, the contest move list and an appeal helper ----------
+   The way a contest runs and what each keyword does are condensed here in plain words from the PTA 3.5 Players Handbook
+   (Contests, Contest Keywords). It is a memory aid, not a copy of the book: the handbook has the full rules.
+   Which contest type and keyword each move has comes from the handbook's Contest Moves table. Like the rest of the handbook text,
+   that table is not part of this site's files. The GM imports it once (GM Desk, Handbook data) and it is kept in the table's
+   database (meta/pta_contest), where only signed-in members can read it. */
+const CT_TYPES=['Cool','Beauty','Cute','Clever','Tough'];   /* the order they sit in around the handbook's wheel */
+const CT_ICON={Cool:'◆',Beauty:'●',Cute:'★',Clever:'■',Tough:'▼',Any:'✦'};
+const CT_VIEWS=[['moves','Contest moves'],['keys','Keywords'],['help','Appeal helper'],['how','How contests work']];
+S.ui.ct=S.ui.ct||{v:'moves',q:'',type:'',kw:'',show:'all',page:1,mv:'',mvt:'',ctype:'',volt:'0',elec:false,first:false,last:false,fin:false,low:false,both:false,maxed:false,before:'0',alone:false,allBig:false,lastHp:'2d4',ready:false,same:false,stat:'0',res:null};
+const CT_PAGE=80;
+
+/* two types on the wheel: the same type, next to each other (they get along), or across from each other (they clash) */
+function ctRel(a,b){
+  const i=CT_TYPES.indexOf(a),j=CT_TYPES.indexOf(b);
+  if(i<0||j<0)return 'n';
+  if(i===j)return 'm';
+  return Math.min((i-j+5)%5,(j-i+5)%5)===1?'c':'x';
+}
+const ctClash=t=>CT_TYPES.filter(x=>ctRel(t,x)==='x');
+const ctNear=t=>CT_TYPES.filter(x=>ctRel(t,x)==='c');
+
+/* the 22 keywords: name, the Heart Points it starts with, the dice it always has (null when it depends), and what it does */
+const CT_KW=[
+  {k:'Appeal',hp:'3d4',n:3,fx:'Nothing special.'},
+  {k:'Attention Grabber',hp:'Special',n:null,fx:'Roll the same number of d4 as the last move used (1d4, 2d4 or 3d4), plus one more die.'},
+  {k:'Big Show',hp:'Special',n:null,fx:'Roll 8d4 if every contestant before you rolled at least 3d4 this round. It only works if you appeal last in the final round.'},
+  {k:'Catching Up',hp:'1d4',n:1,fx:'Roll 3d4 more if you have the fewest total Heart Points right now.'},
+  {k:'Crowd Pleaser',hp:'1d4',n:1,fx:'Raises the judge’s Voltage by exactly 2, whatever the move’s contest type.'},
+  {k:'Excitement',hp:'2d4',n:2,fx:'The judge’s Voltage cannot go down for the rest of the round.'},
+  {k:'Final Appeal',hp:'2d4',n:2,fx:'Roll 2d4 more if this is the final round.'},
+  {k:'Get Ready!',hp:'None',n:0,fx:'No Heart Points of its own. On your next appeal you roll twice the dice you normally would.'},
+  {k:'Good Show!',hp:'1d4',n:1,fx:'Roll 3d4 more if Voltage was raised on both of the last two appeals this round.'},
+  {k:'Hold That Thought',hp:'2d4',n:2,fx:'After your appeal, the judge’s Voltage cannot be raised for the rest of the round.'},
+  {k:'Incredible',hp:'1d4',n:1,fx:'Raises every judge’s Voltage by 1, whatever the contest types.'},
+  {k:'Incentives',hp:'2d4',n:2,fx:'Roll 2d4 more when your appeal raises the judge’s Voltage.'},
+  {k:'Inversed Appeal',hp:'Special',n:null,fx:'Roll 4d4, minus 1d4 for every point of the judge’s Voltage.'},
+  {k:'Reflective Appeal',hp:'Special',n:null,fx:'Roll 1d4 for every point of the judge’s Voltage, up to 4d4.'},
+  {k:'Reliable',hp:'2d4',n:2,fx:'You may use the same move next round and still earn Heart Points. When you do, roll 1d4 more.'},
+  {k:'Round Ender',hp:'2d4',n:2,fx:'Roll 2d4 more if you appeal last this round.'},
+  {k:'Round Starter',hp:'2d4',n:2,fx:'Roll 2d4 more if you appeal first this round.'},
+  {k:'Scrambler',hp:'2d4',n:2,fx:'The order of appeals next round is randomised, and everyone must follow it.'},
+  {k:'Seen Nothing Yet',hp:'2d4',n:2,fx:'Roll 2d4 more if anyone has raised a judge’s Voltage to the maximum this round.'},
+  {k:'Special Attention',hp:'1d4',n:1,fx:'Roll 3d4 more if at least two appeals came before yours and nobody else appealed to your judge this round.'},
+  {k:'Torrential Appeal',hp:'Special',n:null,fx:'Roll 1d4 for every contestant who appealed before you this round.'},
+  {k:'Unsettling',hp:'2d4',n:2,fx:'Lowers every judge’s Voltage by 1.'}
+];
+const CT_KWMAP=new Map(CT_KW.map(x=>[dexKey(x.k),x]));
+const ctKw=k=>CT_KWMAP.get(dexKey(k))||null;
+
+/* ----- the move list, read from the table's database ----- */
+const CT={list:null,map:null,sub:null,busy:null,fail:0,none:false};
+function ctSet(arr){
+  const list=[],map=new Map();
+  (Array.isArray(arr)?arr:[]).forEach(a=>{
+    if(!Array.isArray(a)||!a[0]||!a[2])return;
+    const e={n:String(a[0]),t:String(a[1]||''),k:String(a[2]),note:a[3]?String(a[3]):''};
+    list.push(e);
+    map.set(dexKey(e.n),e);
+  });
+  CT.list=list.length?list:null;
+  CT.map=list.length?map:null;
+  CT.none=!list.length;
+}
+function ctLoad(){
+  if(CT.list)return Promise.resolve(CT.list);
+  if(CT.busy)return CT.busy;
+  if(!S.db||(CT.fail&&Date.now()-CT.fail<30000))return Promise.resolve(null);
+  let done,first=true;
+  const p=new Promise(r=>{done=r;});
+  CT.busy=p;
+  const fin=v=>{if(first){first=false;clearTimeout(to);CT.busy=null;if(!v&&!CT.none)CT.fail=Date.now();done(v);}};
+  const to=setTimeout(()=>fin(null),9000);
+  if(CT.sub)try{CT.sub();}catch(e){}
+  CT.sub=S.db.collection('meta').doc('pta_contest').onSnapshot(s=>{
+    if(!s.exists){
+      if(s.metadata&&s.metadata.fromCache)return;
+      ctSet(null);
+    }else ctSet(jparse((s.data()||{}).j));
+    fin(CT.list);
+    scheduleRender();
+  },()=>fin(null));
+  return p;
+}
+function ctWarm(){
+  if(CT.list||CT.busy||CT.none||!S.db||(CT.fail&&Date.now()-CT.fail<30000))return;
+  ctLoad().then(()=>scheduleRender());
+}
+const ctOf=name=>(CT.map&&CT.map.get(dexKey(name)))||null;
+/* what a Pokémon's move is in a contest: its entry in the handbook list, or an Appeal move of the type its tutor picked */
+function ctOfRow(x){
+  const e=ctOf(x&&x.name);
+  if(e)return {t:e.t,k:e.k,note:e.note,own:false};
+  const t=x&&CT_TYPES.indexOf(x.ct)>=0?x.ct:'';
+  return t?{t,k:'Appeal',note:'',own:true}:null;
+}
+const ctChip=t=>h`<span class="ct ${String(t||'').toLowerCase()}"><span aria-hidden="true">${CT_ICON[t]||''}</span>${t==='Any'?'Any type':t}</span>`;
+
+/* the line under a move on the Pokémon sheet */
+function ctLine(id,m,x,i,ro){
+  ctWarm();
+  if(!CT.list||!String(x.name||'').trim())return '';
+  const c=ctOfRow(x);
+  if(c){
+    const kw=ctKw(c.k);
+    return h`<div class="ctrow"><span class="fl">Contest</span>${ctChip(c.t)}<b>${c.k}</b><span class="sub">${kw?kw.hp+' Heart Points':''}${c.own?' · tutored move':''}</span>
+      <button class="btn sm" data-act="ct_use" data-name="${x.name}" ${c.own?attr('data-ct',c.t):''}>Appeal</button>
+      ${kw?h`<span class="sub ctfx">${kw.fx}</span>`:''}${c.note?h`<span class="sub ctfx">${c.note}</span>`:''}</div>`;
+  }
+  if(ro)return '';
+  return h`<div class="ctrow">${fSel('Contest type','p',id,'moves.'+i+'.ct',m,CT_TYPES,{blank:'Not on the handbook list',cls:'ctsel'})}<span class="sub ctfx">A move taught by a tutor is an Appeal move, and the tutor picks its contest type.</span></div>`;
+}
+
+/* ----- what the viewing trainer's Pokémon know ----- */
+function ctMine(){
+  const uid=dxUid();
+  if(!uid||!S.trainers[uid])return {uid:null,mons:[]};
+  return {uid,mons:monsOf(uid).map(m=>({id:m.id,name:mName(m),sp:m.species||'',moves:(m.moves||[]).map(x=>({n:String(x&&x.name||'').trim(),ct:x&&CT_TYPES.indexOf(x.ct)>=0?x.ct:''})).filter(x=>x.n)})).filter(m=>m.moves.length)};
+}
+
+/* the contest type a player set on a tutored move of theirs, found by the move's name */
+function ctOwnType(name){
+  const k=dexKey(name);
+  const mons=ctMine().mons;
+  for(let i=0;i<mons.length;i++){
+    const x=mons[i].moves.find(y=>dexKey(y.n)===k&&y.ct);
+    if(x)return x.ct;
+  }
+  return '';
+}
+
+/* ----- the appeal helper's arithmetic. Nothing here touches the database. ----- */
+/* o: kw, type (the move's), ctype (the contest's), volt, elec, first, last, fin, low, both, maxed, before, alone, allBig, lastHp, ready, same, stat */
+function ctCalc(o){
+  const kw=o.kw||'Appeal';
+  const volt=clamp(Math.round(num(o.volt)),0,5);
+  const before=clamp(Math.round(num(o.before)),0,9);
+  const rel=o.ctype?ctRel(o.type,o.ctype):'n';
+  const parts=[],notes=[],after=[];
+  const add=(n,why)=>{if(n>0)parts.push({n,why});};
+  /* what the move does to the judge's Voltage */
+  let dv=rel==='m'?1:rel==='x'?-1:0;
+  if(kw==='Crowd Pleaser')dv=2;
+  const raises=dv>0&&volt<5;
+  const reach=volt<5&&volt+dv>=5;
+  switch(kw){
+    case 'Appeal':add(3,'Appeal');break;
+    case 'Attention Grabber':{const n=clamp(Math.round(num(String(o.lastHp||'2d4').replace(/d.*$/,''))),1,3);add(n+1,'the last move’s '+n+'d4 and one more die');break;}
+    case 'Big Show':
+      if(o.last&&o.fin&&o.allBig)add(8,'Big Show');
+      else notes.push('Big Show only works if you appeal last in the final round and every contestant before you rolled at least 3d4. Otherwise it earns no dice.');
+      break;
+    case 'Catching Up':add(1,'Catching Up');if(o.low)add(3,'you have the fewest Heart Points');break;
+    case 'Crowd Pleaser':add(1,'Crowd Pleaser');break;
+    case 'Excitement':add(2,'Excitement');break;
+    case 'Final Appeal':add(2,'Final Appeal');if(o.fin)add(2,'it is the final round');break;
+    case 'Get Ready!':break;
+    case 'Good Show!':add(1,'Good Show!');if(o.both)add(3,'Voltage was raised on both of the last two appeals');break;
+    case 'Hold That Thought':add(2,'Hold That Thought');break;
+    case 'Incredible':add(1,'Incredible');break;
+    case 'Incentives':add(2,'Incentives');if(raises)add(2,'your appeal raises the Voltage');break;
+    case 'Inversed Appeal':add(Math.max(0,4-volt),'4d4 minus 1d4 for each point of Voltage');break;
+    case 'Reflective Appeal':add(Math.min(4,volt),'1d4 for each point of Voltage, up to 4d4');break;
+    case 'Reliable':add(2,'Reliable');if(o.same)add(1,'you repeated a Reliable move');break;
+    case 'Round Ender':add(2,'Round Ender');if(o.last)add(2,'you appeal last');break;
+    case 'Round Starter':add(2,'Round Starter');if(o.first)add(2,'you appeal first');break;
+    case 'Scrambler':add(2,'Scrambler');break;
+    case 'Seen Nothing Yet':add(2,'Seen Nothing Yet');if(o.maxed)add(2,'someone raised a judge’s Voltage to the maximum');break;
+    case 'Special Attention':add(1,'Special Attention');if(before>=2&&o.alone)add(3,'nobody else appealed to this judge');break;
+    case 'Torrential Appeal':add(before,'1d4 for each contestant before you');break;
+    case 'Unsettling':add(2,'Unsettling');break;
+    default:break;
+  }
+  if(rel==='m')add(1,'the move matches the contest type');
+  if(reach)add(3,'the judge reaches 5 Voltage');
+  /* the same move twice in a row earns nothing, except a Reliable one */
+  const zero=!!o.same&&kw!=='Reliable';
+  if(zero){parts.length=0;notes.push('The same move twice in a row earns no Heart Points at all. Its effects still happen.');}
+  let mult=1;
+  if(o.ready&&!zero){mult*=2;parts.forEach(p=>{p.n*=2;});}
+  const stat=clamp(Math.round(num(o.stat)),0,40);
+  const dice=parts.reduce((a,p)=>a+p.n,0);
+  const x2=!!o.elec&&!zero;
+  /* what to do to the judge afterwards */
+  if(kw==='Crowd Pleaser')after.push(volt>=5?'The judge is already at the maximum Voltage.':'Raise the judge’s Voltage by exactly 2.');
+  else if(rel==='m')after.push(volt>=5?'The judge is already at the maximum Voltage.':'Raise the judge’s Voltage by 1: the move matches the contest type.');
+  else if(rel==='x')after.push('Lower the judge’s Voltage by 1: the move clashes with the contest type.');
+  else if(rel==='c')after.push('The move gets along with the contest type, so the Voltage does not change.');
+  if(reach)after.push('The judge is now Electrified: every later appeal to them earns double Heart Points.');
+  if(kw==='Incredible')after.push('Raise every judge’s Voltage by 1.');
+  if(kw==='Unsettling')after.push('Lower every judge’s Voltage by 1.');
+  if(kw==='Excitement')after.push('The judge’s Voltage cannot go down for the rest of the round.');
+  if(kw==='Hold That Thought')after.push('The judge’s Voltage cannot be raised for the rest of the round.');
+  if(kw==='Scrambler')after.push('Randomise the order of appeals for the next round.');
+  if(kw==='Get Ready!')after.push('On your next appeal, roll twice the dice you normally would.');
+  return {kw,rel,parts,dice,stat:zero?0:stat,x2,ready:!!o.ready&&!zero,zero,notes,after,raises,reach};
+}
+const ctDiceTxt=c=>c.parts.length?c.parts.map(p=>p.n+'d4 '+p.why).join(' + '):'no dice';
+function ctDo(c){
+  const rolled=[];
+  for(let i=0;i<c.dice;i++)rolled.push(rnd(4));
+  const sum=rolled.reduce((a,b)=>a+b,0);
+  const sub=sum+c.stat;
+  const total=c.zero?0:(c.x2?sub*2:sub);
+  return {rolled,sum,total,sub};
+}
+function ctDetail(c,r){
+  let s=(c.dice?c.dice+'d4 ['+r.rolled.join(', ')+']':'no dice')+(c.stat?' + '+c.stat+' contest stat':'')+(c.x2?' × 2 Electrified':'')+' = '+r.total;
+  if(c.ready)s+=' (dice doubled by Get Ready!)';
+  return s;
+}
+
+/* ----- the move the helper is working on ----- */
+function ctPickInfo(){
+  const o=S.ui.ct;
+  const name=String(o.mv||'').trim();
+  const e=name?ctOf(name):null;
+  const type=e?e.t:(CT_TYPES.indexOf(o.mvt)>=0?o.mvt:'');
+  return {name,e,type,kw:e?e.k:'Appeal'};
+}
+function ctState(){
+  const o=S.ui.ct,p=ctPickInfo();
+  return {kw:p.kw,type:p.type,ctype:o.ctype,volt:o.volt,elec:o.elec,first:o.first,last:o.last,fin:o.fin,low:o.low,both:o.both,maxed:o.maxed,before:o.before,alone:o.alone,allBig:o.allBig,lastHp:o.lastHp,ready:o.ready,same:o.same,stat:o.stat};
+}
+
+/* ----- the page ----- */
+const ctSel=(key,label,opts,cur)=>h`<label class="fld"><span class="fl">${label}</span><select data-u="ct.${key}">${opts.map(op=>{const v=Array.isArray(op)?op[0]:op;const l=Array.isArray(op)?op[1]:op;return h`<option value="${v}" ${String(v)===String(cur)?raw('selected'):''}>${l}</option>`;})}</select></label>`;
+const ctChk=(key,label)=>h`<label class="row"><input type="checkbox" data-u="ct.${key}" ${S.ui.ct[key]?raw('checked'):''}><span>${label}</span></label>`;
+const ctNums=(a,b)=>Array.from({length:b-a+1},(_,i)=>String(a+i));
+
+function ctGate(){
+  if(CT.list)return '';
+  if(CT.busy||(!CT.none&&!CT.fail))return h`<p class="sub" role="status">Loading the contest move list…</p>`;
+  if(S.me.admin)return h`<div class="banner">The contest move list is not loaded. If you have not imported the newest handbook data yet, open the GM Desk, choose <b>Import again</b> under Handbook data, and pick the newest <b>pta-handbook-data.json</b>.</div>`;
+  return CT.none
+    ?h`<div class="banner">The contest move list has not been added yet. Ask your GM to import the newest handbook data.</div>`
+    :h`<p class="sub bad" role="status">The contest move list could not be loaded just now. Reload the page to try again.</p>`;
+}
+
+function ctMovesView(){
+  const o=S.ui.ct;
+  const mine=ctMine();
+  const gate=ctGate();
+  return h`${S.me.admin?trainerPicker():''}
+    ${gate}
+    ${CT.list&&mine.mons.length?h`<h3 class="refg">${S.me.admin?tName(S.trainers[mine.uid])+'’s Pokémon':'Your Pokémon'}</h3>
+      <div class="ctmons">${mine.mons.map(m=>h`<div class="ctmon"><p class="ctmn"><b>${m.name}</b>${m.sp&&m.sp!==m.name?h` <span class="sub">${m.sp}</span>`:''}</p>
+        <ul class="ctlist">${m.moves.map(x=>{
+          const e=ctOf(x.n);
+          const kw=e?ctKw(e.k):null;
+          const own=!e&&x.ct;
+          return h`<li><span class="ctt">${e?ctChip(e.t):own?ctChip(x.ct):h`<span class="sub">Not listed</span>`}</span><span class="ctn">${x.n}</span><span class="ctk">${e?h`<b>${e.k}</b> <span class="sub">${kw?kw.hp:''}</span>`:own?h`<b>Appeal</b> <span class="sub">3d4 · tutored move</span>`:h`<span class="sub">Appeal, the tutor picks the type</span>`}</span><button class="btn sm" data-act="ct_use" data-name="${x.n}">Appeal</button></li>`;
+        })}</ul></div>`)}</div>`:''}
+    ${CT.list?h`<h3 class="refg">Every contest move</h3>
+    <div class="dxf">
+      <label class="fld dxq"><span class="fl">Search</span><input type="search" data-u="ct.q" data-nr value="${o.q||''}" placeholder="Move name" autocomplete="off"></label>
+      ${ctSel('type','Contest type',[['','All types']].concat(CT_TYPES.concat(['Any']).map(t=>[t,t==='Any'?'Any type':t])),o.type)}
+      ${ctSel('kw','Keyword',[['','All keywords']].concat(CT_KW.map(x=>[x.k,x.k])),o.kw)}
+      ${mine.mons.length?ctSel('show','Show',[['all','Every move'],['mine','Moves my Pokémon know']],o.show):''}
+    </div>
+    <div id="ctres">${ctResults()}</div>`:''}`;
+}
+function ctFiltered(){
+  const o=S.ui.ct;
+  const q=dexKey(o.q);
+  let known=null;
+  if(o.show==='mine'){
+    const mm=ctMine().mons;
+    if(mm.length){known=new Set();mm.forEach(m=>m.moves.forEach(x=>known.add(dexKey(x.n))));}
+  }
+  return (CT.list||[]).filter(e=>(!q||dexKey(e.n).indexOf(q)>=0)&&(!o.type||e.t===o.type)&&(!o.kw||e.k===o.kw)&&(!known||known.has(dexKey(e.n))));
+}
+function ctResults(){
+  const o=S.ui.ct;
+  const all=ctFiltered();
+  const shown=all.slice(0,o.page*CT_PAGE);
+  const filtered=!!(o.q||o.type||o.kw||o.show!=='all');
+  return h`<p class="sub" id="ctcount" aria-live="polite">${all.length===1?'1 move':all.length+' moves'}${all.length>shown.length?' · showing '+shown.length:''}</p>
+    ${all.length?h`<ul class="ctlist">${shown.map(e=>{
+      const kw=ctKw(e.k);
+      return h`<li><span class="ctt">${ctChip(e.t)}</span><span class="ctn">${e.n}</span><span class="ctk"><b>${e.k}</b> <span class="sub">${kw?kw.hp:''}</span>${e.note?h` <span class="sub">${e.note}</span>`:''}</span><button class="btn sm" data-act="ct_use" data-name="${e.n}">Appeal</button></li>`;
+    })}</ul>`:h`<p class="sub">Nothing matches.${filtered?h` <button class="btn sm" data-act="ct_clear">Clear the filters</button>`:''}</p>`}
+    ${all.length>shown.length?h`<div class="row"><button class="btn" data-act="ct_more">Show ${Math.min(CT_PAGE,all.length-shown.length)} more</button></div>`:''}`;
+}
+/* typing in the search box redraws only the results, so the box keeps its place */
+function ctRefresh(){
+  const el=$('#ctres');
+  if(el)el.innerHTML=ctResults().s;
+}
+
+function ctKeysView(){
+  const cnt={};
+  (CT.list||[]).forEach(e=>{cnt[e.k]=(cnt[e.k]||0)+1;});
+  return h`<p class="sub">Every contest move has one keyword. The keyword says how many d4 the appeal rolls for Heart Points and what else it does. In a contest, moves can be used again and again, so a move’s 1/day or 3/day limit does not apply.</p>
+    ${ctGate()}
+    <dl class="refdl ctkw">${CT_KW.map(x=>h`<dt>${x.k}<br><span class="pill">${x.hp}</span></dt><dd>${x.fx}${CT.list?h`<br><button class="btn sm ghost" data-act="ct_kw" data-k="${x.k}">${cnt[x.k]||0} move${(cnt[x.k]||0)===1?'':'s'}</button>`:''}</dd>`)}</dl>`;
+}
+
+/* ----- the appeal helper ----- */
+function ctHelpBody(){
+  const o=S.ui.ct;
+  const p=ctPickInfo();
+  const tn=!p.name;
+  const needs={first:p.kw==='Round Starter',last:p.kw==='Round Ender'||p.kw==='Big Show',fin:p.kw==='Final Appeal'||p.kw==='Big Show',low:p.kw==='Catching Up',both:p.kw==='Good Show!',maxed:p.kw==='Seen Nothing Yet',
+    before:p.kw==='Torrential Appeal'||p.kw==='Special Attention',alone:p.kw==='Special Attention',allBig:p.kw==='Big Show',lastHp:p.kw==='Attention Grabber'};
+  if(tn)return h`<p class="sub">Type a move name above, or pick one of your Pokémon’s moves, and the helper works out what to roll.</p>`;
+  if(!p.type)return h`<p class="sub">“${p.name}” is not on the handbook’s contest list. A tutored move is an Appeal move, and its tutor picks the contest type.</p>
+    <div class="mrgrid refmx">${ctSel('mvt','Contest type of this move',[['','Pick a type']].concat(CT_TYPES),o.mvt)}</div>`;
+  const st=ctState();
+  const c=ctCalc(st);
+  const kwi=ctKw(p.kw);
+  const rel=c.rel;
+  return h`<p class="ctsum">${ctChip(p.type)} <b>${p.name}</b> · ${p.kw} <span class="sub">${kwi?kwi.hp+' Heart Points':''}</span></p>
+    ${kwi?h`<p class="sub">${kwi.fx}</p>`:''}
+    ${p.e&&p.e.note?h`<p class="sub">${p.e.note}</p>`:''}
+    <div class="mrgrid refmx">
+      ${ctSel('ctype','Type of this contest',[['','Not announced / none']].concat(CT_TYPES),o.ctype)}
+      ${ctSel('volt','The judge’s Voltage now',ctNums(0,5),o.volt)}
+      ${ctSel('stat','Contest stat points you spend',ctNums(0,10),o.stat)}
+      ${needs.before?ctSel('before','Contestants who appealed before you this round',ctNums(0,9),o.before):''}
+      ${needs.lastHp?ctSel('lastHp','Heart Points dice of the last move used',['1d4','2d4','3d4'],o.lastHp):''}
+    </div>
+    <div class="ctchecks">
+      ${needs.first?ctChk('first','You appeal first this round'):''}
+      ${needs.last?ctChk('last','You appeal last this round'):''}
+      ${needs.fin?ctChk('fin','This is the final round'):''}
+      ${needs.low?ctChk('low','You have the fewest total Heart Points'):''}
+      ${needs.both?ctChk('both','Voltage was raised on both of the last two appeals this round'):''}
+      ${needs.maxed?ctChk('maxed','Someone raised a judge’s Voltage to the maximum this round'):''}
+      ${needs.alone?ctChk('alone','Nobody else appealed to this judge this round'):''}
+      ${needs.allBig?ctChk('allBig','Every contestant before you rolled at least 3d4'):''}
+      ${p.kw!=='Reliable'?ctChk('same','You used this same move on your last appeal'):ctChk('same','You used this same Reliable move last round')}
+      ${ctChk('ready','Your last appeal was Get Ready! (roll double)')}
+      ${ctChk('elec','This judge is Electrified (double Heart Points)')}
+    </div>
+    <div class="ctcalc" role="status" aria-live="polite">
+      <p><b>${c.zero?'No Heart Points':c.dice+'d4'+(c.stat?' + '+c.stat:'')+(c.x2?' × 2':'')}</b>${rel==='m'?h` <span class="pill good">Matches the contest</span>`:rel==='x'?h` <span class="pill bad">Clashes with the contest</span>`:rel==='c'?h` <span class="pill">Gets along with the contest</span>`:''}</p>
+      ${c.parts.length?h`<ul class="reful">${c.parts.map(x=>h`<li>${x.n}d4 · ${x.why}</li>`)}${c.stat?h`<li>+${c.stat} · contest stat points spent</li>`:''}</ul>`:''}
+      ${c.notes.map(n=>h`<p class="sub">${n}</p>`)}
+    </div>
+    <div class="row"><button class="btn primary" data-act="ct_roll">Roll the appeal</button><button class="btn" data-act="ct_reset">Reset</button></div>
+    ${o.res?ctResult(o.res):''}
+    ${c.after.length?h`<h3 class="refg">After your appeal</h3><ul class="reful">${c.after.map(x=>h`<li>${x}</li>`)}</ul>`:''}
+    <p class="sub">When you describe your appeal (about ten seconds), the GM may add one or two secret d4 rolls for it. The GM rolls those, not you.</p>`;
+}
+function ctResult(r){
+  return h`<div class="ctres" role="status" aria-live="polite"><span class="k">HEART POINTS</span><div class="big">${r.total}</div><div class="sub">${r.name} · ${r.detail}</div></div>`;
+}
+function ctHelpView(){
+  const o=S.ui.ct;
+  const mine=ctMine();
+  return h`<p class="sub">Pick a move and say what is going on in the round. The helper adds up the dice from the move’s keyword, rolls them, and tells you what happens to the judge’s Voltage. It is a memory aid: the handbook has the full rules.</p>
+    ${ctGate()}
+    <div class="mrgrid refmx">
+      <label class="fld"><span class="fl">Move</span><input type="text" data-u="ct.mv" data-nr list="dl-ctmoves" value="${o.mv||''}" placeholder="Start typing a move" autocomplete="off"></label>
+      ${mine.mons.length?h`<label class="fld"><span class="fl">Or one of your Pokémon’s moves</span><select data-u="ct.mvsel"><option value="">Choose…</option>${mine.mons.map(m=>h`<optgroup label="${m.name}">${m.moves.map(x=>h`<option value="${x.n}" ${dexKey(x.n)===dexKey(o.mv)?raw('selected'):''}>${x.n}</option>`)}</optgroup>`)}</select></label>`:''}
+    </div>
+    <datalist id="dl-ctmoves">${(CT.list||[]).map(e=>h`<option value="${e.n}">`)}</datalist>
+    <div id="cthelp">${ctHelpBody()}</div>`;
+}
+function ctHelpRefresh(){
+  const el=$('#cthelp');
+  if(el)el.innerHTML=ctHelpBody().s;
+}
+
+/* ----- how a contest runs, in plain words ----- */
+function ctHowView(){
+  const wheel=CT_TYPES.map(t=>h`<li>${ctChip(t)} <span class="sub">gets along with</span> ${ctNear(t).map(x=>ctChip(x))} <span class="sub">and clashes with</span> ${ctClash(t).map(x=>ctChip(x))}</li>`);
+  return h`<div class="refp">
+    ${refSec('ct_what','What a contest is',h`<ul class="reful">
+      <li>Instead of knocking each other out, coordinators try to impress a panel of judges. Usually there are three judges, and each has three Star Points to give.</li>
+      <li>Each judge has a hidden goal for each Star Point, such as the most Heart Points overall, or the most Heart Points with Clever moves or Fire-type moves. You earn the point by meeting the goal by the end of the contest. Whoever has the most Star Points wins a Contest Ribbon.</li>
+      <li>Appeals earn Heart Points. The judges keep track of them and use them to decide who gets which Star Point.</li>
+      <li>At least one contest type is announced at the start, and at least one judge favours it. That only decides one Star Point, so watch the judges for clues about the others.</li>
+    </ul>`)}
+    ${refSec('ct_types','Contest types',h`<p class="sub">Every move has a contest type as well as its battle type: Cool, Beauty, Cute, Clever or Tough. Around the handbook’s wheel, neighbours get along and the two types across from each other clash.</p>
+      <ul class="ctwheel">${wheel}</ul>
+      <ul class="reful"><li><b>Cool</b> rewards confidence, precision and strong stage presence.</li><li><b>Beauty</b> rewards grace, elegance and visual harmony.</li><li><b>Cute</b> rewards charm, personality and audience appeal.</li><li><b>Clever</b> rewards creativity, strategy and the unexpected.</li><li><b>Tough</b> rewards endurance, resilience and intensity.</li></ul>`)}
+    ${refSec('ct_stages','The three stages',h`<h3 class="refg">Introduction</h3>
+      <ul class="reful"><li>Everyone introduces themselves. Each trainer may make one Insight check on a single judge. A success reveals one hidden goal, and a very good roll may reveal several.</li>
+      <li>The favoured contest type is announced. Moves of that type raise the judge’s excitement.</li>
+      <li>If a judge wants an initial appeal, a Pokémon comes out and its grooming, contest stats and any accessories are looked over. Some contests give Heart Points for this.</li></ul>
+      <h3 class="refg">Appeal stage</h3>
+      <ul class="reful"><li>There are five rounds. In each round you pick a judge to perform for, pick a move, and use its keyword to work out your Heart Points.</li>
+      <li>If the move’s contest type matches the contest’s type, roll 1d4 more Heart Points and raise that judge’s Voltage by 1 afterwards. If it clashes, lower the Voltage by 1 instead. If it gets along with the contest type, nothing changes.</li>
+      <li>When a judge’s Voltage reaches 5, the contestant who got it there gets 3d4 more Heart Points on that appeal, and the judge is Electrified for the rest of the contest: every appeal to them earns double Heart Points.</li>
+      <li>Using the same move twice in a row earns no Heart Points, though its effects and Voltage changes still happen. Reliable moves are the exception.</li>
+      <li>Within a round, contestants appeal in any order. If several want to go at once, the fastest Pokémon goes first. If nobody wants to, the judges pick whoever has the most Heart Points, with Speed breaking ties.</li>
+      <li>Describe your appeal in about ten seconds. The GM may add one or two secret d4 rolls for good creativity.</li></ul>
+      <h3 class="refg">Award stage</h3>
+      <ul class="reful"><li>Each judge announces their goals one by one and hands out Star Points. The trainer with the most Star Points wins a Contest Ribbon, and big contests may give a runner-up ribbon. A tie can mean shared first place.</li>
+      <li>A trainer can earn several ribbons across different contests, but only one honour per contest hall.</li></ul>`)}
+    ${refSec('ct_stats','Contest stats',h`<ul class="reful"><li>Each Pokémon has five contest stats, one for each contest type. They start at zero and grow when you feed it special foods such as Poffins and PokéBlocks.</li>
+      <li>A Pokémon can have 10 points in total, split however you like. Scarves can push the total above 10. Once spent on food, they are permanent.</li>
+      <li>During the introduction or any appeal, you may spend points from a stat to add that many to your Heart Points, but only when the move’s contest type matches that stat. Everything is restored at the end of the contest.</li></ul>`)}
+    ${refSec('ct_var','Variations',h`<dl class="refdl">
+      <dt>Trainer Appeal</dt><dd>The trainer’s own speeches, music, feats or attacks can earn Heart Points too.</dd>
+      <dt>Super Contest</dt><dd>A contest type is picked at random at the start of every round.</dd>
+      <dt>Festival</dt><dd>Each judge announces a different favoured type every round.</dd>
+      <dt>High Voltage</dt><dd>Each judge starts at 1 Voltage. Whenever a judge’s Voltage rises, the appeal adds that many d4. Electrified judges add 5d4 rather than doubling.</dd>
+      <dt>Rival Showcase</dt><dd>Contestants are paired off and judged against each other every round.</dd>
+      <dt>Audience Participation</dt><dd>Exciting the crowd or matching its tastes can earn bonus Heart Points.</dd>
+      <dt>Double Performance</dt><dd>Two Pokémon appeal together each round, and the two moves are combined: take the contest type from one and the keyword from the other. Neither can repeat last round’s move unless it is Reliable.</dd>
+      <dt>Extra stages</dt><dd>Judges can add a Fashion Show (Cute, Beauty), Pokéathlon (Tough), PokéStar Heroes (Cool), Talent Show (Clever) or a Dummy round that scores damage done to a stage dummy. They award extra Star Points.</dd></dl>`)}
+    ${refSec('ct_tut','Moves that are not on the list',h`<p class="sub">A move taught by a tutor that is not on the handbook’s list is an Appeal move. The tutor picks its contest type when the move is learned. On a Pokémon’s sheet you can set that type under the move.</p>`)}
+  </div>`;
+}
+
+function ctTab(){
+  ctWarm();
+  const o=S.ui.ct;
+  if(!CT_VIEWS.some(v=>v[0]===o.v))o.v='moves';
+  const body=o.v==='keys'?ctKeysView():o.v==='help'?ctHelpView():o.v==='how'?ctHowView():ctMovesView();
+  return h`<section class="panel ctp"><div class="ph"><h2>Contests</h2>${CT.list?h`<span class="pill">${CT.list.length} moves</span>`:''}</div>
+    <div class="seg" role="group" aria-label="Contest pages">${CT_VIEWS.map(([k,l])=>h`<button data-act="ct_view" data-v="${k}" aria-pressed="${String(o.v===k)}">${l}</button>`)}</div>
+    <div class="ctbody">${body}</div>
+  </section>`;
+}
+
+/* typing and choosing in the contest page's boxes. Returns true when it redrew by itself. */
+function ctInput(key,t){
+  const o=S.ui.ct;
+  if(key==='q'){o.page=1;ctRefresh();return true;}
+  if(key==='mv'){o.mvt=ctOwnType(o.mv);o.res=null;ctHelpRefresh();return true;}
+  if(key==='mvsel'){if(t.value){o.mv=t.value;o.mvt=ctOwnType(t.value);}}
+  if(key==='type'||key==='kw'||key==='show')o.page=1;
+  o.res=null;
+  return false;
+}
+function ctAct(b){
+  const d=b.dataset,o=S.ui.ct;
+  switch(d.act){
+    case 'ct_view':o.v=d.v;render();break;
+    case 'ct_more':o.page++;ctRefresh();break;
+    case 'ct_clear':o.q='';o.type='';o.kw='';o.show='all';o.page=1;render();break;
+    case 'ct_kw':o.kw=d.k;o.q='';o.type='';o.show='all';o.page=1;o.v='moves';S.ui.toTop=true;render();break;
+    case 'ct_use':
+      o.mv=d.name||'';o.mvt=d.ct||ctOwnType(d.name);o.res=null;o.v='help';
+      if(S.tab!=='contest'){setTab('contest');}else{S.ui.toTop=true;render();}
+      break;
+    case 'ct_reset':
+      Object.assign(o,{ctype:'',volt:'0',elec:false,first:false,last:false,fin:false,low:false,both:false,maxed:false,before:'0',alone:false,allBig:false,lastHp:'2d4',ready:false,same:false,stat:'0',res:null});
+      render();break;
+    case 'ct_roll':{
+      const p=ctPickInfo();
+      if(!p.name||!p.type)return;
+      const c=ctCalc(ctState());
+      const r=ctDo(c);
+      const det=ctDetail(c,r);
+      o.res={name:p.name,total:r.total,detail:det};
+      logRoll(chkEntry('Appeal: '+p.name,r.total,det));
+      render();
+      break;}
+    default:break;
   }
 }
 
@@ -5688,6 +6146,7 @@ function moveRow(id,m,x,i,ro){
       ${fText('Damage','p',id,p+'dice',m,{ro,ph:'e.g. 3d8'})}
     </div>
     ${fArea('Effect','p',id,p+'text',m,{ro,rows:2})}
+    ${ctLine(id,m,x,i,ro)}
   </div>`;
 }
 
@@ -6410,7 +6869,7 @@ function footer(){
 function mainHtml(){
   if(S.noDb)return emptyState('This tracker needs a signed-in view','Open it from your claude.ai link while signed in. The shared table is stored with the page, so it cannot load anywhere else.');
   if(!S.ready)return h`<p class="loading">OPENING THE TABLE…</p>`;
-  const views={overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,dex:dexTab,battle:battleTab,gm:gmTab,npc:npcTab,account:accountTab};
+  const views={overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,dex:dexTab,battle:battleTab,contest:ctTab,gm:gmTab,npc:npcTab,account:accountTab};
   let tab=S.tab;
   if((tab==='gm'||tab==='npc')&&!S.me.admin)tab='overview';
   if(tab==='account'&&!CFG)tab='overview';
@@ -6621,6 +7080,7 @@ function act(b,e){
   const d=b.dataset;
   if(d.act&&d.act.indexOf('b_')===0){batAct(b,e);return;}
   if(d.act&&d.act.indexOf('dx_')===0){dxAct(b,e);return;}
+  if(d.act&&d.act.indexOf('ct_')===0){ctAct(b,e);return;}
   if(d.act&&d.act.indexOf('nt_')===0){ntAct(b,e);return;}
   if(d.act&&d.act.indexOf('bm_')===0){bmAct(b,e);return;}
   switch(d.act){
@@ -6924,6 +7384,7 @@ document.addEventListener('input',e=>{
     const k=t.dataset.u.split('.');
     S.ui[k[0]][k[1]]=t.type==='checkbox'?t.checked:t.value;
     if(k[0]==='dx'){S.ui.dx.page=1;if(k[1]==='q'){dxRefresh();return;}}
+    if(k[0]==='ct'&&ctInput(k[1],t))return;
     if(!('nr' in t.dataset))render();
   }
 });

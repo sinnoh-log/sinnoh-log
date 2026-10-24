@@ -592,6 +592,40 @@ input[type=search]{appearance:none}
 .refdl dd{margin:0;font-size:13.5px;line-height:1.45;color:var(--ink);overflow-wrap:anywhere}
 @media (min-width:760px){.refdl{grid-template-columns:max-content minmax(0,1fr);gap:8px 14px}.refdl dt{margin-top:0;text-align:right}}
 .reful{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:13.5px;line-height:1.45}
+/* ---- contests ---- */
+.ct{display:inline-flex;align-items:center;gap:5px;font:800 12px/1 var(--f-body);padding:4px 9px 3px;border-radius:7px;border:2px solid rgba(0,0,0,.18);box-shadow:inset 0 -2px 0 rgba(0,0,0,.16);color:#fff;white-space:nowrap}
+.ct.cool{background:#C23B32}.ct.beauty{background:#2F66C8}.ct.cute{background:#B8337C}.ct.clever{background:#2B7A3B}.ct.tough{background:#B35309}.ct.any{background:#5B5F7A}
+.ctp .seg{margin:4px 0 10px}
+.ctbody{display:flex;flex-direction:column;gap:10px}
+.ctrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+.ctrow .fl{font:800 11px var(--f-body);text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.ctrow .ctfx{flex:1 1 100%;font-size:12.5px;line-height:1.4}
+.ctrow .ctsel{min-width:200px}
+.ctmons{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:10px}
+.ctmon{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--panel)}
+.ctmn{margin:0 0 4px}
+.ctlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.ctlist li{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:2px 10px;align-items:center;padding:7px 2px;border-top:1px solid var(--line-soft)}
+.ctlist li:first-child{border-top:0}
+.ctlist .ctn{font:800 14px var(--f-body);overflow-wrap:anywhere}
+.ctlist .ctk{grid-column:2;font-size:13px;overflow-wrap:anywhere}
+.ctlist .btn{grid-column:3;grid-row:1 / span 2;align-self:center}
+@media (max-width:520px){.ctlist li{grid-template-columns:minmax(0,1fr) auto}.ctlist .ctt{grid-column:1}.ctlist .ctn{grid-column:1}.ctlist .ctk{grid-column:1}.ctlist .btn{grid-column:2;grid-row:1 / span 3}}
+.ctkw dt .pill{margin-top:4px}
+.ctchecks{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:6px 14px}
+.ctchecks .row{flex-wrap:nowrap;align-items:flex-start;gap:8px}.ctchecks .row input{flex:none;margin-top:3px}
+.ctcalc{border:2px solid var(--frame);border-radius:10px;background:var(--lcd);color:var(--lcd-ink);padding:8px 12px}
+.ctcalc p{margin:2px 0}
+.ctcalc .sub{color:var(--lcd-dim)}
+.ctcalc .reful{margin-top:4px}
+.ctsum{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:0}
+.ctres{border:2px solid var(--frame);border-radius:10px;background:var(--lcd);color:var(--lcd-ink);padding:8px 12px;display:flex;flex-direction:column;gap:2px}
+.ctres .k{font:800 11px var(--f-body);letter-spacing:.08em;color:var(--lcd-dim)}
+.ctres .big{font:400 40px/1 var(--f-num)}
+.ctres .sub{color:var(--lcd-dim)}
+.ctwheel{list-style:none;margin:6px 0 10px;padding:0;display:flex;flex-direction:column;gap:6px}
+.ctwheel li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-size:13.5px}
+
 .refg{font:800 13px var(--f-body);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:6px 0 0}
 .refmx{align-items:end}
 .refres{margin:0;font-size:14px;line-height:1.6}
@@ -856,5 +890,5 @@ html.lbx-on,html.lbx-on body{overflow:hidden}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-10-11-Battle-map-fog-of-war"></script>
+<script src="app.js?v=2026-10-24-Contest-moves"></script>
 </body></html>
