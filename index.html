@@ -14,7 +14,7 @@
   --accent:#2A5BD0; --accent-ink:#FFFFFF; --accent-soft:#D8E3FA;
   --frame:#24387A; --frame-in:#C9D8F6; --frame-sh:#A3B5E0; --cursor:#D8433A; --spr-base:#FFFFFF;
   --lcd:#C8DAA6; --lcd-ink:#1F2E14; --lcd-dim:#5F7745; --lcd-edge:#9DB27A; --lcd-inset:#D6E5BB;
-  --good:#2C7A4B; --warn:#A8620A; --bad:#B9301F; --gold:#C4951A; --gold-ink:#3B2B00;
+  --good:#2C7A4B; --warn:#A8620A; --bad:#B9301F; --gold:#C4951A; --gold-ink:#3B2B00; --gen-m:#2457A6; --gen-f:#A32A6A;
   --shadow:0 2px 0 rgba(36,56,122,.25),0 10px 24px rgba(20,32,63,.14);
   --f-pix:'Pixelify Sans','Trebuchet MS',system-ui,sans-serif;
   --f-num:'VT323','Pixelify Sans',ui-monospace,monospace;
@@ -28,7 +28,7 @@
   --accent:#7FA6FF; --accent-ink:#071030; --accent-soft:#1D2D5E;
   --frame:#6F8EE6; --frame-in:#0F1836; --frame-sh:#050A1A; --cursor:#FF6B5E; --spr-base:#CBD5F2;
   --lcd:#27311D; --lcd-ink:#C2DB99; --lcd-dim:#7E9862; --lcd-edge:#3A4A2A; --lcd-inset:#1E2716;
-  --good:#5CC48A; --warn:#E3A748; --bad:#F2846E; --gold:#E3B84A; --gold-ink:#2B2000;
+  --good:#5CC48A; --warn:#E3A748; --bad:#F2846E; --gold:#E3B84A; --gold-ink:#2B2000; --gen-m:#8DB3F4; --gen-f:#F2A0CB;
   --shadow:0 2px 0 rgba(0,0,0,.5),0 10px 24px rgba(0,0,0,.45);
   color-scheme:dark}}
 :root[data-theme="dark"]{
@@ -37,7 +37,7 @@
   --accent:#7FA6FF; --accent-ink:#071030; --accent-soft:#1D2D5E;
   --frame:#6F8EE6; --frame-in:#0F1836; --frame-sh:#050A1A; --cursor:#FF6B5E; --spr-base:#CBD5F2;
   --lcd:#27311D; --lcd-ink:#C2DB99; --lcd-dim:#7E9862; --lcd-edge:#3A4A2A; --lcd-inset:#1E2716;
-  --good:#5CC48A; --warn:#E3A748; --bad:#F2846E; --gold:#E3B84A; --gold-ink:#2B2000;
+  --good:#5CC48A; --warn:#E3A748; --bad:#F2846E; --gold:#E3B84A; --gold-ink:#2B2000; --gen-m:#8DB3F4; --gen-f:#F2A0CB;
   --shadow:0 2px 0 rgba(0,0,0,.5),0 10px 24px rgba(0,0,0,.45);
   color-scheme:dark}
 
@@ -271,6 +271,17 @@ progress.hp.bad::-moz-progress-bar{background:var(--bad)}
 .pill.hostile,.pill.dead{color:var(--bad);border-color:var(--bad)}
 .pill.status{color:var(--bad);border-color:var(--bad)}
 .pill.gm{background:var(--gold);color:var(--gold-ink);border-color:var(--gold)}
+.csgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:6px 0}
+.csgrid .fld.cs .fl{display:flex;align-items:center}
+.csgrid input{width:100%;text-align:center}
+@media (max-width:620px){.csgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.fld.shn .row{min-height:42px;align-items:center}
+.ctstats{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:4px 0 10px}
+.ctst{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.ctst b{font-size:1.1em}
+.pill.shiny{background:var(--gold);color:var(--gold-ink);border-color:var(--gold)}
+.pill.gen.male{color:var(--gen-m);border-color:var(--gen-m)}
+.pill.gen.female{color:var(--gen-f);border-color:var(--gen-f)}
 
 /* pokemon */
 .mons{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr))}
@@ -880,6 +891,7 @@ html.lbx-on,html.lbx-on body{overflow:hidden}
 <datalist id="dl-moves"></datalist>
 <datalist id="dl-passives"></datalist>
 <datalist id="dl-items"></datalist>
+<datalist id="dl-balls"></datalist>
 <datalist id="dl-places"></datalist>
 <datalist id="dl-freq"><option value="At-Will"><option value="3/day"><option value="1/day"></datalist>
 <datalist id="dl-status"><option value="Burned"><option value="Frozen"><option value="Paralyzed"><option value="Poisoned"><option value="Asleep"><option value="Confused"><option value="Cursed"><option value="Infatuated"></datalist>
@@ -890,5 +902,5 @@ html.lbx-on,html.lbx-on body{overflow:hidden}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-10-24-Contest-moves"></script>
+<script src="app.js?v=2026-10-24-Contest-stats-shiny-Pok-Ball"></script>
 </body></html>
