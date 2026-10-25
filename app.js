@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-24 · Shops';
+const BUILD='2026-10-24 · Ribbons';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -37,7 +37,7 @@ const HONOR_TYPES=['Trial Medal','Frontier Symbol','Contest Ribbon','Certificate
 const ATTITUDES=[['unknown','Unknown'],['friendly','Friendly'],['neutral','Neutral'],['wary','Wary'],['hostile','Hostile']];
 const LEAD_STATES=[['open','Open'],['chasing','Chasing'],['resolved','Resolved'],['dead','Dead end']];
 const LOY_WORDS=['Defiant','Distrustful','Obedient','Trusting','Devoted','Bonded'];
-const DEF_META={campaign:'Sinnoh Trainer Log',subtitle:'Post-game Sinnoh · ten years after Team Galactic',gm:'',session:1,pinned:''};
+const DEF_META={campaign:'Sinnoh Trainer Log',subtitle:'Post-game Sinnoh · ten years after Team Galactic',gm:'',session:1,pinned:'',ribbonNeed:5};
 const NAV=[
   ['Narrative',[['overview','Overview'],['journal','Journal'],['timeline','Timeline']]],
   ['World',[['people','People'],['leads','Leads'],['map','Map']]],
@@ -94,7 +94,7 @@ const S={
   awards:{},timeline:{},pins:{},banner:{},places:{},gmPl:{},placeId:null,members:{},invite:null,mapChunks:{},mapSrc:'',room:null,peers:[],avatars:{},
   pick:null,names:{},save:{cls:'',text:'Saved'},rolls:[],_tsig:'',
   ui:{open:{},lbx:null,adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},pop:null,megaPop:null,
-    award:{uids:{},type:'Gym Badge',badge:'coal',title:'',note:'',levelUp:true}}
+    award:{uids:{},type:'Gym Badge',badge:'coal',ribbon:null,title:'',note:'',levelUp:true}}
 };
 
 /* ---------- look: type colours, species list, sprites ---------- */
@@ -3436,7 +3436,7 @@ function dxAct(b){
    database (meta/pta_contest), where only signed-in members can read it. */
 const CT_TYPES=['Cool','Beauty','Cute','Clever','Tough'];   /* the order they sit in around the handbook's wheel */
 const CT_ICON={Cool:'◆',Beauty:'●',Cute:'★',Clever:'■',Tough:'▼',Any:'✦'};
-const CT_VIEWS=[['moves','Contest moves'],['keys','Keywords'],['help','Appeal helper'],['how','How contests work']];
+const CT_VIEWS=[['moves','Contest moves'],['keys','Keywords'],['help','Appeal helper'],['how','How contests work'],['rib','Ribbons']];
 S.ui.ct=S.ui.ct||{v:'moves',q:'',type:'',kw:'',show:'all',page:1,mv:'',mvt:'',ctype:'',volt:'0',elec:false,first:false,last:false,fin:false,low:false,both:false,maxed:false,before:'0',alone:false,allBig:false,lastHp:'2d4',ready:false,same:false,stat:'0',res:null,mon:'',sfrom:'',spent:{}};
 const CT_PAGE=80;
 
@@ -3886,7 +3886,7 @@ function ctTab(){
   ctWarm();
   const o=S.ui.ct;
   if(!CT_VIEWS.some(v=>v[0]===o.v))o.v='moves';
-  const body=o.v==='keys'?ctKeysView():o.v==='help'?ctHelpView():o.v==='how'?ctHowView():ctMovesView();
+  const body=o.v==='keys'?ctKeysView():o.v==='help'?ctHelpView():o.v==='how'?ctHowView():o.v==='rib'?ribView():ctMovesView();
   return h`<section class="panel ctp"><div class="ph"><h2>Contests</h2>${CT.list?h`<span class="pill">${CT.list.length} moves</span>`:''}</div>
     <div class="seg" role="group" aria-label="Contest pages">${CT_VIEWS.map(([k,l])=>h`<button data-act="ct_view" data-v="${k}" aria-pressed="${String(o.v===k)}">${l}</button>`)}</div>
     <div class="ctbody">${body}</div>
@@ -4427,6 +4427,157 @@ function shAct(b){
     case 'sp_logmore':u.ln+=60;render();break;
     default:break;
   }
+}
+
+/* ---------- Contest ribbons and the road to the Grand Festival ----------
+   Every trainer sheet has a ribbon case, like the gym badge case: one slot per contest hall, ticked when the trainer wins a
+   ribbon there. The case is kept on the trainer's own sheet (trainers/<uid>, field "ribbons"), so the owner and the GM can
+   tick it and the existing rules already allow it.
+   Which ribbons exist, and how many a trainer needs for the Grand Festival, belongs to the whole table, so it is kept with the
+   other table settings (meta/table: "ribbonHalls" and "ribbonNeed"), which every member reads and only the GM writes.
+   Until the GM changes the list, the table uses the Sinnoh ribbons from the anime: 17 contest-hall towns and the Aqua Ribbon,
+   the prize of the Wallace Cup at Lake Valor. Five were needed to enter the Sinnoh Grand Festival.
+   Nothing here is handbook text. The contest rules it points to are written in the table's own words. */
+const RIB_DEFAULT=[
+  ['jubilife','Jubilife','Jubilife City'],['floaroma','Floaroma','Floaroma Town'],['alamos','Alamos','Alamos Town'],
+  ['hearthome','Hearthome','Hearthome City'],['sage','Sage','Sage Town'],['solaceon','Solaceon','Solaceon Town'],
+  ['aqua','Aqua','Lake Valor · Wallace Cup'],['celestic','Celestic','Celestic Town'],['majolica','Majolica','Majolica Town'],
+  ['gerbera','Gerbera','Gerbera Town'],['beachrose','Beach Rose','Beach Rose Town'],['chocovine','Chocovine','Chocovine Town'],
+  ['sandalstraw','Sandalstraw','Sandalstraw Town'],['lilypad','Lilypad','Lilypad Town'],['brussel','Brussel','Brussel Town'],
+  ['daybreak','Daybreak','Daybreak Town'],['neighborly','Neighborly','Neighborly Town'],['arrowroot','Arrowroot','Arrowroot Town']
+];
+const RIB_NEED=5,RIB_MAX=40;
+S.ui.rib=S.ui.rib||{reset:false};
+['rb_ready','rb_road','rb_gf'].forEach(k=>{if(S.ui.ref&&S.ui.ref.open&&!(k in S.ui.ref.open))S.ui.ref.open[k]=true;});
+
+const ribCustom=()=>Array.isArray(S.meta.ribbonHalls);
+const ribDefaults=()=>RIB_DEFAULT.map(([k,n,t])=>({k,n,t}));
+function ribHalls(){
+  const src=ribCustom()?S.meta.ribbonHalls:ribDefaults();
+  const seen=new Set(),out=[];
+  src.forEach(x=>{
+    if(!x||typeof x!=='object')return;
+    const k=String(x.k||'');
+    if(!k||seen.has(k))return;
+    seen.add(k);
+    out.push({k,n:String(x.n||'').trim()||'Unnamed',t:String(x.t||'').trim()});
+  });
+  return out;
+}
+const ribNeedEff=halls=>Math.min(clamp(Math.floor(num(S.meta.ribbonNeed))||RIB_NEED,1,RIB_MAX),Math.max(1,halls.length));
+const ribCount=(t,halls)=>(halls||ribHalls()).filter(x=>t&&t.ribbons&&t.ribbons[x.k]).length;
+const ribColor=k=>{let a=7;for(let i=0;i<k.length;i++)a=(a*31+k.charCodeAt(i))>>>0;return 'hsl('+(a%360)+' 62% 52%)';};
+/* a simple original rosette with two tails; drawn in each ribbon's own colour by CSS */
+const RIB_GLYPH=(()=>{
+  const p=[];
+  for(let i=0;i<24;i++){const r=i%2?9:11,a=Math.PI*i/12-Math.PI/2;p.push((16+r*Math.cos(a)).toFixed(2)+','+(12.5+r*Math.sin(a)).toFixed(2));}
+  return raw('<svg class="gl" viewBox="0 0 32 32" aria-hidden="true" fill="currentColor"><path d="M10.5 19.5L6.8 29.6l4.7-2.3 2.9 3.7 2-10.2z"/><path d="M21.5 19.5l3.7 10.1-4.7-2.3-2.9 3.7-2-10.2z" opacity=".82"/><polygon points="'+p.join(' ')+'"/><circle cx="16" cy="12.5" r="5" fill="rgba(10,16,40,.38)"/><circle cx="16" cy="12.5" r="2" fill="rgba(255,255,255,.85)"/></svg>');
+})();
+const ribBar=(n,need)=>h`<div class="rbar" role="img" aria-label="${n} of ${need} ribbons toward the Grand Festival"><i ${raw('style="width:'+Math.min(100,Math.round(100*n/Math.max(1,need)))+'%"')}></i></div>`;
+/* a short line for the overview card */
+function ribBrief(t){
+  const halls=ribHalls(),n=ribCount(t,halls),need=ribNeedEff(halls);
+  return n>=need?n+' · Grand Festival ✓':n+' of '+need;
+}
+
+/* ----- the ribbon case on a trainer sheet ----- */
+function ribCase(uid,t,ro){
+  const halls=ribHalls(),n=ribCount(t,halls),need=ribNeedEff(halls);
+  const rb=t.ribbons||{},pop=S.ui.pop,left=Math.max(0,need-n);
+  return h`<div class="ribhead"><h3 class="refg">Contest ribbons</h3><span class="mono sub">${n}/${halls.length}</span>
+      <span class="pill ${left?'':'open'}">${left?left+' more for the Grand Festival':'Qualified for the Grand Festival'}</span></div>
+    ${ribBar(n,need)}
+    ${halls.length?h`<div class="case rib ${left?'':'full'}" role="group" aria-label="Ribbon case, ${n} of ${halls.length} earned">
+      ${halls.map(x=>h`<button class="slot ${rb[x.k]?'on':''}${rb[x.k]&&pop&&pop.uid===uid&&pop.key==='r:'+x.k?' pop':''}" ${raw('style="--bc:'+ribColor(x.k)+'"')} data-act="rb_toggle" data-key="${x.k}" data-uid="${uid}" aria-pressed="${String(!!rb[x.k])}" title="${x.n} Ribbon${x.t?', '+x.t:''}" ${dis(ro)}><span class="medal">${RIB_GLYPH}</span><span class="bn">${x.n}</span>${x.t?h`<small>${x.t}</small>`:''}</button>`)}
+    </div>`:h`<p class="sub">The GM has not set up any ribbons yet.</p>`}
+    <p class="sub">${need} ribbons from ${need} different contest halls opens the Grand Festival. <button class="lnk" data-act="rb_goto">How it works</button></p>`;
+}
+
+/* ----- the Ribbons page inside Contests ----- */
+function ribView(){
+  const halls=ribHalls(),need=ribNeedEff(halls),ids=tids(),custom=ribCustom();
+  const holders=k=>ids.filter(u=>S.trainers[u]&&S.trainers[u].ribbons&&S.trainers[u].ribbons[k]).map(u=>tName(S.trainers[u]));
+  const ready=ids.map(u=>{const t=S.trainers[u];const n=ribCount(t,halls);return h`<div class="ribrow"><span class="rn"><b>${tName(t)}</b></span><span class="mono sub">${n} of ${need}</span>${ribBar(n,need)}<span class="pill ${n>=need?'open':''}">${n>=need?'Qualified':(need-n)+' to go'}</span></div>`;});
+  return h`<div class="refp">
+    <p class="sub">The ribbon case on each trainer sheet tracks contest ribbons the way the badge case tracks gym badges. This page is how the table gets from the first ribbon to the Grand Festival.</p>
+    ${refSec('rb_ready','Who is ready for the Grand Festival',ids.length?h`<div class="ribrows">${ready}</div><p class="sub">${need} ribbons from ${need} different contest halls qualify a trainer.</p>`:h`<p class="sub">No trainers yet.</p>`)}
+    ${refSec('rb_road','The road to the Grand Festival',h`<ul class="reful">
+      <li><b>Win ribbons.</b> A contest hall gives its Contest Ribbon to whoever has the most Star Points at the end of the Award stage. Each hall has its own ribbon, which goes in the ribbon case on the trainer sheet. Winning again at a hall whose ribbon you already hold does not add to the count: it is one honour per contest hall.</li>
+      <li><b>${need} ribbons from ${need} different halls.</b> Collect that many and you are invited to the Grand Festival. This is the anime’s rule: five ribbons from one region. The GM can change the number below.</li>
+      <li><b>Registering.</b> Your first ribbon registers you in the region’s contest circuit. The GM’s Guide says the Grand Festival is usually held a week or two before the League championships, and that circuits can have strict expectations for attire and how you carry yourself.</li>
+      <li><b>Using the ribbons up.</b> In the anime, the ribbons used to enter a Grand Festival cannot be used again. If your table wants that, the GM can untick those ribbons on the sheet afterwards.</li>
+    </ul>`)}
+    ${refSec('rb_gf','How the Grand Festival runs',h`<ul class="reful">
+      <li><b>Appeal stage: Double Performance.</b> Every trainer brings two Pokémon, and both take part in each of the five appeals. Each round, both Pokémon pick a move and the two are combined: take the contest type from one move and the keyword from the other. Neither Pokémon can repeat the move it used last round unless that move is Reliable. This is the handbook’s variant, and the Sinnoh Grand Festival in the anime used it.</li>
+      <li><b>The cut.</b> The best performers go on to the finals. In the anime, 32 of the 108 coordinators moved on, in four blocks of eight. Choose the number that fits the size of your field.</li>
+      <li><b>Finals: Rival Showcase.</b> Trainers are paired off and perform in direct opposition each round. Appeals are judged against each other rather than alone, and a typical Star Point is “most rounds won against opposing coordinators”. The winner of the last pairing takes the Ribbon Cup and the title of Top Coordinator.</li>
+      <li><b>The prize.</b> The GM’s Guide says a Grand Festival champion can walk away with over 400,000 Pokécredits, sometimes more than a League championship pays.</li>
+      <li>The handbook’s Double Performance and Rival Showcase rules are on the <button class="lnk" data-act="ct_view" data-v="how">How contests work</button> page under Variations.</li>
+    </ul>`)}
+    ${refSec('rb_circ',custom?'This table’s contest circuit':'The Sinnoh contest circuit',h`
+      <p class="sub">${custom?'The GM has set up this table’s own list of ribbons.':'This is the list of ribbons from the anime’s Sinnoh region: 17 contest-hall towns and the Aqua Ribbon, the prize of the Wallace Cup at Lake Valor. Most of these towns exist only in the anime, and the Alamos Ribbon was only ever seen in an end-credits sequence. The GM can rename them, swap in places from your own map, and add or remove ribbons.'}</p>
+      ${halls.length?h`<ul class="ribl">${halls.map(x=>{const w=holders(x.k);return h`<li><span class="ribdot" ${raw('style="--bc:'+ribColor(x.k)+'"')}></span><b>${x.n} Ribbon</b>${x.t?h` <span class="sub">${x.t}</span>`:''}${w.length?h`<span class="ribwho">${w.join(', ')}</span>`:''}</li>`;})}</ul>`:h`<p class="sub">No ribbons yet.</p>`}`)}
+    ${S.me.admin?ribEditor(custom):''}
+  </div>`;
+}
+
+/* ----- the GM's editor ----- */
+const ids_holding=k=>tids().filter(u=>S.trainers[u]&&S.trainers[u].ribbons&&S.trainers[u].ribbons[k]).length;
+function ribEditor(custom){
+  const raws=custom?S.meta.ribbonHalls:[];
+  return h`<section class="panel ribed"><div class="ph"><h2>Set up the ribbons</h2><span class="pill gm">GM only</span></div>
+    <div class="fgrid">${fNum('Ribbons needed for the Grand Festival','meta','table','ribbonNeed',S.meta,{min:1,max:RIB_MAX})}</div>
+    ${custom?h`<div class="spedlist">${raws.map((x,i)=>h`<div class="spedrow"><div class="sped1">${fText('Ribbon name (without the word Ribbon)','meta','table','ribbonHalls.'+i+'.n',S.meta,{ph:'e.g. Jubilife'})}${fText('Town or event','meta','table','ribbonHalls.'+i+'.t',S.meta,{ph:'e.g. Jubilife City'})}</div>
+        <div class="row sp"><span class="sub">${ids_holding(x&&x.k)} of ${tids().length} trainers hold it</span>${rowBtns('meta','table','ribbonHalls',i,raws.length,false)}</div></div>`)}</div>
+      <div class="row"><button class="btn sm" data-act="rb_add" ${raws.length>=RIB_MAX?raw('disabled'):''}>Add a ribbon</button>
+        ${S.ui.rib.reset?h`<button class="btn sm danger" data-act="rb_resetyes">Yes, go back to the anime’s list</button><button class="btn sm" data-act="rb_resetno">Keep my list</button>`:h`<button class="btn sm ghost" data-act="rb_reset">Use the anime’s list again</button>`}</div>
+      <p class="sub">Removing a ribbon takes it out of every trainer’s case and count. The ticks stay saved on the sheets, but only ribbons on this list are counted or shown.</p>`
+      :h`<p class="sub">The table is using the anime’s list of ${RIB_DEFAULT.length} ribbons. To rename them, remove some, or add your own, start from that list.</p>
+      <div class="row"><button class="btn sm" data-act="rb_custom">Edit the list</button></div>`}
+  </section>`;
+}
+
+function ribAct(b){
+  const d=b.dataset,o=S.ui.rib;
+  switch(d.act){
+    case 'rb_toggle':{
+      const t=S.trainers[d.uid];
+      if(!t||!canEditT(d.uid))return;
+      const on=!(t.ribbons&&t.ribbons[d.key]);
+      edit('t',d.uid,'ribbons.'+d.key,on);
+      if(on){const p={uid:d.uid,key:'r:'+d.key};S.ui.pop=p;setTimeout(()=>{if(S.ui.pop===p)S.ui.pop=null;},1400);}
+      else S.ui.pop=null;
+      render();break;}
+    case 'rb_goto':
+      S.ui.ct.v='rib';S.ui.toTop=true;
+      if(S.tab!=='contest')setTab('contest');else render();
+      break;
+    case 'rb_custom':
+      if(!S.me.admin||ribCustom())return;
+      edit('meta','table','ribbonHalls',ribDefaults());
+      render();break;
+    case 'rb_add':{
+      if(!S.me.admin||!ribCustom())return;
+      const arr=S.meta.ribbonHalls.slice();
+      if(arr.length>=RIB_MAX)return;
+      arr.push({k:'c'+Date.now().toString(36)+Math.floor(Math.random()*1296).toString(36),n:'',t:''});
+      edit('meta','table','ribbonHalls',arr);
+      render();break;}
+    case 'rb_reset':o.reset=true;render();break;
+    case 'rb_resetno':o.reset=false;render();break;
+    case 'rb_resetyes':
+      if(!S.me.admin)return;
+      o.reset=false;
+      edit('meta','table','ribbonHalls',null);
+      render();break;
+  }
+}
+
+/* the ribbon chosen in the Award honors form: the first ribbon until the GM picks, "" for a ribbon with no slot in the case */
+function awardRibbon(){
+  const a=S.ui.award,halls=ribHalls();
+  if(a.ribbon==='')return '';
+  return halls.some(x=>x.k===a.ribbon)?a.ribbon:(halls[0]?halls[0].k:'');
 }
 
 /* ---------- NPC trainers: people the GM runs, with Pokémon of their own ----------
@@ -6522,6 +6673,7 @@ function trainerCard(uid){
       <p class="sub">Played by ${nm(uid)}</p></div>
     <div class="hpline">${hpBar(t.hp)}<span class="mono">${num(t.hp&&t.hp.cur)}/${num(t.hp&&t.hp.max)}</span></div>
     <div class="row sp"><span class="dots" role="img" aria-label="${badgeCount(t)} of 8 badges">${BADGES.map(b=>h`<span class="dot ${bg[b[0]]?'on':''}" ${raw('style="--bc:'+BADGE_COL[b[0]]+'"')} title="${b[1]} Badge"></span>`)}</span><span class="mono sub">${badgeCount(t)}/8</span></div>
+    <div class="row sp"><span class="sub">Contest ribbons</span><span class="mono sub">${ribBrief(t)}</span></div>
     <ul class="team">${mons.length?mons.map(m=>h`<li>${monIcon(m)}<b>${mName(m)}</b>${genPill(m.gender)}${megaOn(m)?h`<span class="pill mega">Mega</span>`:''}${typeChips(m)}</li>`):h`<li class="sub">No Pokémon on hand</li>`}</ul>
     <footer><button class="btn sm" data-act="view" data-uid="${uid}" data-tab="trainer">Sheet</button><button class="btn sm" data-act="view" data-uid="${uid}" data-tab="pokemon">Pokémon</button></footer>
   </article>`;
@@ -6656,6 +6808,7 @@ function honorsPanel(uid,t,ro){
   return h`<section class="panel"><div class="ph"><h2>Honors</h2><span class="mono sub">${badgeCount(t)}/8 Sinnoh badges</span></div>
     ${aw.length?h`<div class="list"><span class="fl">Awarded by the GM</span>${aw.map(a=>h`<div class="award"><div class="row sp"><b>${a.title}</b><span class="pill gm">${a.type}</span></div>${a.note?h`<p class="sub prewrap">${a.note}</p>`:''}<span class="sub">${dt(a.createdAt)}${a.session?' · Session '+a.session:''}${a.levelUp?' · +1 level':''}</span></div>`)}</div>`:''}
     ${badgeCase(uid,t,ro)}
+    ${ribCase(uid,t,ro)}
     <div class="fgrid">${fNum('Pokédex owned','t',uid,'dex',t,{ro,min:0,max:999})}<p class="sub">Next certificate at ${(Math.floor(num(t.dex)/30)+1)*30} owned.</p></div>
     <div class="list">${hs.map((x,i)=>h`<div class="item"><div class="irow two">${fSel('Type','t',uid,'honors.'+i+'.type',t,HONOR_TYPES,{ro})}${rowBtns('t',uid,'honors',i,hs.length,ro)}</div>${fText('Title','t',uid,'honors.'+i+'.name',t,{ro})}${fText('Note','t',uid,'honors.'+i+'.note',t,{ro})}</div>`)}</div>
     ${ro?'':h`<div><button class="btn sm" data-act="add" ${bp('t',uid,'honors')} data-tpl="honor">Add honor</button></div>`}
@@ -7025,7 +7178,8 @@ function awardForm(){
       <div class="fgrid">
         <label class="fld"><span class="fl">Kind of honor</span><select data-u="award.type">${AWARD_TYPES.map(t=>h`<option value="${t}" ${a.type===t?raw('selected'):''}>${t}</option>`)}</select></label>
         ${a.type==='Gym Badge'?h`<label class="fld"><span class="fl">Which badge</span><select data-u="award.badge">${BADGES.map(b=>h`<option value="${b[0]}" ${a.badge===b[0]?raw('selected'):''}>${b[1]} (${b[2]})</option>`)}</select></label>`:''}
-        <label class="fld wide"><span class="fl">Title (optional)</span><input type="text" data-u="award.title" value="${a.title}" placeholder="${a.type==='Gym Badge'?'Defaults to the badge name':'e.g. Saved the ferry'}" data-nr></label>
+        ${a.type==='Contest Ribbon'?h`<label class="fld"><span class="fl">Which ribbon</span><select data-u="award.ribbon">${ribHalls().map(x=>h`<option value="${x.k}" ${awardRibbon()===x.k?raw('selected'):''}>${x.n}${x.t?' ('+x.t+')':''}</option>`)}<option value="" ${awardRibbon()===''?raw('selected'):''}>Another ribbon (not in the case)</option></select></label>`:''}
+        <label class="fld wide"><span class="fl">Title (optional)</span><input type="text" data-u="award.title" value="${a.title}" placeholder="${a.type==='Gym Badge'?'Defaults to the badge name':a.type==='Contest Ribbon'&&awardRibbon()?'Defaults to the ribbon name':'e.g. Saved the ferry'}" data-nr></label>
         <label class="fld wide"><span class="fl">Note for the trainer</span><textarea data-u="award.note" rows="2" data-nr>${raw('\n')}${a.note}</textarea></label>
       </div>
       <label class="row"><input type="checkbox" data-act="awLevel" ${a.levelUp?raw('checked'):''}><span>Raise level by 1 (max 20)</span></label>
@@ -7037,7 +7191,7 @@ function awardHistory(){
   const list=entriesOf(S.awards).sort((a,b)=>num(b.createdAt)-num(a.createdAt)).slice(0,30);
   return h`<section class="panel"><div class="ph"><h2>Award history</h2><span class="sub">${Object.keys(S.awards).length} total</span></div>
     ${list.length?h`<ul class="mini-list">${list.map(a=>h`<li><div class="row sp"><span><b>${a.title}</b> <span class="sub">to ${tName(S.trainers[a.uid])}</span></span>${delBtn('aw',a.id,'Revoke')}</div><span class="sub">${a.type}${a.levelUp?' · +1 level':''} · ${dt(a.createdAt)}${a.session?' · Session '+a.session:''}</span></li>`)}</ul>
-      <p class="sub">Revoking removes the award from the record. It does not take back a badge or level already applied.</p>`
+      <p class="sub">Revoking removes the award from the record. It does not take back a badge, ribbon or level already applied.</p>`
       :h`<p class="sub">Nothing awarded yet.</p>`}</section>`;
 }
 function gmTab(){
@@ -7611,13 +7765,16 @@ function giveAwards(){
   const ids=tids().filter(u=>a.uids[u]);
   if(!ids.length){toast('Pick at least one trainer');return;}
   const bdg=BADGES.find(b=>b[0]===a.badge);
-  const title=String(a.title||'').trim()||(a.type==='Gym Badge'&&bdg?bdg[1]+' Badge':a.type);
+  const rk=a.type==='Contest Ribbon'?awardRibbon():'';
+  const rib=rk?ribHalls().find(x=>x.k===rk):null;
+  const title=String(a.title||'').trim()||(a.type==='Gym Badge'&&bdg?bdg[1]+' Badge':rib?rib.n+' Ribbon':a.type);
   const now=Date.now();
   ids.forEach(uid=>{
     const id=S.db.collection('awards').doc().id;
-    newDoc('aw',id,{uid,type:a.type,title,note:a.note||'',badge:a.type==='Gym Badge'?a.badge:'',levelUp:!!a.levelUp,session:num(S.meta.session)||1,by:S.me.id,createdAt:now});
+    newDoc('aw',id,{uid,type:a.type,title,note:a.note||'',badge:a.type==='Gym Badge'?a.badge:'',ribbon:rib?rib.k:'',levelUp:!!a.levelUp,session:num(S.meta.session)||1,by:S.me.id,createdAt:now});
     const t=S.trainers[uid];
     if(a.type==='Gym Badge'&&a.badge){edit('t',uid,'badges.'+a.badge,true);const p={uid,key:a.badge};S.ui.pop=p;setTimeout(()=>{if(S.ui.pop===p)S.ui.pop=null;},1400);}
+    if(rib){edit('t',uid,'ribbons.'+rib.k,true);const p={uid,key:'r:'+rib.k};S.ui.pop=p;setTimeout(()=>{if(S.ui.pop===p)S.ui.pop=null;},1400);}
     if(a.levelUp&&t)edit('t',uid,'level',clamp(num(t.level||1)+1,1,20));
   });
   a.uids={};a.title='';a.note='';
@@ -7680,6 +7837,7 @@ function act(b,e){
   if(d.act&&d.act.indexOf('ct_')===0){ctAct(b,e);return;}
   if(d.act&&d.act.indexOf('en_')===0){encAct(b);return;}
   if(d.act&&d.act.indexOf('sp_')===0){shAct(b);return;}
+  if(d.act&&d.act.indexOf('rb_')===0){ribAct(b);return;}
   if(d.act&&d.act.indexOf('nt_')===0){ntAct(b,e);return;}
   if(d.act&&d.act.indexOf('bm_')===0){bmAct(b,e);return;}
   switch(d.act){
