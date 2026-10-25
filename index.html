@@ -279,6 +279,58 @@ progress.hp.bad::-moz-progress-bar{background:var(--bad)}
 .ctstats{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:4px 0 10px}
 .ctst{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .ctst b{font-size:1.1em}
+.enclist{display:grid;gap:10px;margin:8px 0}
+.encrow{display:grid;grid-template-columns:minmax(0,2fr) 92px 72px 72px auto auto;gap:8px;align-items:end;padding:8px;border:1px solid var(--line);border-radius:12px}
+.encrow.off{opacity:.75}
+.encrow .encpct{align-self:center}
+.encres{margin:10px 0}
+/* ---------- shops ---------- */
+.spp .sphead{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:baseline;margin:10px 0 2px}
+.spp .sphead h3{margin:0}
+.sppicks{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.sppick{appearance:none;display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;border:2px solid var(--frame);border-radius:12px;background:var(--raised);color:var(--ink);padding:7px 12px;font:600 13px var(--f-body);cursor:pointer}
+.sppick b{font:800 14px var(--f-body)}
+.sppick span{color:var(--muted);font-size:12.5px}
+.sppick em{font:800 11px var(--f-body);font-style:normal;color:var(--warn);text-transform:uppercase;letter-spacing:.05em}
+.sppick[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.sppick[aria-pressed="true"] span,.sppick[aria-pressed="true"] em{color:var(--accent-ink);opacity:.85}
+.sppick1[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.pill.open{background:transparent;color:var(--good);border-color:var(--good)}
+.pill.credit{background:var(--gold);color:var(--gold-ink);border-color:var(--gold)}
+.pill.warn{background:transparent;color:var(--bad);border-color:var(--bad)}
+.splist{display:grid;gap:8px;margin:8px 0}
+.spitem{display:grid;grid-template-columns:minmax(0,1fr) auto 78px auto;gap:6px 14px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:12px}
+.spitem.out{opacity:.55}
+.spmain{display:flex;gap:10px;align-items:center;min-width:0}
+.spmain p{margin:2px 0 0}
+.spprice{font:800 15px var(--f-body);white-space:nowrap}
+.spprice.poor{color:var(--muted);font-weight:600}
+.spleft{font:700 12.5px var(--f-body);color:var(--muted);white-space:nowrap}
+.spbuy{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+.spbuy input[type=number]{width:62px}
+.spedlist{display:grid;gap:10px;margin:8px 0}
+.spedrow{display:grid;gap:8px;padding:10px;border:1px solid var(--line);border-radius:12px}
+.spedrow.off{opacity:.75}
+.sped1{display:grid;grid-template-columns:minmax(0,2fr) 110px 90px;gap:8px;align-items:end}
+.sped2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) auto;gap:8px;align-items:end}
+.spnotes{display:flex;flex-wrap:wrap;gap:6px}
+.splog{display:grid;gap:2px;margin:8px 0}
+.splrow{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line)}
+.splrow .when{color:var(--muted);font-size:12.5px}
+.spmine{display:grid;gap:4px}
+.spchips{flex-wrap:wrap}
+.spflt{margin:8px 0}
+@media (max-width:700px){
+  .spitem{grid-template-columns:minmax(0,1fr) auto}
+  .spitem .spleft{grid-column:1}
+  .spitem .spbuy{grid-column:1/-1;justify-content:flex-start}
+  .sped1,.sped2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sped1 .fld:first-child,.sped2 .fld:last-child{grid-column:1/-1}
+  .splrow{grid-template-columns:minmax(0,1fr) auto}
+  .splrow .when{grid-column:1/-1}
+}
+
+@media (max-width:700px){.encrow{grid-template-columns:repeat(3,minmax(0,1fr))}.encrow .fld:first-child{grid-column:1/-1}.encrow .ibtns{grid-column:1/-1}}
 .pill.shiny{background:var(--gold);color:var(--gold-ink);border-color:var(--gold)}
 .pill.gen.male{color:var(--gen-m);border-color:var(--gen-m)}
 .pill.gen.female{color:var(--gen-f);border-color:var(--gen-f)}
@@ -892,6 +944,7 @@ html.lbx-on,html.lbx-on body{overflow:hidden}
 <datalist id="dl-passives"></datalist>
 <datalist id="dl-items"></datalist>
 <datalist id="dl-balls"></datalist>
+<datalist id="dl-scat"></datalist>
 <datalist id="dl-places"></datalist>
 <datalist id="dl-freq"><option value="At-Will"><option value="3/day"><option value="1/day"></datalist>
 <datalist id="dl-status"><option value="Burned"><option value="Frozen"><option value="Paralyzed"><option value="Poisoned"><option value="Asleep"><option value="Confused"><option value="Cursed"><option value="Infatuated"></datalist>
@@ -902,5 +955,5 @@ html.lbx-on,html.lbx-on body{overflow:hidden}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-10-24-Contest-stats-shiny-Pok-Ball"></script>
+<script src="app.js?v=2026-10-24-Shops"></script>
 </body></html>

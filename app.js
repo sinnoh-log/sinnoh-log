@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-24 · Contest stats, shiny, Poké Ball';
+const BUILD='2026-10-24 · Shops';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -41,10 +41,10 @@ const DEF_META={campaign:'Sinnoh Trainer Log',subtitle:'Post-game Sinnoh · ten 
 const NAV=[
   ['Narrative',[['overview','Overview'],['journal','Journal'],['timeline','Timeline']]],
   ['World',[['people','People'],['leads','Leads'],['map','Map']]],
-  ['Table',[['trainer','Trainer'],['pokemon','Pokémon'],['dex','Pokédex'],['battle','Battle'],['contest','Contests']]]
+  ['Table',[['trainer','Trainer'],['pokemon','Pokémon'],['dex','Pokédex'],['battle','Battle'],['contest','Contests'],['shop','Shop']]]
 ];
 const GM_NAV=['Game Master',[['gm','GM Desk'],['npc','NPC Trainers']]];
-const PAGE_LABEL={overview:'Overview',journal:'Journal',timeline:'Timeline',people:'People',leads:'Leads',map:'Map',place:'Place',trainer:'Trainer sheet',pokemon:'Pokémon',dex:'Pokédex',battle:'Battle',contest:'Contests',gm:'GM Desk',npc:'NPC Trainers',account:'Account'};
+const PAGE_LABEL={overview:'Overview',journal:'Journal',timeline:'Timeline',people:'People',leads:'Leads',map:'Map',place:'Place',trainer:'Trainer sheet',pokemon:'Pokémon',dex:'Pokédex',battle:'Battle',contest:'Contests',shop:'Shop',gm:'GM Desk',npc:'NPC Trainers',account:'Account'};
 const PIN_KINDS=[['place','Place'],['party','Party'],['danger','Danger'],['lead','Lead']];
 const AWARD_TYPES=['Gym Badge','Trial Medal','Frontier Symbol','Contest Ribbon','Certificate','Emblem of Recognition','Loyal Partner','Moment of Destiny','Other'];
 
@@ -90,7 +90,7 @@ const S={
   ready:false,noDb:false,db:null,user:null,dl:null,
   me:{id:null,admin:false,canWrite:true},
   tab:'overview',viewUid:null,
-  megaOk:{},battle:{},battleGm:{},trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},gmNt:{},npcPub:{},
+  megaOk:{},battle:{},battleGm:{},trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},gmNt:{},npcPub:{},shopPub:{},shopGm:{},
   awards:{},timeline:{},pins:{},banner:{},places:{},gmPl:{},placeId:null,members:{},invite:null,mapChunks:{},mapSrc:'',room:null,peers:[],avatars:{},
   pick:null,names:{},save:{cls:'',text:'Saved'},rolls:[],_tsig:'',
   ui:{open:{},lbx:null,adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},pop:null,megaPop:null,
@@ -157,7 +157,7 @@ const PD_BY={};PD.forEach(f=>{PD_BY[f.id]=f;});
 const PLACES=PD.map(f=>f.name).sort();
 
 /* ---------- store: refs, local copies, write queue ---------- */
-const SET_ALWAYS=new Set(['meta','gl','gn','bn','pl','gp','mg','bt','gb','gt','np','bm','bg']);
+const SET_ALWAYS=new Set(['meta','gl','gn','bn','pl','gp','mg','bt','gb','gt','np','bm','bg','sh','sg']);
 function refFor(sc,id){
   const db=S.db;
   switch(sc){
@@ -183,6 +183,8 @@ function refFor(sc,id){
     case 'np':return db.collection('meta').doc('npcs');
     case 'bm':return db.collection('meta').doc('bmap');
     case 'bg':return db.collection('gm').doc('bmap');
+    case 'sh':return db.collection('meta').doc('shops');
+    case 'sg':return db.collection('gm').doc('shops');
   }
 }
 function getLocal(sc,id){
@@ -209,6 +211,8 @@ function getLocal(sc,id){
     case 'np':return S.npcPub;
     case 'bm':return S.bmap;
     case 'bg':return S.bmGm;
+    case 'sh':return S.shopPub;
+    case 'sg':return S.shopGm;
   }
 }
 function putLocal(sc,id,d){
@@ -235,6 +239,8 @@ function putLocal(sc,id,d){
     case 'np':S.npcPub=d;break;
     case 'bm':S.bmap=d;break;
     case 'bg':S.bmGm=d;break;
+    case 'sh':S.shopPub=d;break;
+    case 'sg':S.shopGm=d;break;
   }
 }
 function dropLocal(sc,id){
@@ -314,7 +320,7 @@ function withPending(sc,id,d){
 function edit(sc,id,path,v){
   let doc=getLocal(sc,id);
   if(!doc){
-    if(sc==='gl'||sc==='gn'||sc==='pl'||sc==='gp'||sc==='mg'||sc==='bt'||sc==='gb'||sc==='np'||sc==='bm'){doc={};putLocal(sc,id,doc);}
+    if(sc==='gl'||sc==='gn'||sc==='pl'||sc==='gp'||sc==='mg'||sc==='bt'||sc==='gb'||sc==='np'||sc==='bm'||sc==='sh'||sc==='sg'){doc={};putLocal(sc,id,doc);}
     else return;
   }
   const parts=path.split('.');
@@ -322,6 +328,7 @@ function edit(sc,id,path,v){
   const nv=setIn(doc[top],parts.slice(1),v);
   doc[top]=nv;
   save(sc,id,{[top]:nv});
+  if(sc==='sg')shPubSoon();
 }
 function newDoc(sc,id,doc){putLocal(sc,id,doc);save(sc,id,doc,{create:true});}
 async function removeDoc(sc,id){
@@ -394,6 +401,11 @@ function startWatches(){
     if(s.exists)S.npcPub=withPending('np','npcs',s.data());
     else if(!Q.has('np|npcs'))S.npcPub={};
   },'npcs');
+  watch(db.collection('meta').doc('shops'),s=>{
+    if(s.exists)S.shopPub=withPending('sh','shops',s.data());
+    else if(!Q.has('sh|shops'))S.shopPub={};
+    shPubSoon();
+  },'shops');
   watch(db.collection('meta').doc('bmap'),s=>{
     if(s.exists)S.bmap=withPending('bm','bmap',s.data());
     else if(!Q.has('bm|bmap'))S.bmap={};
@@ -414,9 +426,10 @@ function startWatches(){
   if(S.me.admin){
     watch(db.collection('gm'),s=>{
       const loy={},npc={},gpl={},gnt={},bch={};
-      let gbat=null,gbm=null;
+      let gbat=null,gbm=null,gsh=null;
       s.docs.forEach(d=>{
         if(d.id==='battle')gbat=withPending('gb','battle',d.data());
+        else if(d.id==='shops')gsh=withPending('sg','shops',d.data());
         else if(d.id==='bmap')gbm=withPending('bg','bmap',d.data());
         else if(d.id.indexOf('bmi_')===0)bch[+d.id.slice(4)]=d.data();
         else if(d.id.indexOf('loy_')===0)loy[d.id.slice(4)]=withPending('gl',d.id.slice(4),d.data());
@@ -431,6 +444,8 @@ function startWatches(){
       S.gmLoy=loy;S.gmNpc=npc;S.gmPl=gpl;S.gmNt=gnt;
       if(gbat)S.battleGm=gbat;else if(!Q.has('gb|battle'))S.battleGm={};
       if(gbm)S.bmGm=gbm;else if(!Q.has('bg|bmap'))S.bmGm={};
+      if(gsh)S.shopGm=gsh;else if(!Q.has('sg|shops'))S.shopGm={};
+      shPubSoon();
       S.bmGmCh=bch;
       bmAssembleGm();
     },'gm');
@@ -2602,6 +2617,12 @@ async function btAddFoe(){
   const sp=String(u.foeSp||'').trim();
   if(!sp){toast('Type a species first.');return;}
   const n=clamp(Math.round(num(u.foeN))||1,1,8);
+  await btAddFoeSp(sp,n,n===1?String(u.foeNick||'').trim():'','');
+  u.foeSp='';u.foeNick='';u.foeN=1;
+  render();
+}
+/* n hidden foes of one species, from the handbook data when it has the species. note goes on each foe's secret sheet. */
+async function btAddFoeSp(sp,n,nick,note){
   const pr=ptaResolve(sp);
   let rec=null;
   if(pr)rec=ptaRec(pr)||await ptaChunk(ptaLetter(ptaKey(pr))).then(()=>ptaRec(pr));
@@ -2610,13 +2631,11 @@ async function btAddFoe(){
   for(let i=0;i<n;i++){
     const cid=newCid();
     const base=foeFromRec(rec,si,sp);
-    const f=Object.assign({nick:n===1?String(u.foeNick||'').trim():'',bonus:zeroStats(),stages:zeroStats(),st:'',notes:'',sh:Object.assign({},SHOW_NONE),pn:foeLetter()},base);
+    const f=Object.assign({nick:nick||'',bonus:zeroStats(),stages:zeroStats(),st:'',notes:note||'',sh:Object.assign({},SHOW_NONE),pn:foeLetter()},base);
     edit('gb','battle','foes.'+cid,f);
     btInsert(cid,{s:'f',pub:foePub(f)},fSpd(f)+(b.mode==='d20'?rnd(20):0),rnd(20));
   }
-  u.foeSp='';u.foeNick='';u.foeN=1;
-  toast(n+(n===1?' foe':' foes')+' added'+(rec||si?'':'. That species is not in the data, so fill in its numbers by hand.'),true);
-  render();
+  toast(n+(n===1?' foe':' foes')+' added'+(note?' ('+sp+')':'')+(rec||si?'':'. That species is not in the data, so fill in its numbers by hand')+'.',true);
 }
 function btRemove(cid){
   if(!S.me.admin)return;
@@ -2932,6 +2951,7 @@ function btAddPanel(){
         <label class="fld"><span class="fl">How many</span><input type="number" inputmode="numeric" min="1" max="8" data-u="bt.foeN" data-nr value="${u.foeN}"></label>
       </div>
       <div class="row"><button class="btn primary sm" data-act="b_addfoe">Add foe</button></div></div>
+    ${encBattlePanel()}
     ${ntBattlePanel()}
   </section>`;
 }
@@ -3920,6 +3940,491 @@ function ctAct(b){
       }
       render();
       break;}
+    default:break;
+  }
+}
+
+/* ---------- Wild encounters ----------
+   A weighted list of Pokémon on a place's GM page: what can turn up there. Rolling it picks one (and how many), and the GM can add
+   the result to the battle as hidden foes. The list is kept in the same document as the place's GM notes (gm/place_<id>), which only
+   the GM can read, so the players never receive it. Nothing here needs a new database rule. */
+S.ui.enc=S.ui.enc||{res:{},pick:''};
+const ENC_MAX=30;
+TPL.enc=()=>({sp:'',w:10,lo:1,hi:1});
+
+const encGp=pid=>S.gmPl[pid]||{};
+const encRows=pid=>{const e=encGp(pid).enc;return Array.isArray(e)?e:[];};
+const encOk=x=>!!(x&&String(x.sp||'').trim()&&num(x.w)>0);
+const encValid=pid=>encRows(pid).filter(encOk);
+const encTotal=rows=>rows.reduce((a,x)=>a+num(x.w),0);
+const encPct=(x,total)=>total>0?Math.round(num(x.w)/total*1000)/10:0;
+/* the places that have a table with something usable in it */
+const encPlaces=()=>Object.keys(S.gmPl||{}).filter(id=>PD_BY[id]&&encValid(id).length).map(id=>PD_BY[id]).sort(natural);
+
+/* one roll of a place's table: which Pokémon, how many, and how likely that was */
+function encRoll(pid){
+  const rows=encValid(pid);
+  if(!rows.length)return null;
+  const total=encTotal(rows);
+  let r=Math.random()*total,pick=rows[rows.length-1];
+  for(let i=0;i<rows.length;i++){
+    const w=num(rows[i].w);
+    if(r<w){pick=rows[i];break;}
+    r-=w;
+  }
+  const lo=clamp(Math.round(num(pick.lo))||1,1,8);
+  const hi=clamp(Math.round(num(pick.hi))||lo,lo,8);
+  const n=lo+Math.floor(Math.random()*(hi-lo+1));
+  return {sp:String(pick.sp).trim(),n,pct:encPct(pick,total)};
+}
+async function encToBattle(pid,res){
+  if(!S.me.admin||!res)return;
+  const f=PD_BY[pid];
+  await btAddFoeSp(res.sp,res.n,'','Wild encounter at '+(f?f.name:'a place'));
+  render();
+}
+
+/* ----- the panel on a place's page ----- */
+const encResult=(pid,r)=>h`<div class="ctres encres" role="status" aria-live="polite"><span class="k">ENCOUNTER</span><div class="big">${r.sp}${r.n>1?h` ×${r.n}`:''}</div><div class="sub">${r.pct}% chance</div>
+  <div class="row"><button class="btn primary sm" data-act="en_tobattle" data-id="${pid}">Add to the battle</button><button class="btn sm" data-act="en_roll" data-id="${pid}">Roll again</button></div></div>`;
+function encPanel(f){
+  const pid=f.id,gp=encGp(pid),rows=encRows(pid),valid=encValid(pid),total=encTotal(valid);
+  const res=S.ui.enc.res[pid];
+  return h`<section class="panel encp"><div class="ph"><h2>Wild encounters</h2><span class="pill gm">GM only</span><span class="sub">${rows.length} of ${ENC_MAX}</span></div>
+    <p class="sub">What can turn up here. Each Pokémon has a weight: a weight of 30 out of a total of 100 is a 30% chance. Min and Max say how many appear at once. The players never see this list.</p>
+    ${rows.length?h`<div class="enclist">${rows.map((x,i)=>{
+      const p='enc.'+i+'.';
+      return h`<div class="encrow ${encOk(x)?'':'off'}">
+        ${fText('Pokémon','gp',pid,p+'sp',gp,{list:'dl-species'})}
+        ${fNum('Weight','gp',pid,p+'w',gp,{min:0,max:1000})}
+        ${fNum('Min','gp',pid,p+'lo',gp,{min:1,max:8})}
+        ${fNum('Max','gp',pid,p+'hi',gp,{min:1,max:8})}
+        <span class="pill encpct">${encOk(x)?encPct(x,total)+'%':'not used'}</span>
+        ${rowBtns('gp',pid,'enc',i,rows.length,false)}</div>`;
+    })}</div>`:h`<p class="sub">Nothing here yet. Add the Pokémon that live in this place.</p>`}
+    <div class="row"><button class="btn sm" data-act="en_new" data-id="${pid}" ${rows.length>=ENC_MAX?raw('disabled'):''}>Add a Pokémon</button>${valid.length?h`<button class="btn primary sm" data-act="en_roll" data-id="${pid}">Roll an encounter</button>`:''}</div>
+    ${res?encResult(pid,res):''}
+    ${fArea('Notes for this table','gp',pid,'encNote',gp,{rows:2,ph:'e.g. Only in tall grass. Roll once every ten minutes.'})}
+  </section>`;
+}
+
+/* ----- the box on the Battle page ----- */
+function encBattlePanel(){
+  const pl=encPlaces();
+  const e=S.ui.enc;
+  if(!pl.length)return h`<div class="mgd"><b>Wild encounter</b><p class="sub">Roll from a place's table of Pokémon and add what turns up as foes. To make a table, open a place from the Map page and use <b>Wild encounters</b> (GM only).</p></div>`;
+  const cur=pl.some(p=>p.id===e.pick)?e.pick:pl[0].id;
+  return h`<div class="mgd"><b>Wild encounter</b>
+    <p class="sub">Roll from a place's table and add what turns up as foes. They start hidden, like any foe.</p>
+    <div class="fgrid"><label class="fld"><span class="fl">Where</span><select data-u="enc.pick">${pl.map(p=>h`<option value="${p.id}" ${p.id===cur?raw('selected'):''}>${p.name}</option>`)}</select></label></div>
+    <div class="row"><button class="btn primary sm" data-act="en_rollbattle" data-id="${cur}">Roll and add to the battle</button></div></div>`;
+}
+
+async function encAct(b){
+  if(!S.me.admin)return;
+  const d=b.dataset,pid=d.id;
+  switch(d.act){
+    case 'en_new':{
+      const arr=encRows(pid).slice();
+      if(arr.length>=ENC_MAX)break;
+      arr.push(TPL.enc());
+      edit('gp',pid,'enc',arr);
+      render();
+      break;}
+    case 'en_roll':{
+      const r=encRoll(pid);
+      if(!r){toast('Add a Pokémon with a weight above 0 first.');break;}
+      S.ui.enc.res[pid]=r;
+      render();
+      break;}
+    case 'en_tobattle':{
+      const r=S.ui.enc.res[pid];
+      if(!r)break;
+      delete S.ui.enc.res[pid];
+      await encToBattle(pid,r);
+      setTab('battle');
+      break;}
+    case 'en_rollbattle':{
+      const r=encRoll(pid);
+      if(!r){toast('That place has nothing in its table yet.');break;}
+      await encToBattle(pid,r);
+      break;}
+    default:break;
+  }
+}
+/* The shop catalog: every priced item in the Players Handbook (and the extra items in the second handbook), grouped by kind.
+   Each entry is [name, group, price, description]. A price of null means the book gives none. */
+const SCAT_CATS=["Poké Balls", "Potions", "Status cures", "Revives", "Energy", "Battle boosters", "Vitamins", "Mints", "Repels", "Herbs", "Held items", "Berries", "Contest", "Evolution stones", "TMs and TRs", "Packs and kits", "Utility", "Survival gear", "Clothing and armor", "Tech", "Camping and play", "Rare", "General goods"];
+const SCAT=[["Basic Ball",0,100,"+5 to your capture roll."],["Great Ball",0,600,"+0 to your capture roll."],["Ultra Ball",0,1000,"-5 from your capture roll."],["Master Ball",0,null,"-100 from your capture roll. The Master Ball can and will often fail when thrown at legendary Pokémon."],["Park Ball",0,550,"-20 from your capture roll against domesticated wild Pokémon."],["Safari Ball",0,550,"-20 from your capture roll against domesticated wild Pokémon."],["Sport Ball",0,550,"-20 from your capture roll against domesticated wild Pokémon."],["Cherish Ball",0,1500,"-5 from your capture roll. Captured Pokémon are more easily befriended."],["Luxury Ball",0,1500,"-5 from your capture roll. Captured Pokémon are more easily befriended."],["Premier Ball",0,1500,"-5 from your capture roll. Captured Pokémon are more easily befriended."],["Dive Ball",0,1250,"-12 from your capture roll if the Pokémon is in water."],["Dusk Ball",0,1150,"-7 from your capture roll if it’s night time (no sunlight)."],["Fast Ball",0,1250,"-8 from your capture roll on a Pokémon that acts before your Pokémon."],["Lure Ball",0,1250,"-10 from your capture roll if you lured the wild Pokémon into combat."],["Quick Ball",0,1550,"-16 from your capture roll if thrown as your first action during combat."],["Repeat Ball",0,1250,"-10 from your capture roll if the Pokémon already had a Poké Ball thrown at it this encounter."],["Timer Ball",0,1450,"-10 from your capture roll if the encounter has lasted at least one min; -18 from your capture roll if the encounter has lasted at least two mins."],["Friend Ball",0,1000,"+0 to your capture roll. Captured Pokémon are more easily befriended."],["Heal Ball",0,1000,"+0 to your capture roll. Captured Pokémon are healed 20 hit points."],["Dream Ball",0,1250,"-10 from your capture roll if the Pokémon is afflicted."],["Heavy Ball",0,1250,"-15 from your capture roll if the Pokémon is Heavy or Superweight."],["Level Ball",0,1250,"-10 from your capture roll if the Pokémon is fully evolved, and did evolve at least once."],["Love Ball",0,1250,"-10 from your capture roll if the target shares a type with one of your active Pokémon."],["Moon Ball",0,1250,"-10 from your capture roll if the Pokémon evolves with an evolution stone."],["Nest Ball",0,1250,"-10 from your capture roll if the Pokémon can evolve, but is not evolved."],["Net Ball",0,1250,"-15 from your capture roll when used against a Bug or Water type Pokémon."],["Beast Ball",0,null,"-25 from your capture roll if the Pokémon is from a parallel dimension."],["Strange Ball",0,null,"-25 from your capture roll if the Pokémon is temporally displaced."],["Potion",1,25,"Heals a Pokémon 12 HP."],["Super Potion",1,250,"Heals a Pokémon 24 HP."],["Hyper Potion",1,550,"Heals a Pokémon 36 HP."],["Max Potion",1,850,"Heals a Pokémon to their Max HP."],["Full Restore",1,1200,"Heals a Pokémon to their Max HP and cures them of any afflictions."],["Potion Water",1,100,"Heals a human 10 HP."],["Super Soda",1,300,"Heals a human 20 HP."],["Hyper Lemonade",1,550,"Heals a human 30 HP."],["Moo Moo Milk",1,175,"Heals anything 8 HP. 164"],["Antidote",2,120,"Cures a Pokémon or human of Poisoned or Toxified."],["Awakening",2,120,"Cures a Pokémon or human of Drowsy."],["Burn Heal",2,120,"Cures a Pokémon or human of Burned."],["Ice Heal",2,120,"Cures a Pokémon or human of Frostbite."],["Paralyze Heal",2,120,"Cures a Pokémon or human of Paralysis."],["Touga Spray",2,120,"Cures a Pokémon of Entranced."],["Full Heal",2,520,"Cures a Pokémon or human of all afflictions."],["Revive",3,1350,"Restore an unconscious Pokémon to half of its max HP."],["Max Revive",3,2950,"Restore an unconscious Pokémon to its max HP."],["Ether",4,480,"A Pokémon’s strength is partially restored and regains a single use of one of its 3/day moves."],["Elixir",4,1280,"A Pokémon’s strength is partially Restored and regains a single use of one of its 1/day moves."],["Max Ether",4,2280,"A Pokémon’s strength is partially restored. Choose two 3/day and/or 1/day moves to restore one each of the moves uses."],["Max Elixir",4,3480,"A Pokémon’s strength is partially restored. Choose two 3/day and/or 1/day moves to restore all of the moves uses."],["X Attack",5,240,"Gives a Pokémon Attack▲."],["X Defend",5,240,"Gives a Pokémon Defense▲."],["X Special",5,240,"Gives a Pokémon SpAttack▲."],["X Sp. Def",5,240,"Gives a Pokémon SpDefense▲."],["X Speed",5,240,"Gives a Pokémon Speed▲."],["X Accuracy",5,240,"Increases a Pokémon’s AC by +1."],["Dire Hit",5,840,"The next attack the Pokémon makes is Lethal."],["Guard Spec.",5,440,"The next time the Pokémon would get ▼from a foe, ignore it."],["HP Up",6,800,"Increase HP by 4 for two weeks."],["Protein",6,800,"Increase Attack by 1 for two weeks."],["Iron",6,800,"Increase Defense by 1 for two weeks."],["Calcium",6,800,"Increase Special Attack by 1 for two weeks."],["Zinc",6,800,"Increase Special Defense by 1 for two weeks."],["Carbos",6,800,"Increase speed by 1 for two weeks."],["PP UP",6,1200,"Increase the frequency of a 3/day move to 4/day for one week."],["PP Max",6,1900,"Increase the frequency of a 1/day move to 2/day(1/combat) for one week."],["Cinnaleaf Mint",7,8750,"Raise Attack 1 point, then lower a non-Attack non-HP stat 1 point."],["Stonebalm Mint",7,8750,"Raise Defense 1 point, then lower a non-Defense non-HP stat 1 point."],["Spearmist Mint",7,8750,"Raise Special Attack 1 point, then lower a non-Special Attack non-HP stat 1 point."],["Calmrest Mint",7,8750,"Raise Special Defense 1 point, then lower a non-Special Defense non-HP stat 1 point."],["Lightwind Mint",7,8750,"Raise Speed 1 point, then lower a non-Speed non-HP stat 1 point."],["Pureleaf Mint",7,8750,"Do not add to or subtract from any stats after removing the effects of the Pokémon’s Nature."],["Repel",8,150,"Wild Pokémon find the smell repulsive for one hour after applied, but may ignore it to protect something precious to them."],["Super Repel",8,400,"Wild Pokémon find the smell repulsive for three hours after applied, but may ignore it to protect something precious to them."],["Max Repel",8,1000,"Wild Pokémon find the smell repulsive for ten hours after applied, but may ignore it to protect something precious to them."],["Heal Powder",9,480,"Removes any affliction"],["Energy Powder",9,125,"Recovers 30 Hit Points (Pokémon)"],["Energy Root",9,400,"Recovers 48 Hit Points (Pokémon)"],["Revival Herb",9,1000,"Recovers an unconscious Pokémon to half of their max HP."],["Ability Shield",10,1350,"Your passives cannot be disabled or replaced by any foe’s effects during combat."],["Absorb Bulb",10,300,"When you are hit by a Water-type attack, Absorb Bulb is destroyed and you get SpAttack▲."],["Adrenaline Orb",10,2550,"If you get Attack▼or SpAttack▼from a foe’s effects, you get Speed▲. If you get Attack▼▼or SpAttack▼▼from a foe’s effects, you get Speed▲▲."],["Air Balloon",10,1350,"You are immune to Ground-type attacks. If you are hit by any other type of attack, Air Balloon is destroyed."],["Assault Vest",10,2550,"Your Special Defense is +2. You may not use moves that do not have power."],["Big Root",10,2550,"Whenever you would recover HP or gain temporary HP after dealing damage to a foe, gain +1d4 temporary HP."],["Binding Band",10,2550,"If you use an attack that binds a target, the target loses 1d4 HP at the end of each of your turns if they are still Bound."],["Black Sludge",10,1050,"As an action, consume and destroy Black Sludge. Poison-types regain 1d4 HP after acting until at max HP. All other Pokémon are Poisoned by consuming Black Sludge."],["Bright Powder",10,850,"As a free action, destroy Bright Powder. Until your next turn, if you are targeted by an attack, the attacker must roll +2 higher in order to hit you during AC."],["Cell Battery",10,300,"When you are hit by a Electric-type attack, Cell Battery is destroyed and you get Attack▲."],["Choice Band",10,2550,"Your Attack stat is +2. Whenever you use a move, that is the only move you can use for the rest of the encounter."],["Choice Scarf",10,2550,"Your Speed stat is +2. Whenever you use a move, that is the only move you can use for the rest of the encounter."],["Choice Specs",10,2550,"Your Special Attack stat is +2. Whenever you use a move, that is the only move you can use for the rest of the encounter."],["Clear Amulet",10,1350,"You are immune to getting ▼from the effects of your foe’s Styles."],["Covert Cloak",10,1350,"You are immune to the effects of your foe’s held items."],["Destiny Knot",10,1750,"When you become Entranced, the Pokémon who caused your Entranced becomes Entranced with you as well."],["Eviolite",10,2550,"If you can still potentially evolve, your Defense and Special Defense stats are +1."],["Expert Belt",10,2550,"When you hit with a super-effective or extremely-effective attack, deal an additional +2 damage."],["Flame Orb",10,1350,"After acting, you are Burned."],["Float Stone",10,1350,"If you are Heavy (weight), you are treated as Medium (weight). This is also true for Medium to Light and Light to Featherweight. You get +15ft movement speed."],["Focus Band",10,1950,"If you would be knocked out, you may roll 1d20. On 17 or higher, you are instead set to 1 hit point and the Focus Band is destroyed."],["Focus Sash",10,2550,"If you would be knocked out from a single attack when you were at max hit points, instead you are set to 1 hit point once per battle."],["Grip Claw",10,1950,"If you bind a foe and your foe tries to escape, they must roll +4 higher to escape successfully."],["Heavy Boots",10,2550,"The first time you would take damage from a Hazard per combat, ignore that damage."],["Iron Ball",10,1350,"If you are Featherweight (weight), you are treated as Light (weight). This is also true for Light to Medium and Medium to Heavy."],["King’s Rock",10,2550,"On your first single-target attack per day, the attack gains the following effect: “18 or higher during AC inflicts Dazed.”"],["Lagging Tail",10,1350,"You act last during each round of combat."],["Leftovers",10,2550,"As an action, consume and destroy Leftovers. Regain 1d6 HP after acting until you are at max HP."],["Life Orb",10,2550,"Your attacks have +1d6 power. After acting, no matter what actions you take, you lose 1d6 HP."],["Luminous Moss",10,300,"When you are hit by a Water-type attack, Luminous Moss is destroyed and you get SpDefense▲."],["Mental Herb",10,650,"As a free action, consume and destroy Mental Herb. If a foe does anything to try and prevent you from using any of your moves, it fails."],["Metronome",10,2550,"Your attacks have +1d4 power for each other time the same attack has been used that encounter (max +3d4)."],["Mirror Herb",10,350,"As a free Reaction [When a foe gets▲], consume and destroy Mental Herb. Gain the same ▲that the foe just gained."],["Muscle Band",10,3550,"Your Physical attacks deal +1 damage."],["Power Herb",10,850,"As a free Reaction [When you use a move with multiple turns], consume and destroy Power Herb."],["Protective Pads",10,2550,"If you would be damaged as a result of making a melee attack against a foe by a foe’s passive or other effect, ignore that damage."],["Quick Claw",10,2550,"On your first single-target melee attack with at-will frequency per day, the attack gains the following effect: “This attack has Priority.”"],["Razor Claw",10,2550,"On your first single-target melee attack per day, the attack gains the following effect: “This attack is Lethal.”"],["Razor Fang",10,2550,"Your Latched attacks deal +2 damage."],["Ring Target",10,1050,"You lose all of your type immunities. When hit by an attack that you are usually immune to, treat the damage as ineffective."],["Rocky Helmet",10,3550,"Whenever you are hit by an attack at melee range, the attacker loses 1d4 HP."],["Safety Goggles",10,2550,"You are immune to damaging effects from Weather."],["Scope Lens",10,2550,"On your first single-target ranged attack per day, the attack gains the following effect: “This attack is Lethal.”"],["Shed Shell",10,450,"As a free Reaction [When you become Bound by a foe], destroy Shed Shell. You are no longer Bound."],["Shell Bell",10,3550,"Whenever you hit with an attack, you can drop your highest rolled damage result. If you do, recover 1d4 HP."],["Snowball",10,300,"When you are hit by a Ice-type attack, Snowball is destroyed and you get Attack▲."],["Sticky Barb",10,2050,"Whenever you move more than 10ft during your turn, you lose 1d4 HP. If you are hit by a melee range attack, give Sticky Barb to the attacker."],["Throat Spray",10,1850,"Your Sound attacks deal +2 damage."],["Toxic Orb",10,1350,"After acting, you are Poisoned."],["White Herb",10,650,"As a free action, consume and destroy White Herb. Get rid of any ▼ that you have."],["Wide Lens",10,3550,"Your effect moves have +1 Accuracy."],["Wise Glasses",10,3550,"Your Special attacks deal +1 damage."],["Zoom Lens",10,3550,"On your first attack per combat, your attack has +2 Accuracy and -4 power."],["Elemental Boon (choose a type)",10,1850,"Elemental Boons have many names and each correspond to each Pokémon type (Soft Sand for Ground, Silk Scarf for Normal, Never Melt Ice for Ice, etc.)."],["Elemental Plate (choose a type)",10,19800,"Elemental Plates are rare artifacts named per Pokémon type (Bug Plate, Dark Plate, etc.)."],["Weather/Terrain/Zone Rock",10,450,"These items are named after the Weather, Terrain, or Zone that the held item affects (Sunny Rock, Tricky Rock, Grassy Rock, etc.)."],["Weather/Terrain/Zone Seed",10,450,"These items are named after the Weather, Terrain, or Zone that the held item affects (Rainy Seed, Gravity Seed, Electric Seed, etc.)."],["Oran Berry",11,25,"Heals a Pokémon 5 HP."],["Sitrus Berry",11,120,"Heals a Pokémon 12 HP. (uncommon in the wild)"],["Aguav Berry",11,850,"Heals 1/3 of a Pokémon’s max HP, then they are Confused. (uncommon in the wild)"],["Figy Berry",11,850,"Heals 1/3 of a Pokémon’s max HP, then they are Confused. (uncommon in the wild)"],["Iapapa Berry",11,850,"Heals 1/3 of a Pokémon’s max HP, then they are Confused. (uncommon in the wild)"],["Mago Berry",11,850,"Heals 1/3 of a Pokémon’s max HP, then they are Confused. (uncommon in the wild)"],["Wiki Berry",11,850,"Heals 1/3 of a Pokémon’s max HP, then they are Confused. (uncommon in the wild)"],["Aspear Berry",11,120,"Cures Frostbite"],["Cheri Berry",11,120,"Cures Paralysis"],["Chesto Berry",11,120,"Cures Drowsy"],["Pecha Berry",11,120,"Cures Poisoned and Toxified"],["Persim Berry",11,120,"Cures Confused"],["Rawst Berry",11,120,"Cures Burns"],["Lum Berry",11,580,"Cures all Afflictions (uncommon in the wild)"],["Grepa Berry",11,680,"When you have SpDefense▼ you get SpDefense▲. (rare in the wild)"],["Hondew Berry",11,680,"When you have SpAttack▼ you get SpAttack▲. (rare in the wild)"],["Kelpsy Berry",11,680,"When you have Attack▼ you get Attack▲. (rare in the wild)"],["Pomeg Berry",11,1080,"When you have ▼ you get a matching ▲. (rare in the wild)"],["Qualot Berry",11,680,"When you have Defense▼ you get Defense▲. (rare in the wild)"],["Tamato Berry",11,680,"When you have Speed▼ you get Speed▲. (rare in the wild)"],["Babiri Berry",11,540,"Protection from Steel. (uncommon in the wild)"],["Charti Berry",11,540,"Protection from Rock. (uncommon in the wild)"],["Chilan Berry",11,540,"Protection from Normal. (uncommon in the wild)"],["Chople Berry",11,540,"Protection from Fighting. (uncommon in the wild)"],["Coba Berry",11,540,"Protection from Flying. (uncommon in the wild)"],["Colbur Berry",11,540,"Protection from Dark. (uncommon in the wild)"],["Haban Berry",11,540,"Protection from Dragon. (uncommon in the wild)"],["Kasib Berry",11,540,"Protection from Ghost. (uncommon in the wild)"],["Kebia Berry",11,540,"Protection from Poison. (uncommon in the wild)"],["Occa Berry",11,540,"Protection from Fire. (uncommon in the wild)"],["Passho Berry",11,540,"Protection from Water. (uncommon in the wild)"],["Payapa Berry",11,540,"Protection from Psychic. (uncommon in the wild)"],["Rindo Berry",11,540,"Protection from Grass. (uncommon in the wild)"],["Roseli Berry",11,540,"Protection from Fairy. (uncommon in the wild)"],["Shuca Berry",11,540,"Protection from Ground. (uncommon in the wild)"],["Tanga Berry",11,540,"Protection from Bug. (uncommon in the wild)"],["Wacan Berry",11,540,"Protection from Electric. (uncommon in the wild)"],["Yache Berry",11,540,"Protection from Ice. (uncommon in the wild)"],["Apicot Berry",11,1880,"At half HP or lower, you get SpDefense▲. (rare in the wild)"],["Ganlon Berry",11,1880,"At half HP or lower, you get Defense▲. (rare in the wild)"],["Lansat Berry",11,1880,"At half HP or lower, your next attack is Lethal. (rare in the wild)"],["Liechi Berry",11,1880,"At half HP or lower, you get Attack▲. (rare in the wild)"],["Micle Berry",11,1880,"At half HP or lower, increase your AC by +1 until the end of combat. (rare in the wild)"],["Petaya Berry",11,1880,"At half HP or lower, you get SpAttack▲. (rare in the wild)"],["Salac Berry",11,1880,"At half HP or lower, you get Speed▲. (rare in the wild)"],["Starf Berry",11,1280,"At half HP or lower, get a random ▲. (rare in the wild)"],["Custap Berry",11,null,"When at 6 HP or less, your next At-Will attack has Priority. (rare in the wild)"],["Enigma Berry",11,null,"When hit by a super-effective or extremely-effective attack, restore HP equal to 1/4th of your max HP. (rare in the wild)"],["Jacoba Berry",11,null,"When hit by a melee Attack move, the attacker loses HP equal to 1/4th the damage you just took. (rare in the wild)"],["Kee Berry",11,null,"When hit by an Attack move, increase Defense by 1 for 2 mins. (rare in the wild)"],["Leppa Berry",11,null,"Restore the use of one 3/day frequency move as if you’ve had an extended rest. (rare in the wild)"],["Maranga Berry",11,null,"When hit by an Sp. Atk move, increase Sp. Def by 1 for 2 mins. (rare in the wild)"],["Rowap Berry",11,null,"When hit by a ranged Sp. Atk move, the offender loses HP equal to 1/4th the damage you just took. (rare in the wild)"],["Belue Berry",11,120,"No special effect; used for contest treats and berry food."],["Bluk Berry",11,120,"No special effect; used for contest treats and berry food."],["Cornn Berry",11,120,"No special effect; used for contest treats and berry food."],["Durin Berry",11,120,"No special effect; used for contest treats and berry food."],["Magost Berry",11,120,"No special effect; used for contest treats and berry food."],["Nanab Berry",11,120,"No special effect; used for contest treats and berry food."],["Nomel Berry",11,120,"No special effect; used for contest treats and berry food."],["Pamtre Berry",11,120,"No special effect; used for contest treats and berry food."],["Pinap Berry",11,120,"No special effect; used for contest treats and berry food."],["Rabuta Berry",11,120,"No special effect; used for contest treats and berry food."],["Razz Berry",11,120,"No special effect; used for contest treats and berry food."],["Spelon Berry",11,120,"No special effect; used for contest treats and berry food."],["Watmel Berry",11,120,"No special effect; used for contest treats and berry food."],["Wepear Berry",11,120,"No special effect; used for contest treats and berry food."],["Beautiful Bandanna",12,2280,"Beauty contest stat is +2 while worn."],["Clever Cravat",12,2280,"Clever contest stat is +2 while worn."],["Cool Kerchief",12,2280,"Cool contest stat is +2 while worn."],["Cute Comforter",12,2280,"Cute contest stat is +2 while worn."],["Tough Tippet",12,2280,"Tough contest stat is +2 while worn."],["Sweet PokéBlock (level 1)",12,980,"Raises Cute stat +1"],["Dry & Sweet Poffin (level 2)",12,1880,"Raises both Beauty and Cute stat +2"],["Bitter Donut (level 4)",12,3680,"Raises Clever stat +4"],["Spicy PokéBlock (level 5)",12,4580,"Raises Cool stat +5"],["Null Poffin (level 4)",12,480,"Permanently lowers 4 Contest stats. (They can be raised again.)"],["Dawn Stone",13,9800,"Induces evolution in certain species of Pokémon."],["Dusk Stone",13,9800,"Induces evolution in certain species of Pokémon."],["Fire Stone",13,9800,"Induces evolution in certain species of Pokémon."],["Ice Stone",13,9800,"Induces evolution in certain species of Pokémon."],["Leaf Stone",13,9800,"Induces evolution in certain species of Pokémon."],["Moon Stone",13,9800,"Induces evolution in certain species of Pokémon."],["Shiny Stone",13,9800,"Induces evolution in certain species of Pokémon."],["Sun Stone",13,9800,"Induces evolution in certain species of Pokémon."],["Thunder Stone",13,9800,"Induces evolution in certain species of Pokémon."],["Water Stone",13,9800,"Induces evolution in certain species of Pokémon."],["TM (At-Will)",14,4800,"Teaches an at-will move. 3 uses."],["TM (3/day)",14,11800,"Teaches a 3/day move. 3 uses."],["TM (1/day)",14,26800,"Teaches a 1/day move. 3 uses."],["TR (At-Will)",14,2400,"Teaches an at-will move. 1 use."],["TR (3/day)",14,5900,"Teaches a 3/day move. 1 use."],["TR (1/day)",14,13400,"Teaches a 1/day move. 1 use."],["HM (At-Will)",14,null,"Teaches an at-will move. Unlimited uses. Hard to price and hard to find."],["HM (3/day)",14,null,"Teaches a 3/day move. Unlimited uses. Hard to price and hard to find."],["HM (1/day)",14,null,"Teaches a 1/day move. Unlimited uses. Hard to price and hard to find."],["Basic Tool Kit",15,95,"Basic tools for basic repairs or maintenance. (8 lbs)"],["Camera Bag",15,220,"Everything you need as a traveling photographer, minus the camera. (3 lbs)"],["Cooking Kit",15,850,"For the chef on the go, in the wilds. (35 lbs)"],["Dig Kit",15,150,"Whatever you’re looking for, this should help. (15 lbs)"],["Drawing Kit",15,35,"For an artist, or maybe just a doodler. (4 lbs)"],["Studious Pack",15,260,"Useful things for a trainer with a knack for academics. (10 lbs)"],["Traveler’s Pack",15,150,"Really useful gear for extended travel through the wilds. (15 lbs)"],["Trainer’s Pack",15,140,"Basic goods for a trainer who’s starting their journey. (5 lbs)"],["Engineer’s Tool Kit",15,1050,"If you’re building something on the go, or taking something else apart, maybe you’ll need this? (15 lbs)"],["Field Survey Kit",15,200,"If any trainers want to do some research while out in the wilds, these tools will help. (8 lbs)"],["Fishing Kit",15,250,"For trainers who are looking to lure underwater Pokémon to the surface. (8 lbs)"],["Grooming Kit",15,150,"Your Pokémon will always look their best when you’re using this kit. (4 lbs)"],["Make Up Kit",15,150,"You will always look your best when you’re with this kit. (4 lbs)"],["Medical Field Kit",15,1750,"Even if you’re not entirely sure how to use it, it’s very useful to have. (10 lbs)"],["Mess Kit",15,10,"Everything you need to enjoy a meal on the go. (1.5 lbs)"],["Miscreant’s Pack",15,300,"There’s no real reason to have this, let alone sell it. This may not be easily found and available in stores. (10 lbs)"],["Performer’s Pack",15,700,"Perfect for trainers who travel as entertainers, coordinators, or influencers. (9 lbs)"],["Poké Ball Smith Kit",15,1250,"If you’re planning to make your own Poké Balls, this will be necessary. (15 lbs)"],["Portable Chemistry Set",15,800,"Science on the go! (12 lbs)"],["Ruin Explorer’s Pack",15,325,"Intended for trainers investigating ancient sites, abandoned structures, and lost routes. (11 lbs)"],["Sewing Kit",15,325,"This is useful for the designer on the go. (20 lbs)"],["Spiritualist’ Pack",15,140,"For those who travel and spread the word of various greater beings. (5 lbs)"],["Arctic Travel Pack",15,575,"For exposure to cold climates and snow-covered routes. (14 lbs)"],["Climber’s Pack",15,350,"Steep routes, cliffs, and elevated terrain. (12 lbs)"],["Coastal & Open Water Pack",15,525,"For long island routes, shoreline travel, and open-water crossings. (11 lbs)"],["Extreme Weather Pack",15,425,"For routes with dangerous or unpredictable weather conditions. (7 lbs)"],["Swamp & Wetlands Pack",15,575,"Built for travel through marshes, bogs, and flooded wilds. (10 lbs)"],["Volcanic Route Pack",15,850,"Intended for travel near active volcanic zones and other dangerous extreme heat environments. (9 lbs)"],["Berry Planter",16,2800,"A portable planter that can turn one berry into two or three when watered daily. (Same item as the Portable Berry Planter.)"],["Egg Incubator",16,1350,"Egg incubators are electronic, reusable containers that safely keep and warm Pokémon eggs. (15 lbs)"],["Folding Bicycle",16,950,"A 3-speed bike that folds onto itself. (25 lbs)"],["Lure Module Launcher",16,950,"An electronic setup that deploys scent/light emitters that last for 30 mins that attract Pokémon to your location in wild spaces. (15 lbs)"],["Portable Berry Planter",16,2800,"By planting a berry in a portable berry planter, you create a mini-ecosystem for the berry to rapidly grow into a fruit bearing shrub, often producing two or even three…"],["Signal Scanner",16,650,"Handheld device that detects nearby electronic signals (50ft), recent Poké Ball activity (2 minutes), and strong energy emissions nearby (150ft)."],["Solar Charger",16,50,"An unfolding solar panel that charges devices."],["Blizzard Wear",17,1050,"Carefully made clothes for humans protect them from harmful hail and snowstorms."],["Desert Gear",17,1050,"Carefully made clothes for humans protect them from harmful sandstorms and desert winds."],["Diving Gear",17,1050,"Self contained underwater breathing apparatus . Allows for humans to explore underwater with enough air to breathe for two hours."],["Hazmat Suit",17,750,"Full-body protective suit used to shield trainers from dangerous chemical, biological, radiological, or nuclear harms."],["Wet Suit",17,750,"Insulated body suit for diving in any waters. Includes gloves and flippers ."],["Ninja Tabi",18,800,"+2 to a Acrobatics skill check. You can use only one clothing or equipment bonus per day."],["Bracing Sleeves",18,800,"+2 to a Athletics skill check. You can use only one clothing or equipment bonus per day."],["Domino Mask",18,800,"+2 to a Bluff / Deception skill check. You can use only one clothing or equipment bonus per day."],["Pyramid Hat",18,800,"+2 to a Concentration skill check. You can use only one clothing or equipment bonus per day."],["Padded Jacket",18,800,"+2 to a Constitution skill check. You can use only one clothing or equipment bonus per day."],["Fine Ascot",18,800,"+2 to a Diplomacy skill check. You can use only one clothing or equipment bonus per day."],["Fingerless Gloves",18,800,"+2 to a Engineering / Operation skill check. You can use only one clothing or equipment bonus per day."],["Grand Monocle",18,800,"+2 to a History skill check. You can use only one clothing or equipment bonus per day."],["Cozy Scarf",18,800,"+2 to a Insight skill check. You can use only one clothing or equipment bonus per day."],["Wrist Magnifier",18,800,"+2 to a Investigate skill check. You can use only one clothing or equipment bonus per day."],["New Stethoscope",18,800,"+2 to a Medicine skill check. You can use only one clothing or equipment bonus per day."],["Field Boots",18,800,"+2 to a Nature skill check. You can use only one clothing or equipment bonus per day."],["Tech Visor",18,800,"+2 to a Perception skill check. You can use only one clothing or equipment bonus per day."],["Baller Hacky Sack",18,800,"+2 to a Perform skill check. You can use only one clothing or equipment bonus per day."],["Soft Brush",18,800,"+2 to a Pokémon Handling skill check. You can use only one clothing or equipment bonus per day."],["AR Goggles",18,800,"+2 to a Programming skill check. You can use only one clothing or equipment bonus per day."],["Loose Overcoat",18,800,"+2 to a Sleight of Hand skill check. You can use only one clothing or equipment bonus per day."],["Silent Sneakers",18,800,"+2 to a Stealth skill check. You can use only one clothing or equipment bonus per day."],["Studded Leather",18,1250,"+1 Defense during accuracy checks made against you. (10 lbs)"],["Chainmail",18,3450,"+2 Defense during accuracy checks made against you, and you move 10 ft less per turn. (20 lbs)"],["Full Plate Armor",18,9650,"+3 Defense during accuracy checks made against you, and you move 20 ft less per turn. (50 lbs)"],["Nimble Spandex",18,1250,"+1 Special Defense during accuracy checks made against you. (1 lb)"],["Arctic Wetsuit",18,775,"Cold-resistant wetsuit with gloves and flippers. Swim in frigid water without damage; +4 to Constitution checks against cold."],["All-Sight Helmet",18,975,"+4 to Perception checks in the dark, fog or other obstacles to sight or hearing."],["Biome Camouflage",18,675,"Fatigues for one terrain. +4 to Stealth checks while wearing the matching suit."],["Cleated Boots",18,95,"Your movement is not hindered by mud or other slippery terrain."],["Cross-country Skis",18,675,"+15 ft movement per turn on snow or sand; other terrain is difficult."],["Divers Suit",18,200,"Swimsuit for temperate waters, with flippers. Movement is not hindered underwater."],["Hooked-Finger Gloves",18,675,"+4 to Acrobatics checks when climbing a tree, mountainside or other non-metal surface."],["Ice Vest",18,675,"Cooling vest. +4 to Constitution checks to endure desert or volcano heat."],["Noise Neutralizers",18,675,"Noise-cancelling headset. +4 to Concentration checks when focusing without physical pressure."],["Purrloin Suit",18,675,"Dark full-body suit. +4 to Stealth checks in an urban setting."],["Rebreather",18,9950,"Oxygen recycler: up to 30 minutes of air underwater, then must be cleaned and dried for 1 hour."],["Rollerblades",18,675,"+15 ft movement per turn on smooth surfaces; rough terrain is difficult."],["Snow Suit",18,675,"Warm jacket and pants with hand warmers. +4 to Constitution checks to endure the cold."],["Snow Treks",18,250,"Treat difficult terrain created by ice or snow as normal terrain."],["Pokédex",19,600,"Identifies Pokémon with its camera and brings up their data. About the size of a smartphone."],["C-Gear",19,280,"Wrist-worn smart device connected to your phone or Pokédex: calls, GPS, trainer IDs and more."],["Pokégear",19,280,"Wrist-worn smart device connected to your phone or Pokédex: calls, GPS, trainer IDs and more."],["PokéNav",19,280,"Wrist-worn smart device connected to your phone or Pokédex: calls, GPS, trainer IDs and more."],["Pokétch",19,280,"Wrist-worn smart device connected to your phone or Pokédex: calls, GPS, trainer IDs and more."],["Vs. Seeker",19,280,"Wrist-worn smart device connected to your phone or Pokédex: calls, GPS, trainer IDs and more."],["Xtransceiver",19,280,"Wrist-worn smart device connected to your phone or Pokédex: calls, GPS, trainer IDs and more."],["Pokémon Box Link",19,198000,"Portable access to the Pokémon Bank from anywhere with a signal. Needs about three hours of charging a week. (20 lbs)"],["Backup Solar Battery",19,100,"Recharges with a solar charger. Charges up to four devices from zero to full."],["Ball (Basic)",20,2,"A Poké Ball-sized ball for fetch and simple games."],["Ball (Durable)",20,5,"A tougher ball that resists sharp teeth and extreme temperatures."],["Camping Heater",20,40,"Solar-powered, rechargeable heater for a tent. Runs eight hours on a full charge."],["Camping Stove (Gas)",20,120,"Small gas stove with two fuel canisters (six hours each). Extra canisters 10 P. (4 lbs)"],["Chew/String Toy",20,10,"A chew or string toy in assorted shapes for Pokémon enrichment."],["Chew/String Toy (Tough)",20,15,"A difficult-to-destroy chew or string toy, good for carnivorous Pokémon."],["Campfire Set",20,45,"Kit for cooking outdoors: lighter, fire starters, collapsible stand, tinfoil and a canteen."],["Curry Campfire Kit",20,80,"Everything for Galarian-style curry: pot, stand, fan, ladle and ingredients for 3 large pots. (4 lbs)"],["Frisbee",20,5,"A plastic disk for playing fetch."],["Tea Campfire Kit",20,30,"Metal teapot, four mugs and two starter boxes of teabags. (2 lbs)"],["Tray Feeder",20,100,"Collapsible feeder that attracts small wild Pokémon, depending on the bait. (10 lbs)"],["Feeder Fruit",20,100,"Bait that attracts avian and Bug-type Pokémon, and some furry Pokémon."],["Feeder Nectar",20,100,"Bait that attracts avian, Bug-type and some Grass-type Pokémon."],["Feeder Seeds",20,100,"Bait that attracts avian and small furry Pokémon."],["Ranger Styler",21,8000,"ILLEGAL to sell or buy. Electronic restraint system that makes a wild Pokémon Helpful for a time."],["Snag Machine",21,68000,"EXTREMELY ILLEGAL. Lets thrown Poké Balls capture owned Pokémon; fails on loyalty 3 or higher."],["Dynamax Band",21,48000,"Once per day near a Power Spot, a Pokémon with loyalty 2+ can Dynamax or Gigantamax for 1 minute."],["Mega Ring (Key Stone holder)",21,48000,"Once per day, a Pokémon with a Mega Stone and loyalty 2+ can Mega Evolve for 10 minutes. Needs a Key Stone."],["Mega Stone",21,98000,"A rare stone that enables Mega Evolution for one species."],["Key Stone",21,98000,"The stone worn in a Mega Ring to trigger Mega Evolution."],["Tera Orb",21,48000,"Once per day, a Pokémon with a Tera Type and loyalty 2+ can Terastallize for 10 minutes."],["Z-Ring",21,48000,"With a Z-Crystal attached, once per day a Pokémon with loyalty 2+ can use a Z-Move."],["Z-Crystal",21,98000,"Enables a specific type of Z-Move when used with a Z-Ring."],["Backpack",22,5,""],["Ball bearings (25)",22,10,""],["Bedroll",22,5,""],["Binoculars (Digital)",22,45,""],["Blanket",22,2,""],["Blanket (Winter)",22,10,""],["Block and Tackle",22,50,""],["Bolt Cutter",22,10,""],["Book (Hardcover)",22,10,""],["Book (Paperback)",22,5,""],["Bottle (Glass)",22,3,""],["Bottle (Metal)",22,8,""],["Briefcase",22,5,""],["Cable (Steel, 25 ft)",22,20,""],["Camera (Digital High End)",22,2850,""],["Camera (Digital)",22,450,""],["Camera (Film High End)",22,1050,""],["Canteen",22,5,""],["Case (Aluminum)",22,20,""],["Carabiner (4)",22,6,""],["Cell Phone",22,80,""],["Chain (10 ft)",22,5,""],["Chalk (10 Sticks)",22,1,""],["Clothes (Brand Names)",22,100,""],["Clothes (Custom-Fit High End)",22,1250,""],["Clothes (Designer Brands)",22,350,""],["Clothes (Camo Fatigue)",22,65,""],["Clothes (Generic Brands)",22,35,""],["Clothes (Workout / Outdoors)",22,20,""],["Computer (Desktop)",22,780,""],["Computer (Laptop)",22,1080,""],["Computer (Tablet)",22,880,""],["Cooler bag (Foldable)",22,10,""],["Crowbar",22,10,""],["Duct Tape",22,5,""],["Flashlight",22,2,""],["Flask",22,4,""],["Gas Mask",22,25,""],["Grappling Hook",22,10,""],["Hammer",22,10,""],["Hammer (Sledge)",22,15,""],["Handheld Transceiver (Pair)",22,60,""],["Ink (Bottle)",22,10,""],["Jacket (Rain)",22,65,""],["Jacket (Snow)",22,145,""],["Jacket (Windbreaker)",22,50,""],["Knife (Folding)",22,10,""],["Ladder (Folding, 10ft)",22,15,""],["Lantern (fuel)",22,20,""],["Lantern (battery)",22,20,""],["Lantern (solar)",22,45,""],["Lighter",22,2,""],["Lock (Combination)",22,5,""],["Lock (With Key)",22,6,""],["Luggage Bag (Wheeled)",22,5,""],["Messenger Bag",22,5,""],["Memory Stick (100gb)",22,45,""],["Metal Detector",22,30,""],["Mirror (Signal)",22,4,""],["Mobile Trailer Home (for 1)",22,19800,""],["Mobile Trailer Home (for 4)",22,39800,""],["Multi-Purpose Tool",22,20,""],["Nails (100)",22,5,""],["Night-Vision Goggles",22,350,""],["Nintendo Switch",22,350,""],["Padlock and Key",22,10,""],["Pencils (10 Coloring)",22,2,""],["Pencils (10 Graphite)",22,2,""],["Pens (10 Coloring)",22,2,""],["Pens (5 Writing)",22,2,""],["Pick",22,10,""],["Pitons (5)",22,5,""],["Pokémon Card Booster Pack",22,4,""],["Pole (Steel, 10 ft)",22,5,""],["Rope (50 ft)",22,5,""],["Saddle (Large)",22,35,""],["Saddle (Massive)",22,55,""],["Saddle (Small)",22,15,""],["Shovel (Folding)",22,10,""],["Smartphone",22,580,""],["Soap / Shampoo / Toothpaste",22,4,""],["Tent (Folding, Two-Person)",22,35,""],["Tarp (6x8 ft)",22,10,""],["Tarp (10x12 ft)",22,20,""],["Thermos",22,10,""],["Torch (5)",22,5,""],["Vehicle (Bus)",22,248800,""],["Vehicle (Car)",22,49800,""],["Vehicle (Camper)",22,124800,""],["Vehicle (Motorcycle)",22,4980,""],["Vehicle (Truck)",22,69800,""],["Vehicle (Van)",22,49800,""],["Vial",22,5,""],["Wallet",22,5,""],["Whistle",22,2,""],["Zip Ties (30)",22,10,""]];
+
+/* ---------- Shops ----------
+   The GM builds shops and puts them on places. Each shop has its own stock and prices.
+   Where things live (no new database rule is needed):
+     gm/shops    the GM's full list of shops, including closed ones, hidden items and items still locked.     Only the GM can read it.
+     meta/shops  what the players see: only open shops, and in them only the items that are for sale right now.   The GM's page keeps it up to date.
+   Players buy from their own browser. A purchase changes only the buyer's own trainer sheet (credits, inventory, a count of what they bought,
+   and a purchase record), which the rules already let a player edit. The units left of a limited item are the stock the GM set minus what all
+   the trainers' sheets say they have bought, so everyone sees the same number without any shared counter. */
+S.ui.shop=S.ui.shop||{view:'floor',sel:'',who:'',cat:'',q:'',qty:{},edit:'',newname:'',tpl:'',addq:'',dstock:'5',addcat:'',rpick:'',lshop:'',lwho:'',ln:60,del:''};
+const SHOP_MAX=30,SHOP_ITEMS_MAX=250,SHOP_LOG_MAX=300,SHOP_DOC_MAX=800000;
+const SCAT_BY=(()=>{const m=new Map();SCAT.forEach(x=>{const k=dexKey(x[0]);if(!m.has(k))m.set(k,x);});return m;})();
+const SHOP_OTHER='Other';
+const SHOP_CATS=SCAT_CATS.concat([SHOP_OTHER]);
+const fmtP=n=>Math.round(num(n)).toLocaleString('en-US')+' P';
+const plName=id=>PD_BY[id]?PD_BY[id].name:'';
+let SHOP_PLOPT=null;
+const shPlOpt=()=>SHOP_PLOPT||(SHOP_PLOPT=PD.slice().sort(natural).map(f=>[f.id,f.name]));
+let shSeq=0;
+const shKey=()=>Math.random().toString(36).slice(2,6)+(shSeq++).toString(36)+Date.now().toString(36).slice(-3);
+
+const shG=()=>(S.shopGm&&S.shopGm.shops)||{};
+const shP=()=>(S.shopPub&&S.shopPub.shops)||{};
+const shRc=()=>(S.shopPub&&S.shopPub.rc)||{};
+const shOrder=m=>Object.keys(m).sort((a,b)=>num(m[a].at)-num(m[b].at)||a.localeCompare(b));
+const shCanon=v=>JSON.stringify(v,(k,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.keys(x).sort().reduce((o,kk)=>{o[kk]=x[kk];return o;},{}):x);
+
+/* how many of an item the trainers have bought between them, and how many are left */
+function shSold(sid,k){
+  let n=0;
+  Object.keys(S.trainers).forEach(u=>{const b=S.trainers[u]&&S.trainers[u].shopBought;if(b&&b[sid])n+=num(b[sid][k]);});
+  return n;
+}
+const shStockOf=x=>(x.stock==null||x.stock==='')?null:Math.max(0,Math.floor(num(x.stock)));
+function shLeft(sid,k,s){return s==null?Infinity:Math.max(0,s-shSold(sid,k));}
+
+/* ----- what the players are allowed to see ----- */
+function shPubShops(){
+  const g=shG(),rc=shRc(),out={};
+  shOrder(g).forEach(id=>{
+    const s=g[id];
+    if(!s)return;
+    const seen=s.place&&rc[s.place];
+    if(!s.open&&!seen)return;
+    const o={n:String(s.name||'Shop'),pl:String(s.place||''),o:s.open?1:0,t:String(s.note||''),at:num(s.at),it:[]};
+    if(s.open){
+      (Array.isArray(s.items)?s.items:[]).forEach(x=>{
+        if(!x||x.hide||x.price==null||x.price==='')return;
+        if(x.unlock&&!rc[x.unlock])return;
+        o.it.push({k:String(x.k),n:String(x.name||'Item'),c:String(x.cat||''),p:Math.max(0,Math.round(num(x.price))),s:shStockOf(x),d:String(x.desc||'')});
+      });
+    }
+    out[id]=o;
+  });
+  return out;
+}
+let shTimer=0;
+function shPubSoon(){
+  if(!S.me.admin)return;
+  clearTimeout(shTimer);
+  shTimer=setTimeout(()=>{
+    shTimer=0;
+    const nv=shPubShops();
+    if(shCanon(nv)===shCanon(shP()))return;
+    edit('sh','shops','shops',nv);
+  },120);
+}
+function shSetReached(pid,on){
+  if(!S.me.admin||!PD_BY[pid])return;
+  const rc=Object.assign({},shRc());
+  if(on)rc[pid]=true;else delete rc[pid];
+  edit('sh','shops','rc',rc);
+  shPubSoon();
+}
+
+/* ----- buying ----- */
+const shBuyer=()=>S.me.admin?(S.trainers[S.ui.shop.who]?S.ui.shop.who:(tids()[0]||'')):S.me.id;
+function shBuy(sid,k,qtyRaw){
+  const uid=shBuyer(),t=S.trainers[uid];
+  if(!t){toast(S.me.admin?'There is no trainer to sell to yet.':'Make your trainer sheet first, then you can shop.');return;}
+  if(!S.me.admin&&!S.me.canWrite){toast('You can only look at the table right now.');return;}
+  const sh=shP()[sid];
+  if(!sh||!sh.o){toast('That shop is closed.');return;}
+  const it=(sh.it||[]).find(x=>x.k===k);
+  if(!it){toast('That item is not for sale.');return;}
+  const qty=clamp(Math.floor(num(qtyRaw))||1,1,99);
+  const left=shLeft(sid,k,it.s);
+  if(qty>left){toast(left>0?'Only '+left+' left of '+it.n+'.':it.n+' is sold out.');return;}
+  const total=it.p*qty,have=num(t.credits);
+  if(total>have){toast('Not enough credits: that costs '+fmtP(total)+' and '+(S.me.admin?tName(t):'you')+' '+(S.me.admin?'has':'have')+' '+fmtP(have)+'.');return;}
+  edit('t',uid,'credits',have-total);
+  const items=(t.items||[]).map(x=>Object.assign({},x));
+  const key=dexKey(it.n);
+  const row=items.find(x=>dexKey(x.name)===key&&!String(x.note||'').trim());
+  if(row)row.qty=num(row.qty)+qty;else items.push({name:it.n,qty,note:''});
+  edit('t',uid,'items',items);
+  const sb=JSON.parse(JSON.stringify(t.shopBought||{}));
+  if(!sb[sid])sb[sid]={};
+  sb[sid][k]=num(sb[sid][k])+qty;
+  edit('t',uid,'shopBought',sb);
+  const log=(Array.isArray(t.shopLog)?t.shopLog:[]).concat([{t:Date.now(),sid,sn:sh.n,k,n:it.n,q:qty,p:it.p,c:total,by:S.me.id}]).slice(-SHOP_LOG_MAX);
+  edit('t',uid,'shopLog',log);
+  S.ui.shop.qty[sid+'|'+k]=1;
+  toast((S.me.admin?'Sold ':'Bought ')+qty+' × '+it.n+' for '+fmtP(total)+(S.me.admin?' to '+tName(t):'')+'.',true);
+  render();
+}
+
+/* the quantity box next to Buy: keep it between 1 and what is left, and remember it across redraws */
+function shQty(t){
+  const mx=num(t.max)||99;
+  let v=Math.floor(num(t.value));
+  if(t.value!==''&&v<1)v=1;
+  if(v>mx)v=mx;
+  if(t.value!==''&&String(v)!==t.value)t.value=String(v);
+  S.ui.shop.qty[t.dataset.sq]=t.value===''?1:v;
+}
+
+/* ----- the shop floor: what a player sees ----- */
+function shItemsHtml(){
+  const u=S.ui.shop,pub=shP(),sh=pub[u.sel];
+  if(!sh)return h``;
+  if(!sh.o)return h`<p class="sub">This shop is closed right now.${sh.t?h` “${sh.t}”`:''}</p>`;
+  const q=String(u.q||'').trim().toLowerCase();
+  let list=(sh.it||[]).filter(x=>(!u.cat||x.c===u.cat)&&(!q||(x.n+' '+x.d).toLowerCase().indexOf(q)>=0));
+  if(!(sh.it||[]).length)return h`<p class="sub">Nothing is on the shelves yet.</p>`;
+  if(!list.length)return h`<p class="sub">Nothing here matches.</p>`;
+  const rows=list.map(x=>({x,left:shLeft(u.sel,x.k,x.s)}));
+  rows.sort((a,b)=>(a.left===0)-(b.left===0));
+  const t=S.trainers[shBuyer()];
+  const have=num(t&&t.credits);
+  return h`<div class="splist">${rows.map(({x,left})=>{
+    const qk=u.sel+'|'+x.k;
+    const q0=clamp(Math.floor(num(u.qty[qk]))||1,1,99);
+    return h`<div class="spitem ${left===0?'out':''}">
+      <div class="spmain">${itemTile(x.n)}<div><b>${x.n}</b>${x.c?h` <span class="pill">${x.c}</span>`:''}${x.d?h`<p class="sub">${x.d}</p>`:''}</div></div>
+      <div class="spprice ${x.p>have?'poor':''}">${fmtP(x.p)}</div>
+      <div class="spleft">${left===Infinity?'':left===0?'Sold out':left+' left'}</div>
+      <div class="spbuy"><input type="number" inputmode="numeric" min="1" max="${left===Infinity?99:Math.max(1,Math.min(99,left))}" value="${q0}" data-sq="${qk}" aria-label="How many ${x.n}"><button class="btn primary sm" data-act="sp_buy" data-sid="${u.sel}" data-k="${x.k}" ${left===0?raw('disabled'):''}>Buy</button></div>
+    </div>`;}
+  )}</div>`;
+}
+function shRefresh(){const el=document.getElementById('shoplist');if(el)el.innerHTML=shItemsHtml().s;}
+function shFloor(){
+  const u=S.ui.shop,pub=shP(),ids=shOrder(pub);
+  if(!pub[u.sel])u.sel=(ids.find(i=>pub[i].o)||ids[0]||'');
+  const sh=pub[u.sel];
+  const uid=shBuyer(),t=S.trainers[uid];
+  const cats=sh&&sh.o?[...new Set((sh.it||[]).map(x=>x.c).filter(Boolean))]:[];
+  const mine=(t&&Array.isArray(t.shopLog)?t.shopLog:[]).slice(-8).reverse();
+  return h`<section class="panel spp"><div class="ph"><h2>Shops</h2>${t?h`<span class="pill credit">${S.me.admin?tName(t)+': ':'You have '}${fmtP(t.credits)}</span>`:''}</div>
+    ${!t&&!S.me.admin?h`<div class="banner">You have no trainer sheet yet, so you cannot buy anything. Make one on the Trainer page.</div>`:''}
+    ${S.me.admin?h`<div class="fgrid"><label class="fld"><span class="fl">Sell to</span><select data-u="shop.who">${tids().map(id=>h`<option value="${id}" ${id===uid?raw('selected'):''}>${tName(S.trainers[id])}</option>`)}</select></label></div>`:''}
+    ${ids.length?h`<div class="sppicks" role="group" aria-label="Shops">${ids.map(id=>h`<button class="sppick" data-act="sp_pick" data-id="${id}" aria-pressed="${String(id===u.sel)}"><b>${pub[id].n}</b><span>${pub[id].pl?plName(pub[id].pl):'Travelling'}</span>${pub[id].o?'':h`<em>Closed</em>`}</button>`)}</div>`
+      :h`<p class="sub">No shops are open right now. The GM opens them as the party reaches a town.</p>`}
+    ${sh?h`<div class="sphead"><h3>${sh.n}</h3>${sh.pl?h`<span class="sub">${plName(sh.pl)}</span>`:''}${sh.o?h`<span class="pill open">Open</span>`:h`<span class="pill">Closed</span>`}</div>
+      ${sh.o&&sh.t?h`<p class="sub">“${sh.t}”</p>`:''}
+      ${sh.o&&(sh.it||[]).length?h`<div class="fgrid spflt"><label class="fld"><span class="fl">Search</span><input type="search" data-u="shop.q" value="${u.q}" placeholder="Name or effect" data-nr></label>
+        <label class="fld"><span class="fl">Kind</span><select data-u="shop.cat"><option value="">All</option>${cats.map(c=>h`<option value="${c}" ${c===u.cat?raw('selected'):''}>${c}</option>`)}</select></label></div>`:''}
+      <div id="shoplist">${shItemsHtml()}</div>`:''}
+  </section>
+  ${t&&mine.length?h`<section class="panel"><div class="ph"><h2>${S.me.admin?tName(t)+'’s':'Your'} recent purchases</h2></div>
+    <div class="spmine">${mine.map(e=>h`<div class="row sp"><span>${e.q} × ${e.n} <span class="sub">${e.sn||''}</span></span><span class="mono">${fmtP(e.c)}</span></div>`)}</div></section>`:''}`;
+}
+
+/* ----- the GM's editor ----- */
+const SHOP_TPL=[
+  ['','An empty shop'],
+  ['center','Mart in a Pokémon Center: travel medicine and basic balls'],
+  ['mart','Poké Mart: balls, medicine, repels and berries'],
+  ['dept','Department store: packs, gear, clothes, tech and goods'],
+  ['spec','Specialty shop: stones, TMs, held items and vitamins']
+];
+function shTplRows(t){
+  const by=name=>{const x=SCAT_BY.get(dexKey(name));return x?[x]:[];};
+  const cat=names=>SCAT.filter(x=>names.indexOf(SCAT_CATS[x[1]])>=0);
+  if(t==='center')return cat(['Potions','Status cures','Revives','Repels']).concat(by('Basic Ball'),by('Great Ball'),by('Ultra Ball'));
+  if(t==='mart')return cat(['Poké Balls','Potions','Status cures','Revives','Energy','Battle boosters','Repels','Herbs']).concat(['Oran Berry','Sitrus Berry','Cheri Berry','Chesto Berry','Pecha Berry','Rawst Berry','Aspear Berry','Persim Berry'].reduce((a,n)=>a.concat(by(n)),[]));
+  if(t==='dept')return cat(['Packs and kits','Utility','Survival gear','Clothing and armor','Tech','Camping and play','General goods']);
+  if(t==='spec')return cat(['Evolution stones','TMs and TRs','Held items','Vitamins','Mints','Contest']);
+  return [];
+}
+const shMkItem=(x,stock)=>({k:shKey(),name:x[0],cat:SCAT_CATS[x[1]],price:x[2],stock,desc:x[3],unlock:'',hide:false});
+const shDefStock=()=>{const v=String(S.ui.shop.dstock==null?'':S.ui.shop.dstock).trim();return v===''?null:Math.max(0,Math.floor(num(v)));};
+function shRoom(){
+  if(JSON.stringify(S.shopGm||{}).length>SHOP_DOC_MAX){toast('The shop list is nearly full. Delete a shop or some items before adding more.');return false;}
+  return true;
+}
+function shEditor(){
+  const g=shG(),ids=shOrder(g),u=S.ui.shop,rc=shRc();
+  if(!g[u.edit])u.edit=ids.length===1?ids[0]:'';
+  const sid=u.edit;
+  const s=sid?g[sid]:null;
+  const P='shops.'+sid+'.';
+  const reached=Object.keys(rc).filter(id=>PD_BY[id]).map(id=>PD_BY[id]).sort(natural);
+  return h`<section class="panel"><div class="ph"><h2>Your shops</h2><span class="pill gm">GM only</span><span class="sub">${ids.length} of ${SHOP_MAX}</span></div>
+    <p class="sub">Each shop has its own stock and prices. Put it on a place, then open it when the party gets there. Closed shops are hidden from the players, except in places the party has already reached, where they see a Closed sign.</p>
+    ${ids.length?h`<div class="splist">${ids.map(id=>{const x=g[id];return h`<div class="spitem">
+      <div class="spmain"><div><b>${x.name||'Shop'}</b> <span class="pill ${x.open?'open':''}">${x.open?'Open':'Closed'}</span><p class="sub">${x.place?plName(x.place):'Not on the map'} · ${(x.items||[]).length} items</p></div></div>
+      <div class="spbuy"><button class="btn sm" data-act="sp_toggle" data-id="${id}">${x.open?'Close shop':'Open shop'}</button><button class="btn sm ${id===sid?'primary':''}" data-act="sp_edit" data-id="${id}">${id===sid?'Editing':'Edit'}</button></div></div>`;})}</div>`:h`<p class="sub">No shops yet. Make the first one below.</p>`}
+    <div class="mgd"><b>New shop</b>
+      <div class="fgrid"><label class="fld"><span class="fl">Name</span><input type="text" data-u="shop.newname" value="${u.newname}" placeholder="e.g. Jubilife Poké Mart" data-nr></label>
+        <label class="fld"><span class="fl">Start with</span><select data-u="shop.tpl">${SHOP_TPL.map(([k,l])=>h`<option value="${k}" ${k===u.tpl?raw('selected'):''}>${l}</option>`)}</select></label>
+        <label class="fld"><span class="fl">Stock of each (blank = unlimited)</span><input type="number" inputmode="numeric" min="0" data-u="shop.dstock" value="${u.dstock}" data-nr></label></div>
+      <div class="row"><button class="btn primary sm" data-act="sp_new" ${ids.length>=SHOP_MAX?raw('disabled'):''}>Make the shop</button></div></div>
+  </section>
+  <section class="panel"><div class="ph"><h2>Where the party has been</h2><span class="pill gm">GM only</span></div>
+    <p class="sub">An item can wait for a place: it only goes on sale once the party has reached it. You can also tick a place on its own page on the Map.</p>
+    ${reached.length?h`<div class="row spchips">${reached.map(f=>h`<button class="btn sm" data-act="sp_reach" data-id="${f.id}" aria-label="Remove ${f.name}">${f.name} ×</button>`)}</div>`:h`<p class="sub">No places marked yet.</p>`}
+    <div class="row"><label class="fld"><span class="fl">Mark a place as reached</span><select data-u="shop.rpick"><option value="">Choose a place</option>${shPlOpt().filter(([id])=>!rc[id]).map(([id,n])=>h`<option value="${id}" ${id===u.rpick?raw('selected'):''}>${n}</option>`)}</select></label>
+      <button class="btn sm" data-act="sp_reachadd" ${u.rpick?'':raw('disabled')}>Mark reached</button></div>
+  </section>
+  ${s?shEdit1(sid,s,P):''}`;
+}
+function shEdit1(sid,s,P){
+  const u=S.ui.shop,items=Array.isArray(s.items)?s.items:[];
+  return h`<section class="panel"><div class="ph"><h2>${s.name||'Shop'}</h2><span class="pill gm">GM only</span><span class="sub">${items.length} of ${SHOP_ITEMS_MAX} items</span></div>
+    <div class="fgrid">${fText('Shop name','sg','shops',P+'name',S.shopGm,{})}
+      ${fSel('Where it is','sg','shops',P+'place',S.shopGm,shPlOpt(),{blank:'Not on the map'})}
+      ${fText('A note players see (optional)','sg','shops',P+'note',S.shopGm,{ph:'e.g. Back in ten minutes'})}</div>
+    <div class="row">${fCheck('Open for business','sg','shops',P+'open',S.shopGm,false)}</div>
+    ${items.length?h`<div class="spedlist">${items.map((x,i)=>{
+      const p=P+'items.'+i+'.',stock=shStockOf(x),sold=shSold(sid,x.k),locked=x.unlock&&!shRc()[x.unlock];
+      return h`<div class="spedrow ${x.hide?'off':''}">
+        <div class="sped1">${fText('Item','sg','shops',p+'name',S.shopGm,{list:'dl-scat'})}${fNum('Price (P)','sg','shops',p+'price',S.shopGm,{min:0})}${fNum('Stock','sg','shops',p+'stock',S.shopGm,{min:0})}</div>
+        <div class="sped2">${fSel('Kind','sg','shops',p+'cat',S.shopGm,SHOP_CATS,{blank:'None'})}${fSel('On sale once the party reaches','sg','shops',p+'unlock',S.shopGm,shPlOpt(),{blank:'Always'})}
+          <div class="fld"><span class="fl">Status</span><div class="row">${fCheck('Hidden',  'sg','shops',p+'hide',S.shopGm,false)}</div></div></div>
+        ${fText('Description','sg','shops',p+'desc',S.shopGm,{})}
+        <div class="row sp"><span class="spnotes">${x.price==null||x.price===''?h`<span class="pill warn">Needs a price</span>`:''}${x.hide?h`<span class="pill">Hidden</span>`:''}${locked?h`<span class="pill">Locked until ${plName(x.unlock)}</span>`:''}
+          ${stock==null?h`<span class="pill">Unlimited</span>`:h`<span class="pill">${sold} sold · ${Math.max(0,stock-sold)} left</span>`}${stock!=null&&sold>stock?h`<span class="pill warn">Sold ${sold-stock} too many</span>`:''}</span>
+          ${rowBtns('sg','shops','shops.'+sid+'.items',i,items.length,false)}</div></div>`;})}</div>`:h`<p class="sub">Nothing on the shelves yet. Add items below.</p>`}
+    <div class="mgd"><b>Stock the shelves</b>
+      <p class="sub">Type an item from the handbook and its price and description fill in. Anything else you type becomes a custom item you price yourself.</p>
+      <div class="fgrid"><label class="fld"><span class="fl">Item</span><input type="text" list="dl-scat" data-u="shop.addq" value="${u.addq}" placeholder="e.g. Great Ball" data-nr></label>
+        <label class="fld"><span class="fl">Stock (blank = unlimited)</span><input type="number" inputmode="numeric" min="0" data-u="shop.dstock" value="${u.dstock}" data-nr></label></div>
+      <div class="row"><button class="btn sm" data-act="sp_additem" ${items.length>=SHOP_ITEMS_MAX?raw('disabled'):''}>Add the item</button></div>
+      <div class="fgrid"><label class="fld"><span class="fl">Or add a whole group</span><select data-u="shop.addcat"><option value="">Choose a kind</option>${SCAT_CATS.map(c=>h`<option value="${c}" ${c===u.addcat?raw('selected'):''}>${c} (${SCAT.filter(x=>SCAT_CATS[x[1]]===c&&x[2]!=null).length})</option>`)}</select></label></div>
+      <div class="row"><button class="btn sm" data-act="sp_addcat" ${u.addcat?'':raw('disabled')}>Add every priced item in that group</button></div></div>
+    <div class="mgd"><b>Delete this shop</b>
+      ${u.del===sid?h`<p class="sub">This removes the shop and its stock list. Purchases already made stay in the players' logs.</p><div class="row"><button class="btn sm danger" data-act="sp_delyes" data-id="${sid}">Yes, delete ${s.name||'this shop'}</button><button class="btn sm" data-act="sp_delno">Keep it</button></div>`
+        :h`<div class="row"><button class="btn sm danger" data-act="sp_del" data-id="${sid}">Delete the shop</button></div>`}</div>
+  </section>`;
+}
+
+/* ----- the GM's purchase log ----- */
+function shLogRows(){
+  const out=[];
+  Object.keys(S.trainers).forEach(uid=>{(Array.isArray(S.trainers[uid].shopLog)?S.trainers[uid].shopLog:[]).forEach(e=>{if(e&&typeof e==='object')out.push(Object.assign({u:uid},e));});});
+  return out.sort((a,b)=>num(b.t)-num(a.t));
+}
+function shLogView(){
+  const u=S.ui.shop,all=shLogRows();
+  const shops=[...new Map(all.map(e=>[e.sid,e.sn||'Shop'])).entries()];
+  let rows=all.filter(e=>(!u.lshop||e.sid===u.lshop)&&(!u.lwho||e.u===u.lwho));
+  const total=rows.reduce((a,e)=>a+num(e.c),0);
+  const over=[];
+  const g=shG();
+  Object.keys(g).forEach(id=>{(g[id].items||[]).forEach(x=>{const st=shStockOf(x);if(st!=null){const so=shSold(id,x.k);if(so>st)over.push({shop:g[id].name||'Shop',item:x.name,n:so-st});}});});
+  const shown=rows.slice(0,u.ln);
+  const when=t=>{const d=new Date(num(t));return d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});};
+  return h`<section class="panel"><div class="ph"><h2>Purchase log</h2><span class="pill gm">GM only</span><span class="sub">${rows.length} purchases · ${fmtP(total)}</span></div>
+    ${over.length?h`<div class="banner">Sold more than the stock: ${over.map(o=>o.item+' at '+o.shop+' (by '+o.n+')').join('; ')}. Two players bought the last one at the same moment. Fix it on the players' sheets or raise the stock.</div>`:''}
+    <div class="fgrid"><label class="fld"><span class="fl">Shop</span><select data-u="shop.lshop"><option value="">All shops</option>${shops.map(([id,n])=>h`<option value="${id}" ${id===u.lshop?raw('selected'):''}>${n}</option>`)}</select></label>
+      <label class="fld"><span class="fl">Trainer</span><select data-u="shop.lwho"><option value="">Everyone</option>${tids().map(id=>h`<option value="${id}" ${id===u.lwho?raw('selected'):''}>${tName(S.trainers[id])}</option>`)}</select></label></div>
+    ${shown.length?h`<div class="splog">${shown.map(e=>h`<div class="splrow"><span class="when">${when(e.t)}</span><span><b>${tName(S.trainers[e.u])}</b> bought ${e.q} × ${e.n}${num(e.q)>1?h` <span class="sub">at ${fmtP(e.p)} each</span>`:''}<span class="sub"> · ${e.sn||'Shop'}${e.by&&e.by!==e.u?' · sold by the GM':''}</span></span><span class="mono">${fmtP(e.c)}</span></div>`)}</div>
+      ${rows.length>shown.length?h`<div class="row"><button class="btn sm" data-act="sp_logmore">Show more (${rows.length-shown.length} older)</button></div>`:''}`
+      :h`<p class="sub">No purchases yet.</p>`}
+    <p class="sub">Each trainer's sheet keeps its last ${SHOP_LOG_MAX} purchases. The log is built from those sheets.</p>
+  </section>`;
+}
+
+/* ----- the Shop page ----- */
+function shopTab(){
+  const u=S.ui.shop;
+  if(!S.me.admin)u.view='floor';
+  const views=[['floor','Shop floor'],['edit','Edit shops'],['log','Purchase log']];
+  return h`${S.me.admin?h`<div class="seg" role="group" aria-label="Shop pages">${views.map(([k,l])=>h`<button data-act="sp_view" data-v="${k}" aria-pressed="${String(u.view===k)}">${l}</button>`)}</div>`:''}
+    ${u.view==='edit'&&S.me.admin?shEditor():u.view==='log'&&S.me.admin?shLogView():shFloor()}`;
+}
+
+/* ----- on a place's page ----- */
+function shPlacePanel(f){
+  const admin=!!S.me.admin,rc=shRc();
+  if(admin){
+    const g=shG(),here=shOrder(g).filter(id=>g[id].place===f.id);
+    return h`<section class="panel"><div class="ph"><h2>Shops and the party</h2><span class="pill gm">GM only</span></div>
+      <div class="row"><button class="btn sm sppick1" data-act="sp_reach" data-id="${f.id}" aria-pressed="${String(!!rc[f.id])}">${rc[f.id]?'✓ The party has reached '+f.name:'The party has reached '+f.name}</button></div>
+      <p class="sub">Items that wait for ${f.name} go on sale once this is ticked.</p>
+      ${here.length?h`<div class="splist">${here.map(id=>h`<div class="spitem"><div class="spmain"><div><b>${g[id].name||'Shop'}</b> <span class="pill ${g[id].open?'open':''}">${g[id].open?'Open':'Closed'}</span><p class="sub">${(g[id].items||[]).length} items</p></div></div>
+        <div class="spbuy"><button class="btn sm" data-act="sp_toggle" data-id="${id}">${g[id].open?'Close shop':'Open shop'}</button><button class="btn sm" data-act="sp_edit" data-id="${id}">Edit</button></div></div>`)}</div>`
+        :h`<p class="sub">No shop is on this place. Make one on the Shop page and choose this place for it.</p>`}
+    </section>`;
+  }
+  const pub=shP(),here=shOrder(pub).filter(id=>pub[id].pl===f.id);
+  if(!here.length)return '';
+  return h`<section class="panel"><div class="ph"><h2>Shops here</h2></div>
+    <div class="splist">${here.map(id=>h`<div class="spitem"><div class="spmain"><div><b>${pub[id].n}</b> <span class="pill ${pub[id].o?'open':''}">${pub[id].o?'Open':'Closed'}</span></div></div>
+      <div class="spbuy">${pub[id].o?h`<button class="btn primary sm" data-act="sp_visit" data-id="${id}">Go shopping</button>`:''}</div></div>`)}</div></section>`;
+}
+
+/* ----- clicks ----- */
+function shAct(b){
+  const d=b.dataset,u=S.ui.shop;
+  switch(d.act){
+    case 'sp_view':u.view=d.v;render();break;
+    case 'sp_pick':u.sel=d.id;u.q='';u.cat='';render();break;
+    case 'sp_visit':u.sel=d.id;u.view='floor';u.q='';u.cat='';setTab('shop');break;
+    case 'sp_buy':{
+      const inp=b.parentNode.querySelector('input[data-sq]');
+      shBuy(d.sid,d.k,inp?inp.value:1);
+      break;}
+    default:break;
+  }
+  if(!S.me.admin)return;
+  const g=shG();
+  switch(d.act){
+    case 'sp_toggle':{
+      if(!g[d.id])break;
+      edit('sg','shops','shops.'+d.id+'.open',!g[d.id].open);
+      render();break;}
+    case 'sp_edit':u.edit=d.id;u.view='edit';u.del='';render();break;
+    case 'sp_new':{
+      if(Object.keys(g).length>=SHOP_MAX||!shRoom())break;
+      const id=shKey(),name=String(u.newname||'').trim()||'New shop';
+      const st=shDefStock();
+      const rows=shTplRows(u.tpl).filter(x=>x[2]!=null).map(x=>shMkItem(x,st));
+      const all=Object.assign({},g);
+      all[id]={name,place:'',open:false,note:'',at:Date.now(),items:rows};
+      edit('sg','shops','shops',all);
+      u.edit=id;u.newname='';u.tpl='';u.view='edit';
+      toast('“'+name+'” is made. It is closed until you open it.',true);
+      render();break;}
+    case 'sp_del':u.del=d.id;render();break;
+    case 'sp_delno':u.del='';render();break;
+    case 'sp_delyes':{
+      const all=Object.assign({},g);
+      delete all[d.id];
+      edit('sg','shops','shops',all);
+      u.del='';if(u.edit===d.id)u.edit='';
+      render();break;}
+    case 'sp_additem':{
+      const s=g[u.edit];
+      if(!s||!shRoom())break;
+      const name=String(u.addq||'').trim();
+      if(!name){toast('Type the item to add first.');break;}
+      const items=(Array.isArray(s.items)?s.items:[]).slice();
+      if(items.length>=SHOP_ITEMS_MAX)break;
+      const hit=SCAT_BY.get(dexKey(name));
+      items.push(hit?shMkItem(hit,shDefStock()):{k:shKey(),name,cat:'',price:null,stock:shDefStock(),desc:'',unlock:'',hide:false});
+      edit('sg','shops','shops.'+u.edit+'.items',items);
+      u.addq='';
+      toast(hit?'Added '+hit[0]+'.':'Added “'+name+'”. Give it a price so players can buy it.',true);
+      render();break;}
+    case 'sp_addcat':{
+      const s=g[u.edit];
+      if(!s||!u.addcat||!shRoom())break;
+      const items=(Array.isArray(s.items)?s.items:[]).slice();
+      const have=new Set(items.map(x=>dexKey(x.name)));
+      const st=shDefStock();
+      let n=0;
+      SCAT.forEach(x=>{
+        if(SCAT_CATS[x[1]]!==u.addcat||x[2]==null||have.has(dexKey(x[0]))||items.length>=SHOP_ITEMS_MAX)return;
+        items.push(shMkItem(x,st));n++;
+      });
+      edit('sg','shops','shops.'+u.edit+'.items',items);
+      toast(n?'Added '+n+' items.':'Everything in that group is already here.',true);
+      render();break;}
+    case 'sp_reach':shSetReached(d.id,!shRc()[d.id]);render();break;
+    case 'sp_reachadd':if(u.rpick){shSetReached(u.rpick,true);u.rpick='';}render();break;
+    case 'sp_logmore':u.ln+=60;render();break;
     default:break;
   }
 }
@@ -6883,7 +7388,9 @@ function placeTab(){
       :h`<p class="sub">Nothing yet. Fill in the Place field on a person, journal entry, lead or timeline event with “${f.name}” and it will show up here.</p>`}
     </section>
     ${admin?h`<section class="panel"><div class="ph"><h2>GM notes</h2><span class="pill gm">GM only</span></div>
-      ${fArea('','gp',f.id,'notes',gp,{rows:5,ph:'Secrets, hooks and what is really here. Players never receive this.'})}</section>`:''}`;
+      ${fArea('','gp',f.id,'notes',gp,{rows:5,ph:'Secrets, hooks and what is really here. Players never receive this.'})}</section>`:''}
+    ${shPlacePanel(f)}
+    ${admin?encPanel(f):''}`;
 }
 
 /* ---------- standalone build only: account page and table access (GM) ---------- */
@@ -6959,7 +7466,7 @@ function footer(){
 function mainHtml(){
   if(S.noDb)return emptyState('This tracker needs a signed-in view','Open it from your claude.ai link while signed in. The shared table is stored with the page, so it cannot load anywhere else.');
   if(!S.ready)return h`<p class="loading">OPENING THE TABLE…</p>`;
-  const views={overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,dex:dexTab,battle:battleTab,contest:ctTab,gm:gmTab,npc:npcTab,account:accountTab};
+  const views={overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,dex:dexTab,battle:battleTab,contest:ctTab,shop:shopTab,gm:gmTab,npc:npcTab,account:accountTab};
   let tab=S.tab;
   if((tab==='gm'||tab==='npc')&&!S.me.admin)tab='overview';
   if(tab==='account'&&!CFG)tab='overview';
@@ -7171,6 +7678,8 @@ function act(b,e){
   if(d.act&&d.act.indexOf('b_')===0){batAct(b,e);return;}
   if(d.act&&d.act.indexOf('dx_')===0){dxAct(b,e);return;}
   if(d.act&&d.act.indexOf('ct_')===0){ctAct(b,e);return;}
+  if(d.act&&d.act.indexOf('en_')===0){encAct(b);return;}
+  if(d.act&&d.act.indexOf('sp_')===0){shAct(b);return;}
   if(d.act&&d.act.indexOf('nt_')===0){ntAct(b,e);return;}
   if(d.act&&d.act.indexOf('bm_')===0){bmAct(b,e);return;}
   switch(d.act){
@@ -7469,12 +7978,14 @@ document.addEventListener('input',e=>{
   if(!t||!t.dataset)return;
   if(t.classList&&t.classList.contains('ptz')){ntFrameZoom(t,false);return;}
   if(t.dataset.pq!=null){S.ui.q.places=t.value;refreshPlaceList();return;}
+  if(t.dataset.sq!=null){shQty(t);return;}
   if(t.dataset.b!=null){onBound(t);if(e.inputType==='insertReplacementText')onSpeciesChange(t);return;}
   if(t.dataset.u!=null){
     const k=t.dataset.u.split('.');
     S.ui[k[0]][k[1]]=t.type==='checkbox'?t.checked:t.value;
     if(k[0]==='dx'){S.ui.dx.page=1;if(k[1]==='q'){dxRefresh();return;}}
     if(k[0]==='ct'&&ctInput(k[1],t))return;
+    if(k[0]==='shop'&&k[1]==='q'){shRefresh();return;}
     if(!('nr' in t.dataset))render();
   }
 });
@@ -7557,6 +8068,8 @@ async function boot(){
   applyTheme(themePref());
   const di=$('#dl-items');
   if(di)di.innerHTML=ITEMSL.split('|').map(s=>'<option value="'+esc(itemLabel(s))+'">').join('');
+  const dsc=$('#dl-scat');
+  if(dsc)dsc.innerHTML=SCAT.map(x=>'<option value="'+esc(x[0])+'">').join('');
   const dbl=$('#dl-balls');
   if(dbl)dbl.innerHTML=BALLS.map(s=>'<option value="'+esc(itemLabel(s))+'">').join('');
   const ds=$('#dl-species');
