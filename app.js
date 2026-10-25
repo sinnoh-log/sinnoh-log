@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-24 · Ribbons';
+const BUILD='2026-10-25 · Double HP and the Option B contest';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -37,7 +37,7 @@ const HONOR_TYPES=['Trial Medal','Frontier Symbol','Contest Ribbon','Certificate
 const ATTITUDES=[['unknown','Unknown'],['friendly','Friendly'],['neutral','Neutral'],['wary','Wary'],['hostile','Hostile']];
 const LEAD_STATES=[['open','Open'],['chasing','Chasing'],['resolved','Resolved'],['dead','Dead end']];
 const LOY_WORDS=['Defiant','Distrustful','Obedient','Trusting','Devoted','Bonded'];
-const DEF_META={campaign:'Sinnoh Trainer Log',subtitle:'Post-game Sinnoh · ten years after Team Galactic',gm:'',session:1,pinned:'',ribbonNeed:5};
+const DEF_META={campaign:'Sinnoh Trainer Log',subtitle:'Post-game Sinnoh · ten years after Team Galactic',gm:'',session:1,pinned:'',ribbonNeed:5,hpx:2};
 const NAV=[
   ['Narrative',[['overview','Overview'],['journal','Journal'],['timeline','Timeline']]],
   ['World',[['people','People'],['leads','Leads'],['map','Map']]],
@@ -91,7 +91,7 @@ const S={
   me:{id:null,admin:false,canWrite:true},
   tab:'overview',viewUid:null,
   megaOk:{},battle:{},battleGm:{},trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},gmNt:{},npcPub:{},shopPub:{},shopGm:{},
-  awards:{},timeline:{},pins:{},banner:{},places:{},gmPl:{},placeId:null,members:{},invite:null,mapChunks:{},mapSrc:'',room:null,peers:[],avatars:{},
+  awards:{},timeline:{},pins:{},banner:{},cond:{},places:{},gmPl:{},placeId:null,members:{},invite:null,mapChunks:{},mapSrc:'',room:null,peers:[],avatars:{},
   pick:null,names:{},save:{cls:'',text:'Saved'},rolls:[],_tsig:'',
   ui:{open:{},lbx:null,adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},pop:null,megaPop:null,
     award:{uids:{},type:'Gym Badge',badge:'coal',ribbon:null,title:'',note:'',levelUp:true}}
@@ -157,7 +157,7 @@ const PD_BY={};PD.forEach(f=>{PD_BY[f.id]=f;});
 const PLACES=PD.map(f=>f.name).sort();
 
 /* ---------- store: refs, local copies, write queue ---------- */
-const SET_ALWAYS=new Set(['meta','gl','gn','bn','pl','gp','mg','bt','gb','gt','np','bm','bg','sh','sg']);
+const SET_ALWAYS=new Set(['meta','gl','gn','bn','pl','gp','mg','bt','gb','gt','np','bm','bg','sh','sg','cd']);
 function refFor(sc,id){
   const db=S.db;
   switch(sc){
@@ -185,6 +185,7 @@ function refFor(sc,id){
     case 'bg':return db.collection('gm').doc('bmap');
     case 'sh':return db.collection('meta').doc('shops');
     case 'sg':return db.collection('gm').doc('shops');
+    case 'cd':return db.collection('meta').doc('conditions');
   }
 }
 function getLocal(sc,id){
@@ -213,6 +214,7 @@ function getLocal(sc,id){
     case 'bg':return S.bmGm;
     case 'sh':return S.shopPub;
     case 'sg':return S.shopGm;
+    case 'cd':return S.cond;
   }
 }
 function putLocal(sc,id,d){
@@ -241,6 +243,7 @@ function putLocal(sc,id,d){
     case 'bg':S.bmGm=d;break;
     case 'sh':S.shopPub=d;break;
     case 'sg':S.shopGm=d;break;
+    case 'cd':S.cond=d;break;
   }
 }
 function dropLocal(sc,id){
@@ -320,7 +323,7 @@ function withPending(sc,id,d){
 function edit(sc,id,path,v){
   let doc=getLocal(sc,id);
   if(!doc){
-    if(sc==='gl'||sc==='gn'||sc==='pl'||sc==='gp'||sc==='mg'||sc==='bt'||sc==='gb'||sc==='np'||sc==='bm'||sc==='sh'||sc==='sg'){doc={};putLocal(sc,id,doc);}
+    if(sc==='gl'||sc==='gn'||sc==='pl'||sc==='gp'||sc==='mg'||sc==='bt'||sc==='gb'||sc==='np'||sc==='bm'||sc==='sh'||sc==='sg'||sc==='cd'){doc={};putLocal(sc,id,doc);}
     else return;
   }
   const parts=path.split('.');
@@ -389,6 +392,10 @@ function startWatches(){
     if(s.exists)S.banner=withPending('bn','banner',s.data());
     else if(!Q.has('bn|banner'))S.banner={};
   },'banner');
+  watch(db.collection('meta').doc('conditions'),s=>{
+    if(s.exists)S.cond=withPending('cd','conditions',s.data());
+    else if(!Q.has('cd|conditions'))S.cond={};
+  },'conditions');
   watch(db.collection('meta').doc('mega'),s=>{
     if(s.exists)S.megaOk=withPending('mg','mega',s.data());
     else if(!Q.has('mg|mega'))S.megaOk={};
@@ -1388,7 +1395,7 @@ function ptaFields(r){
   return {
     types:[t[0]||'',t[1]||''],
     base:{atk:num(r.at),def:num(r.df),spa:num(r.sa),spd:num(r.sd),spe:num(r.sp)},
-    hp:num(r.hp),
+    hp:Math.round(num(r.hp)*hpx()),
     size:SIZES.indexOf(r.sz)>=0?r.sz:'Medium',
     weight:WEIGHTS.indexOf(r.wt)>=0?r.wt:'Medium',
     skills:(r.sk||[]).map(gloss).join(', '),
@@ -1443,6 +1450,7 @@ function ptaApply(uid,pid,rec,force){
   if(ok.hp){
     const cur=num(hp.cur)>=num(hp.max)?F.hp:Math.min(num(hp.cur),F.hp);
     edit('p',id,'hp',Object.assign({},hp,{cur,max:F.hp}));sig.hp=hsh(String(F.hp));
+    edit('p',id,'hpx',hpx());
   }else kept.push('HP');
   if(ok.sz){edit('p',id,'size',F.size);sig.sz=hsh(F.size);}else kept.push('size');
   if(ok.wt){edit('p',id,'weight',F.weight);sig.wt=hsh(F.weight);}else kept.push('weight');
@@ -1494,12 +1502,81 @@ function ptaRowFill(t){
 }
 
 /* ---------- GM Desk: import ---------- */
+/* ---------- House rule: every Pokémon's HP is the handbook number times a multiplier (the GM sets it; the default is double) ---------- */
+function hpx(){
+  const v=Math.round(Number(S.meta&&S.meta.hpx));
+  return v>=1&&v<=5?v:1;
+}
+/* the multiplier a Pokémon's current HP was set up at. Sheets from before the rule have no mark, which means ×1. */
+function hpxOf(m){
+  const v=Math.round(num(m&&m.hpx));
+  return v>=1?v:1;
+}
+/* every Pokémon whose HP is at a different multiplier from the table's: players' Pokémon, NPC teams and foes in the battle */
+function hpxList(){
+  const want=hpx(),out=[];
+  const add=(sc,id,path,m,who,cid)=>{
+    const hp=m&&m.hp;
+    if(!hp||num(hp.max)<=0||hpxOf(m)===want)return;
+    /* a blank sheet (20 / 20 and never filled in) has no real HP to scale; filling it in from the handbook already uses the new number */
+    if(sc==='p'&&num(hp.max)===20&&num(hp.cur)===20&&!(m.autoSig&&m.autoSig.hp))return;
+    out.push({sc,id,path,m,hp,from:hpxOf(m),cid:cid||'',who});
+  };
+  Object.keys(S.pokemon||{}).forEach(uid=>{
+    const box=S.pokemon[uid]||{};
+    Object.keys(box).forEach(pid=>add('p',uid+'/'+pid,'',box[pid],(box[pid].nick||box[pid].species||'Pokémon')+' ('+tName(S.trainers[uid])+')'));
+  });
+  Object.keys(S.gmNt||{}).forEach(nid=>{
+    const nt=S.gmNt[nid];
+    (Array.isArray(nt&&nt.team)?nt.team:[]).forEach((m,i)=>add('gt',nid,'team.'+i+'.',m,(m.nick||m.sp||'Pokémon')+' ('+ntName(nt)+')'));
+  });
+  const fo=(S.battleGm&&S.battleGm.foes)||{};
+  Object.keys(fo).forEach(cid=>add('gb','battle','foes.'+cid+'.',fo[cid],(fo[cid].nick||fo[cid].sp||'Foe')+' (in the battle)',cid));
+  return out;
+}
+/* current and maximum HP both change by the same factor, so damage already taken stays in proportion */
+function hpxApply(){
+  if(!S.me.admin)return;
+  const want=hpx(),list=hpxList();
+  if(!list.length){toast('Every Pokémon is already at ×'+want+'.');return;}
+  list.forEach(x=>{
+    const k=want/x.from;
+    const oldMax=num(x.hp.max),oldCur=num(x.hp.cur);
+    const max=Math.max(1,Math.round(oldMax*k));
+    const cur=oldCur<=0?0:clamp(Math.round(oldCur*k),1,max);
+    edit(x.sc,x.id,x.path+'hp',Object.assign({},x.hp,{cur,max}));
+    edit(x.sc,x.id,x.path+'hpx',want);
+    if(x.sc==='p'&&x.m.autoSig&&x.m.autoSig.hp===hsh(String(oldMax)))edit('p',x.id,'autoSig.hp',hsh(String(max)));
+    if(x.sc==='gb'){
+      if(num(x.m.alMax)>0)edit('gb','battle',x.path+'alMax',Math.max(1,Math.round(num(x.m.alMax)*k)));
+      foePublish(x.cid);
+    }
+  });
+  toast('Set '+list.length+' Pokémon to ×'+want+' HP.',true);
+  render();
+}
+function hpxAct(b){
+  if(b.dataset.act==='hpx_apply')hpxApply();
+}
+function hpxDesk(){
+  const want=hpx(),list=hpxList();
+  return h`<section class="panel"><div class="ph"><h2>Pokémon HP</h2><span class="pill gm">GM only</span></div>
+    <div class="fgrid">${fNum('HP multiplier for every Pokémon','meta','table','hpx',S.meta,{min:1,max:5})}</div>
+    <p class="sub">The handbook’s HP is multiplied by this number: 1 is the book, 2 is double. It is used when a Pokémon is filled in from the handbook, when it evolves, for wild foes and for NPC teams. The Pokédex shows the multiplied number.</p>
+    ${list.length?h`<div class="hpxgo" role="status"><p><b>${list.length}</b> Pokémon on the site were set up at a different multiplier.</p>
+      <p class="sub">${list.slice(0,8).map(x=>x.who).join(', ')}${list.length>8?' and '+(list.length-8)+' more':''}.</p>
+      <p class="sub">Their current and maximum HP both change to match ×${want}, so damage already taken stays in proportion. Do this once, right after you change the number.</p>
+      <button class="btn primary" data-act="hpx_apply">Set all ${list.length} to ×${want} HP</button></div>`
+      :h`<p class="sub"><b>Every Pokémon on the site is at ×${want} HP.</b> New ones filled in from the handbook use it automatically.</p>`}
+  </section>`;
+}
+
 function ptaDesk(){
   const I=PTA.idx,im=S.ui.pta||{};
   const when=I&&I.t?new Date(I.t).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}):'';
   return h`<section class="panel"><div class="ph"><h2>Handbook data</h2><span class="pill gm">GM only</span>
       <div class="acts"><button class="btn sm" data-act="ptaPick" ${im.busy?raw('disabled'):''}>${I?'Import again':'Import handbook data'}</button></div></div>
-    ${I?h`<p class="sub">${I.names.length} Pokémon from the PTA 3 Pokédex are in your database${when?', imported '+when:''}. Type a species and its stats, passives and moves fill in. Type a move or passive name and its details fill in.${I.ver>=2?' Evolution lines are included.':' This copy has no evolution lines. Import again with the newest file to turn evolution on.'}${I.ver>=3?' Contest moves are included.':' This copy has no contest moves. Import again with the newest file to add them.'}</p>`
+    ${I?h`<p class="sub">${I.names.length} Pokémon from the PTA 3 books are in your database${when?', imported '+when:''}. Type a species and its stats, passives and moves fill in. Type a move or passive name and its details fill in.${I.ver>=2?' Evolution lines are included.':' This copy has no evolution lines. Import again with the newest file to turn evolution on.'}${I.ver>=3?' Contest moves are included.':' This copy has no contest moves. Import again with the newest file to add them.'}${I.ver>=4?' The legendary Pokémon from the Game Master’s Guide are included.':' This copy has no legendary Pokémon. Import again with the newest file to add them.'}</p>`
       :h`<p class="sub">Not imported yet. Choose <b>pta-handbook-data.json</b> from the update download. This fills in stats, passives and moves when someone types a species. The handbook text goes into your database, not into the public site.</p>`}
     ${im.busy?h`<progress class="ptaprog" max="${num(im.total)}" value="${num(im.done)}" aria-label="Import progress"></progress>`:''}
     ${im.msg?h`<p class="sub ${im.bad?'bad':''}" role="status">${im.msg}</p>`:''}
@@ -1703,7 +1780,7 @@ function evoPlan(uid,pid,m,toRec,cond){
   const stone=st?{name:st,i:bagStone(uid,st)}:null;
   const oldB=baseList(m.base);
   const hp=m.hp||{};
-  const rows=[{ab:'HP',o:num(hp.max),n:F.hp}].concat(STATS.map((s,i)=>({ab:s[2],o:oldB[i],n:num(F.base[s[0]])})));
+  const rows=[{ab:'HP',o:Math.round(num(hp.max)*hpx()/hpxOf(m)),n:F.hp}].concat(STATS.map((s,i)=>({ab:s[2],o:oldB[i],n:num(F.base[s[0]])})));
   return {uid,pid,from:m.species,to:toRec.n,F,cands,passives,gained,dropped,own:own.map(x=>x.name),skills,stone,rows,cond:cond||''};
 }
 const evoMoveCount=p=>p.cands.filter(c=>c.sel).length;
@@ -1740,7 +1817,7 @@ function evoMvBook(){
 }
 function evoCancel(){S.ui.evo=null;render();}
 
-const EVO_KEEP=['species','types','base','hp','size','weight','skills','passives','moves','autoSig','autoPta','autoSid','psRef','mega','megaOn'];
+const EVO_KEEP=['species','types','base','hp','hpx','size','weight','skills','passives','moves','autoSig','autoPta','autoSid','psRef','mega','megaOn'];
 async function evoGo(uid,pid){
   const p=S.ui.evo;
   const id=uid+'/'+pid;
@@ -1773,9 +1850,12 @@ async function evoGo(uid,pid){
   edit('p',id,'types',F.types.slice());
   edit('p',id,'base',Object.assign({},m.base||{},F.base));
   const hp=m.hp||{};
-  const oldMax=num(hp.max),oldCur=num(hp.cur);
-  const cur=!oldMax?F.hp:(oldCur<=0?0:clamp(F.hp-(oldMax-oldCur),1,F.hp));
+  /* an older sheet is brought to the table's multiplier first, so the damage it has taken stays in proportion */
+  const hk=hpx()/hpxOf(m);
+  const oldMax=num(hp.max)*hk,oldCur=num(hp.cur)*hk;
+  const cur=!oldMax?F.hp:(oldCur<=0?0:clamp(F.hp-Math.round(oldMax-oldCur),1,F.hp));
   edit('p',id,'hp',Object.assign({},hp,{cur,max:F.hp}));
+  edit('p',id,'hpx',hpx());
   edit('p',id,'size',F.size);
   edit('p',id,'weight',F.weight);
   edit('p',id,'skills',p.skills);
@@ -2601,7 +2681,7 @@ function btAddParty(uid){
 function foeFromRec(rec,si,sp){
   if(rec){
     const F=ptaFields(rec);
-    return {sp:rec.n,ty:F.types,sz:F.size,wt:F.weight,hp:{cur:F.hp,max:F.hp},base:F.base,sk:F.skills,ps:F.passives,mv:F.moves};
+    return {sp:rec.n,ty:F.types,sz:F.size,wt:F.weight,hp:{cur:F.hp,max:F.hp},hpx:hpx(),base:F.base,sk:F.skills,ps:F.passives,mv:F.moves};
   }
   if(si)return {sp:si.name,ty:si.types.slice(),sz:'Medium',wt:'Medium',hp:{cur:20,max:20},base:Object.assign({},si.base),sk:'',ps:[],mv:[]};
   return {sp,ty:['',''],sz:'Medium',wt:'Medium',hp:{cur:20,max:20},base:{atk:3,def:3,spa:3,spd:3,spe:3},sk:'',ps:[],mv:[]};
@@ -2621,8 +2701,41 @@ async function btAddFoe(){
   u.foeSp='';u.foeNick='';u.foeN=1;
   render();
 }
+/* ----- alpha Pokémon (PTA GM Guide): the wild aura, doubled HP and stronger stats while wild ----- */
+const ALPHA_PS=[
+  {name:'Wild Alpha Aura',text:'While wild, this Pokémon has Alpha Beam, Alpha Impact and Alpha Restoration, the passive Alpha Tenacity and the stat passive Wild Might. It loses the aura if it is captured.'},
+  {name:'Alpha Tenacity',text:'Cannot be captured by non-Master Poké Balls unless it is at half of its max HP or lower. It is always treated as at full HP when working out the capture rate.'},
+  {name:'Wild Might',text:'HP doubled, +5 Attack, +5 Special Attack, and Defense or Special Defense raised to 15.'}
+];
+const ALPHA_MV=[
+  {name:'Alpha Beam',freq:'1/day',kind:'Special',range:'Ranged (25ft beam)',type:'Normal',dice:'5d20',text:'Needs a recharge turn afterwards. −2 on the Accuracy Check.',used:0},
+  {name:'Alpha Impact',freq:'1/day',kind:'Physical',range:'Melee (10ft burst)',type:'Normal',dice:'5d20',text:'Needs a recharge turn afterwards. −2 on the Accuracy Check.',used:0},
+  {name:'Alpha Restoration',freq:'3/day',kind:'Effect',range:'Self',type:'Normal',dice:'',text:'You are healed 1d12 HP. Your uses of Alpha Beam and Alpha Impact are restored as if you had rested.',used:0}
+];
+const ALPHA_NAMES=new Set(['Wild Alpha Aura','Alpha Tenacity','Wild Might','Alpha Beam','Alpha Impact','Alpha Restoration']);
+function foeMakeAlpha(f){
+  if(!f||f.alpha)return f;
+  const bs=f.base||{};
+  const bn=Object.assign(zeroStats(),f.bonus||{});
+  const hp=f.hp||{cur:20,max:20};
+  const mx=Math.max(1,num(hp.max));
+  f.alMax=mx;
+  f.hp={cur:mx*2,max:mx*2};
+  bn.atk=num(bn.atk)+5;bn.spa=num(bn.spa)+5;
+  /* Wild Might raises Defense or Special Defense to 15. The better one is raised, and the GM can change the Adj boxes. */
+  const dk=num(bs.def)+num(bn.def)>=num(bs.spd)+num(bn.spd)?'def':'spd';
+  const cur=num(bs[dk])+num(bn[dk]);
+  if(cur<15)bn[dk]=num(bn[dk])+15-cur;
+  f.bonus=bn;
+  f.ps=(f.ps||[]).concat(ALPHA_PS.map(x=>Object.assign({},x)));
+  f.mv=(f.mv||[]).concat(ALPHA_MV.map(x=>Object.assign({},x)));
+  f.alpha=1;
+  if(!String(f.nick||'').trim())f.nick='Alpha '+(f.sp||'');
+  f.notes=(f.notes?f.notes+'\n':'')+'ALPHA. Wild Might: HP doubled, +5 Attack and Special Attack, '+(dk==='def'?'Defense':'Special Defense')+' raised to 15 (change the Adj boxes if you want the other one).';
+  return f;
+}
 /* n hidden foes of one species, from the handbook data when it has the species. note goes on each foe's secret sheet. */
-async function btAddFoeSp(sp,n,nick,note){
+async function btAddFoeSp(sp,n,nick,note,opts){
   const pr=ptaResolve(sp);
   let rec=null;
   if(pr)rec=ptaRec(pr)||await ptaChunk(ptaLetter(ptaKey(pr))).then(()=>ptaRec(pr));
@@ -2632,10 +2745,11 @@ async function btAddFoeSp(sp,n,nick,note){
     const cid=newCid();
     const base=foeFromRec(rec,si,sp);
     const f=Object.assign({nick:nick||'',bonus:zeroStats(),stages:zeroStats(),st:'',notes:note||'',sh:Object.assign({},SHOW_NONE),pn:foeLetter()},base);
+    if(opts&&opts.alpha)foeMakeAlpha(f);
     edit('gb','battle','foes.'+cid,f);
     btInsert(cid,{s:'f',pub:foePub(f)},fSpd(f)+(b.mode==='d20'?rnd(20):0),rnd(20));
   }
-  toast(n+(n===1?' foe':' foes')+' added'+(note?' ('+sp+')':'')+(rec||si?'':'. That species is not in the data, so fill in its numbers by hand')+'.',true);
+  toast(n+(n===1?' foe':' foes')+' added'+(note?' ('+((opts&&opts.alpha)?'alpha ':'')+sp+')':'')+(rec||si?'':'. That species is not in the data, so fill in its numbers by hand')+'.',true);
 }
 function btRemove(cid){
   if(!S.me.admin)return;
@@ -2800,15 +2914,26 @@ function foeGive(cid){
   const uid=S.ui.bt.giveTo&&S.trainers[S.ui.bt.giveTo]?S.ui.bt.giveTo:tids()[0];
   if(!f||!uid)return;
   const id=S.db.collection('trainers').doc(uid).collection('pokemon').doc().id;
-  const hp=f.hp||{cur:20,max:20};
-  newDoc('p',uid+'/'+id,blankMon(uid,{
-    nick:f.nick||'',species:f.sp||'',types:[(f.ty||[])[0]||'',(f.ty||[])[1]||''],size:f.sz||'Medium',weight:f.wt||'Medium',
+  let hp=f.hp||{cur:20,max:20};
+  let nick=f.nick||'',ps=(f.ps||[]).map(x=>Object.assign({},x)),mv=(f.mv||[]).map(x=>Object.assign({},x,{used:0}));
+  const wasAlpha=!!f.alpha;
+  if(wasAlpha){
+    /* a captured alpha loses its aura and its doubled HP, and gains the stat passive Alpha */
+    const mx=Math.max(1,num(f.alMax)||Math.round(num(hp.max)/2));
+    hp={cur:Math.min(num(hp.cur),mx),max:mx};
+    ps=ps.filter(x=>!ALPHA_NAMES.has(x.name));
+    mv=mv.filter(x=>!ALPHA_NAMES.has(x.name));
+    ps.push({name:'Alpha',text:'+1 Attack or +1 Special Attack, and +1 Defense or +1 Special Defense. Once chosen, the bonuses cannot be changed.'});
+    if(nick==='Alpha '+(f.sp||''))nick='';
+  }
+  newDoc('p',uid+'/'+id,blankMon(uid,Object.assign({
+    nick,species:f.sp||'',types:[(f.ty||[])[0]||'',(f.ty||[])[1]||''],size:f.sz||'Medium',weight:f.wt||'Medium',
     hp:{cur:Math.max(1,num(hp.cur)),max:Math.max(1,num(hp.max))},base:Object.assign({atk:3,def:3,spa:3,spd:3,spe:3},f.base),
-    skills:f.sk||'',passives:(f.ps||[]).map(x=>Object.assign({},x)),moves:(f.mv||[]).map(x=>Object.assign({},x,{used:0})),
+    skills:f.sk||'',passives:ps,moves:mv,
     item:f.item||'',up:f.up||'',down:f.down||'',natureName:f.natureName||'',gender:f.gender||'',shiny:f.shiny===true,mega:f.mega?JSON.parse(JSON.stringify(f.mega)):null,
     caught:'Caught in the wild, session '+(num(S.meta.session)||1)
-  }));
-  toast((f.sp||'The foe')+' now belongs to '+tName(S.trainers[uid])+'.',true);
+  },f.hpx?{hpx:num(f.hpx)}:{})));
+  toast((f.sp||'The foe')+' now belongs to '+tName(S.trainers[uid])+'.'+(wasAlpha?' It lost the alpha aura and has the passive Alpha: choose its +1 bonuses on its sheet. If it now has four stat passives, one must go.':''),true);
   btRemove(cid);
 }
 
@@ -2840,7 +2965,7 @@ function btRow(cid,idx,gm,turn){
     <div class="bmain">
       <span class="bn" aria-label="Position ${idx+1}">${idx+1}</span>
       <span class="bpic"><span class="spr bs ${v.side==='f'&&!v.pic?'unk':''}" ${v.side==='a'?typeVars(v.m):typeVars({types:v.types||[]})}>${v.side==='a'?monPic(v.m):foePic(v)}</span></span>
-      <div class="btx"><b class="bnm">${v.name}</b>${turn?h` <span class="pill good">Acting</span>`:''}${v.down?h` <span class="pill">Down</span>`:''}
+      <div class="btx"><b class="bnm">${v.name}</b>${turn?h` <span class="pill good">Acting</span>`:''}${secret&&v.f.alpha?h` <span class="pill encal">Alpha</span>`:''}${v.down?h` <span class="pill">Down</span>`:''}
         <span class="sub">${sub}${ini!=null&&ini!==0?' · initiative '+ini:''}</span>
         <div class="types">${types}${hidden?h`<span class="pill">Types unknown</span>`:''}${v.mega||v.mg?h`<span class="pill mega">Mega</span>`:''}${v.itemTxt&&v.side==='f'?h`<span class="pill">Holding ${v.itemTxt}</span>`:''}${v.status?h`<span class="pill status">${v.status}</span>`:''}${v.stages?stgPills({stages:v.stages}):''}${secret?h`<span class="pill gm">GM sheet</span>`:''}</div></div>
       <div class="bhp">${btHpView(v)}</div>
@@ -3279,16 +3404,33 @@ function dxForms(id){
     <ul class="dxforms">${fm.map(f=>h`<li><b>${f.n}</b> ${chipsOf(typePair(f.t))}</li>`)}${mg.map(x=>h`<li><b>${x.f}</b> ${chipsOf(typePair(x.t))} <span class="sub">${x.st}</span></li>`)}</ul></section>`;
 }
 
+/* legendary categories from the GM Guide: the label, the suggested base capture rate and a line of what they are */
+const LEG_CAT={
+  'Time-Displaced':{l:'Time-Displaced',c:-25,t:'Lost in time. One turning up usually means a portal is letting the past or future meddle with the present.'},
+  'Ultra Beast':{l:'Ultra Beast',c:-25,t:'From another dimension. Invasive and quick to attack, but Poké Balls can hold them.'},
+  'Man-made':{l:'Man-made Legendary',c:-50,t:'Created by people. Powerful, but not gods, so a Poké Ball may weaken their strength.'},
+  'Nature':{l:'Being of Nature / Oddity',c:-100,t:'Holds domain over some force in the world. Not unique, though exceedingly rare.'},
+  'God':{l:'God',c:-500,t:'Unique and untamable. It would only consider a Poké Ball after being shown dominance.'}
+};
+const legTag=r=>r&&r.cat==='Ultra Beast'?'Ultra Beast':r&&r.cat==='Time-Displaced'?'Paradox':'Legendary';
+function dxLegend(r){
+  const c=r.cat&&LEG_CAT[r.cat];
+  if(!c)return '';
+  return h`<div class="dxleg" role="note"><div class="row"><span class="pill leg">${c.l}${r.sub?' · '+r.sub:''}</span><span class="pill">Base capture rate ${c.c}</span></div>
+    <p class="sub">${c.t} A captured one loses its ${legTag(r)} moves, passives and features, and its HP drops, rarely above 100.</p></div>`;
+}
 function dxRecView(r,many){
-  const stats=[['HP',r.hp,false],['Atk',r.at,true],['Def',r.df,true],['SpA',r.sa,true],['SpD',r.sd,true],['Spe',r.sp,true]];
+  const stats=[['HP',num(r.hp)*hpx(),false],['Atk',r.at,true],['Def',r.df,true],['SpA',r.sa,true],['SpD',r.sd,true],['Spe',r.sp,true]];
   const ps=r.ps||[],mv=r.mv||[],sk=r.sk||[];
+  const lt=legTag(r);
   return h`<div class="dxrec">
     ${many?h`<h3 class="refg">${r.n}</h3>`:''}
     <div class="row">${chipsOf(r.ty)}<span class="pill">${r.sz||'Medium'}</span><span class="pill">${r.wt||'Medium'}</span></div>
-    <div class="dxst">${stats.map(([l,v,m])=>h`<div class="dxs"><span>${l}</span><b>${num(v)}</b>${m?h`<small>${sgn(mod(num(v)))}</small>`:''}</div>`)}</div>
+    ${dxLegend(r)}
+    <div class="dxst">${stats.map(([l,v,m])=>h`<div class="dxs"><span>${l}</span><b>${num(v)}</b>${m?h`<small>${sgn(mod(num(v)))}</small>`:(l==='HP'&&hpx()!==1?h`<small title="The handbook’s HP, before the table’s ×${hpx()} multiplier">book ${num(r.hp)}</small>`:'')}</div>`)}</div>
     ${sk.length?h`<p><b>Skills</b> ${sk.map(x=>x.n+(x.t?' ('+x.t+')':'')).join(', ')}</p>`:''}
-    ${ps.length?h`<h3 class="refg">Passives</h3><dl class="refdl">${ps.map(x=>h`<dt>${x.n}</dt><dd>${x.t||''}</dd>`)}</dl>`:''}
-    ${mv.length?h`<h3 class="refg">Moves</h3><ul class="dxmvs">${mv.map(x=>h`<li><div class="row"><b>${x.n}</b>${chipsOf([x.t])}<span class="pill">${x.k||''}</span><span class="pill">${x.f||''}</span></div>
+    ${ps.length?h`<h3 class="refg">Passives</h3><dl class="refdl">${ps.map(x=>h`<dt>${x.n}${x.lg?h` <span class="pill leg">${lt}</span>`:''}</dt><dd>${x.t||''}</dd>`)}</dl>`:''}
+    ${mv.length?h`<h3 class="refg">Moves</h3><ul class="dxmvs">${mv.map(x=>h`<li><div class="row"><b>${x.n}</b>${chipsOf([x.t])}<span class="pill">${x.k||''}</span><span class="pill">${x.f||''}</span>${x.lg?h`<span class="pill leg">${lt}</span>`:''}</div>
       <p class="sub">${[x.r,x.d].filter(Boolean).join(' · ')}</p>${x.x?h`<p>${x.x}</p>`:''}</li>`)}</ul>`:''}
   </div>`;
 }
@@ -3436,7 +3578,7 @@ function dxAct(b){
    database (meta/pta_contest), where only signed-in members can read it. */
 const CT_TYPES=['Cool','Beauty','Cute','Clever','Tough'];   /* the order they sit in around the handbook's wheel */
 const CT_ICON={Cool:'◆',Beauty:'●',Cute:'★',Clever:'■',Tough:'▼',Any:'✦'};
-const CT_VIEWS=[['moves','Contest moves'],['keys','Keywords'],['help','Appeal helper'],['how','How contests work'],['rib','Ribbons']];
+const CT_VIEWS=[['moves','Contest moves'],['keys','Keywords'],['help','Appeal helper'],['how','How contests work'],['ex','Example (Option B)'],['rib','Ribbons']];
 S.ui.ct=S.ui.ct||{v:'moves',q:'',type:'',kw:'',show:'all',page:1,mv:'',mvt:'',ctype:'',volt:'0',elec:false,first:false,last:false,fin:false,low:false,both:false,maxed:false,before:'0',alone:false,allBig:false,lastHp:'2d4',ready:false,same:false,stat:'0',res:null,mon:'',sfrom:'',spent:{}};
 const CT_PAGE=80;
 
@@ -3878,7 +4020,106 @@ function ctHowView(){
       <dt>Audience Participation</dt><dd>Exciting the crowd or matching its tastes can earn bonus Heart Points.</dd>
       <dt>Double Performance</dt><dd>Two Pokémon appeal together each round, and the two moves are combined: take the contest type from one and the keyword from the other. Neither can repeat last round’s move unless it is Reliable.</dd>
       <dt>Extra stages</dt><dd>Judges can add a Fashion Show (Cute, Beauty), Pokéathlon (Tough), PokéStar Heroes (Cool), Talent Show (Clever) or a Dummy round that scores damage done to a stage dummy. They award extra Star Points.</dd></dl>`)}
+    ${refSec('ct_optb','House rule: Option B',h`<p>Each appeal is made to one judge. That judge’s Voltage changes, and the appeal’s Heart Points count only toward that judge’s Star Point categories. Categories that don’t depend on appeals (dress, stats, appearance) are judged across all contestants.</p>
+      <p class="sub">The handbook is not clear on whether a Star Point category counts every appeal or only the ones made to that judge, so a table has to pick. This is the second, more tactical choice.</p>
+      <button class="btn sm" data-act="ct_view" data-v="ex">See a full example contest</button>`)}
     ${refSec('ct_tut','Moves that are not on the list',h`<p class="sub">A move taught by a tutor that is not on the handbook’s list is an Appeal move. The tutor picks its contest type when the move is learned. On a Pokémon’s sheet you can set that type under the move.</p>`)}
+  </div>`;
+}
+
+/* ----- a whole contest played out under the Option B house rule ----- */
+const ctB=s=>raw(esc(String(s)).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>'));
+const CT_EX={
+  judges:[
+    ['Brutus','head judge, public',['Most Heart Points from Tough moves','Highest total Heart Points','Most appeals made to him']],
+    ['Rosa','a regular',['Most Heart Points from Electric-type moves','Most Heart Points from Clever moves','Best-dressed trainer (not appeal-based)']],
+    ['Madame Vex','mystery judge',['Most Heart Points from non-damaging moves','Most different contest types used','Pokémon that most looks like its trainer (not appeal-based)']]
+  ],
+  cons:[
+    ['Ren','player','Luxray',[['Tackle','Tough','Appeal'],['Zing Zap','Tough','Appeal'],['Thunder Wave','Cool','Excitement'],['Bide','Tough','Final Appeal']],'All of Brutus’s categories (DC 10), plus Rosa’s Electric category (DC 20)'],
+    ['Mae','player','Roserade',[['Absorb','Clever','Good Show!'],['Toxic','Clever','Excitement'],['Acid Armor','Tough','Hold That Thought']],'Brutus’s categories, plus Rosa’s Clever category (Insight check)'],
+    ['Garrett','NPC Grand Festival coordinator','Infernape',[['Flamethrower','Beauty','Round Starter'],['Darkest Lariat','Cool','Special Attention'],['Bitter Blade','Cool','Good Show!'],['Tackle','Tough','Appeal']],'Four categories; plans to take Brutus’s total and Vex’s variety category']
+  ],
+  rounds:[
+    {t:'Round 1',rows:[
+      ['Garrett → **Vex**',['Flamethrower','Beauty','Round Starter'],'2d4 + 2d4 for going first = 4d4','**10**','Clash, but Vex is already at 0'],
+      ['Ren → **Brutus**',['Zing Zap','Tough','Appeal'],'3d4 + 1d4 match = 4d4','**11**','Brutus 0 → **1**'],
+      ['Mae → **Rosa**',['Toxic','Clever','Excitement'],'2d4','**5**','Gets along, no change; Rosa’s Voltage can’t drop this round']
+    ],note:'Garrett goes first to trigger Round Starter. Ren starts building Brutus toward Electrified.'},
+    {t:'Round 2',rows:[
+      ['Ren → **Brutus**',['Tackle','Tough','Appeal'],'4d4','**10**','Brutus 1 → **2**'],
+      ['Mae → **Brutus**',['Acid Armor','Tough','Hold That Thought'],'2d4 + 1d4 match = 3d4','**7**','Brutus 2 → **3**; Brutus can’t rise again this round'],
+      ['Garrett → **Brutus**',['Bitter Blade','Cool','Good Show!'],'1d4 + 3d4 (both earlier appeals this round raised Voltage) = 4d4','**10**','Gets along, no change']
+    ],note:'Garrett waited for two Voltage raises in a row, then cashed in Good Show!. Mae’s Hold That Thought blocked nothing here, but it would have stopped a Tough move from Garrett.'},
+    {t:'Round 3',rows:[
+      ['Ren → **Brutus**',['Zing Zap','Tough','Appeal'],'4d4','**9**','Brutus 3 → **4**'],
+      ['Mae → **Rosa**',['Absorb','Clever','Good Show!'],'1d4 (only one appeal came before, so no bonus)','**2**','No change'],
+      ['Garrett → **Vex**',['Darkest Lariat','Cool','Special Attention'],'1d4 + 3d4 (two appeals came before him; nobody else performed for Vex) = 4d4','**11**','No change']
+    ],note:'Ren can use Zing Zap again because his last move was Tackle. Brutus is one step from Electrified.'},
+    {t:'Round 4',rows:[
+      ['Garrett → **Brutus**',['Tackle','Tough','Appeal'],'3d4 + 1d4 match + 3d4 for reaching 5 = 7d4','**18**','Brutus 4 → **5: Electrified**'],
+      ['Ren → **Brutus**',['Tackle','Tough','Appeal'],'4d4 = 10, doubled','**20**','Already at maximum'],
+      ['Mae → **Rosa**',['Toxic','Clever','Excitement'],'2d4','**6**','No change']
+    ],note:'The turning point: Ren raised Brutus, but Garrett jumped in first and took the +3d4 for reaching 5. Electrified still benefits everyone, so Ren’s Tackle earns double.'},
+    {t:'Round 5 (final round)',rows:[
+      ['Ren → **Brutus**',['Bide','Tough','Final Appeal'],'2d4 + 2d4 final round + 1d4 match = 5d4 = 13, doubled','**26**','Already at maximum'],
+      ['Garrett → **Brutus**',['Flamethrower','Beauty','Round Starter'],'2d4 (not first) = 5, doubled','**10**','Clash: 5 → 4, but Brutus stays Electrified'],
+      ['Mae → **Vex**',['Acid Armor','Tough','Hold That Thought'],'2d4 + 1d4 match = 3d4','**8**','Vex 0 → **1**']
+    ],note:'Garrett can’t use Tackle again because he used it last round, so he settles for a weaker doubled appeal.'}
+  ],
+  awards:[
+    ['Brutus','Saw Ren 5 times (11 + 10 + 9 + 20 + 26 = 76, all from Tough moves), Garrett 3 times (10 + 18 + 10 = 38, of which 18 from Tough moves) and Mae once (7, from a Tough move).',[
+      ['Most Heart Points from Tough moves','**Ren** (76)'],['Highest total Heart Points','**Ren** (76)'],['Most appeals made to him','**Ren** (5)']]],
+    ['Rosa','Only ever saw Mae (Toxic 5, Absorb 2, Toxic 6).',[
+      ['Most Heart Points from Electric-type moves','**Not awarded.** Ren knew this category existed but spent every Electric move on Brutus, so Rosa never saw them.'],
+      ['Most Heart Points from Clever moves','**Mae** (13)'],['Best-dressed trainer','**Mae** (GM’s call: a coordinated garden-themed outfit)']]],
+    ['Madame Vex','Saw Garrett twice (Beauty and Cool moves) and Mae once (a Tough move).',[
+      ['Most Heart Points from non-damaging moves','**Mae** (Acid Armor, 8)'],['Most different contest types used','**Garrett** (2 types against Mae’s 1)'],['Pokémon that most looks like its trainer','**Garrett** (GM’s call: wild hair, fiery temper)']]]
+  ],
+  stand:[['Ren',3,76],['Mae',3,28],['Garrett',2,59]],
+  lessons:[
+    ['Heart Points alone don’t win.','Garrett had the second-highest total but finished last, because his points were spread across judges and categories.'],
+    ['Picking a judge has a cost.','Ren swept Brutus but left Rosa’s Electric point unclaimed. One Electric appeal to Rosa would have won him the contest outright.'],
+    ['Scouting pays off.','Mae took Rosa’s Clever point because her Insight check revealed it, then grabbed Vex’s non-damaging point in the final round.'],
+    ['Racing for Voltage matters.','Garrett let Ren build Brutus’s Voltage, then stole the +3d4 for reaching 5.']
+  ]
+};
+function cxTable(cols,rows,cls){
+  return h`<div class="cxw"><table class="cxt ${cls||''}"><thead><tr>${cols.map(c=>h`<th scope="col">${c}</th>`)}</tr></thead><tbody>${rows.map(r=>h`<tr>${r.map((c,i)=>h`<td data-l="${cols[i]}"><div class="cxc">${c}</div></td>`)}</tr>`)}</tbody></table></div>`;
+}
+const cxMv=m=>h`${ctChip(m[1])} <b>${m[0]}</b> <span class="sub">${m[2]}</span>`;
+function ctExView(){
+  const X=CT_EX;
+  return h`<div class="refp ctex">
+    <div class="cxrule" role="note"><p class="fl">The Option B rule</p>
+      <p>Each appeal is made to <b>one judge</b>. That judge’s Voltage changes, and the appeal’s Heart Points count <b>only toward that judge’s Star Point categories</b>. Categories that don’t depend on appeals (dress, stats, appearance) are judged across all contestants.</p>
+      <p class="sub">Option A is the simpler version: every category counts every appeal, whichever judge it was aimed at, so choosing a judge only matters for Voltage. If your players are new to contests, run the first one with Option A to teach the basics, then switch to B.</p></div>
+    <p class="sub">A worked contest, to show how Option B plays out. It uses three contestants so it is easy to follow; real contests usually have four or five. The movesets are made up for the example. Each move’s contest type and keyword come from the handbook’s list, so you can check any of them on the Contest moves page, and the dice follow the Keywords page.</p>
+    <h3 class="refg">The setup</h3>
+    <p><b>Contest:</b> Solaceon Town, ${ctChip('Tough')} contest. ${ctChip('Clever')} and ${ctChip('Cool')} moves get along with Tough; ${ctChip('Beauty')} and ${ctChip('Cute')} moves clash. All three judges start at 0 Voltage.</p>
+    <p class="fl">Judges and their hidden Star Point categories</p>
+    ${cxTable(['Judge','Star Point 1','Star Point 2','Star Point 3'],X.judges.map(j=>[h`<b>${j[0]}</b> <span class="sub">(${j[1]})</span>`].concat(j[2])))}
+    <p class="fl">Contestants</p>
+    ${cxTable(['Contestant','Pokémon','Moves (contest type, keyword)','Scouted beforehand'],X.cons.map(c=>[h`<b>${c[0]}</b> <span class="sub">(${c[1]})</span>`,c[2],h`<ul class="cxmv">${c[3].map(m=>h`<li>${cxMv(m)}</li>`)}</ul>`,c[4]]))}
+    <p class="fl">Dice reminders</p>
+    <ul class="reful">
+      <li><b>Matching move:</b> a Tough move rolls +1d4 and raises the chosen judge’s Voltage by 1.</li>
+      <li><b>Clashing move:</b> lowers that judge’s Voltage by 1.</li>
+      <li><b>Reaching 5:</b> the appeal that takes a judge to 5 Voltage rolls +3d4, and that judge is Electrified for the rest of the contest (double Heart Points for everyone).</li>
+    </ul>
+    <h3 class="refg">The rounds</h3>
+    <p class="sub">Brutus becomes the centre of the contest: Ren builds his Voltage for three rounds, Garrett steals the Electrified bonus in round 4, and both cash in on double points at the end.</p>
+    ${X.rounds.map(r=>h`<h4 class="cxh">${r.t}</h4>
+      ${cxTable(['Order','Who → Judge','Move','Dice','Heart Points','Voltage'],r.rows.map((x,i)=>[String(i+1),ctB(x[0]),cxMv(x[1]),x[2],ctB(x[3]),ctB(x[4])]),'cxr')}
+      <p class="sub">${r.note}</p>`)}
+    <h3 class="refg">The awards</h3>
+    <p class="sub">Under Option B, each judge looks only at the appeals made to them, so Ren sweeps Brutus while Rosa’s Electric Star Point goes unclaimed.</p>
+    ${X.awards.map(a=>h`<h4 class="cxh">${a[0]}</h4><p class="sub">${a[1]}</p>${cxTable(['Star Point','Winner'],a[2].map(r=>[r[0],ctB(r[1])]))}`)}
+    <h3 class="refg">Final standings</h3>
+    <p>Ren and Mae tie on Star Points; total Heart Points breaks the tie, so <b>Ren wins the ribbon</b>. A shared first place is also allowed.</p>
+    ${cxTable(['Contestant','Star Points','Total Heart Points'],X.stand.map(r=>[r[0],String(r[1]),String(r[2])]))}
+    <h3 class="refg">What this example shows</h3>
+    <ul class="reful">${X.lessons.map(l=>h`<li><b>${l[0]}</b> ${l[1]}</li>`)}</ul>
   </div>`;
 }
 
@@ -3886,7 +4127,7 @@ function ctTab(){
   ctWarm();
   const o=S.ui.ct;
   if(!CT_VIEWS.some(v=>v[0]===o.v))o.v='moves';
-  const body=o.v==='keys'?ctKeysView():o.v==='help'?ctHelpView():o.v==='how'?ctHowView():o.v==='rib'?ribView():ctMovesView();
+  const body=o.v==='keys'?ctKeysView():o.v==='help'?ctHelpView():o.v==='how'?ctHowView():o.v==='ex'?ctExView():o.v==='rib'?ribView():ctMovesView();
   return h`<section class="panel ctp"><div class="ph"><h2>Contests</h2>${CT.list?h`<span class="pill">${CT.list.length} moves</span>`:''}</div>
     <div class="seg" role="group" aria-label="Contest pages">${CT_VIEWS.map(([k,l])=>h`<button data-act="ct_view" data-v="${k}" aria-pressed="${String(o.v===k)}">${l}</button>`)}</div>
     <div class="ctbody">${body}</div>
@@ -3944,67 +4185,790 @@ function ctAct(b){
   }
 }
 
+/* ---------- Today: time of day, weather, season, moon, tide and festival week ----------
+   One shared set of conditions for the whole party, kept in meta/conditions (everyone can read it, only the GM can change it).
+   Every player sees it as a strip under the title, and the screen shows it: sun, rain, snow, fog, storm, night sky and so on.
+   Each viewer can switch the screen effects off. The GM's wild encounter tables read the same conditions. */
+S.ui.cd=S.ui.cd||{open:false};
+const CD_T=[['dawn','Dawn'],['day','Day'],['dusk','Dusk'],['night','Night']];
+const CD_X=[['clear','Clear'],['cloudy','Cloudy'],['rain','Rain'],['storm','Storm'],['fog','Fog'],['snow','Snow'],['blizzard','Blizzard'],['windy','Windy']];
+const CD_S=[['spring','Spring'],['summer','Summer'],['autumn','Autumn'],['winter','Winter']];
+const CD_M=[['new','New moon'],['waxing','Waxing'],['full','Full moon'],['waning','Waning']];
+const CD_D=[['high','High tide'],['low','Low tide']];
+const CD_LAB={};[CD_T,CD_X,CD_S,CD_M,CD_D].forEach(g=>g.forEach(p=>{CD_LAB[p[0]]=p[1];}));
+/* how likely each kind of weather is in each season (Sinnoh is cool and wet, with a long snowy winter in the north) */
+const CD_ODDS={
+  spring:{clear:30,cloudy:20,rain:28,storm:6,fog:8,windy:8},
+  summer:{clear:45,cloudy:15,rain:15,storm:12,fog:5,windy:8},
+  autumn:{clear:25,cloudy:25,rain:22,storm:6,fog:14,windy:8},
+  winter:{clear:18,cloudy:18,snow:30,blizzard:8,fog:10,rain:8,windy:8}
+};
+function cdSeasonNow(){const m=new Date().getMonth();return m<2||m===11?'winter':m<5?'spring':m<8?'summer':'autumn';}
+const cdOk=(list,v)=>list.some(p=>p[0]===v);
+function cdGet(){
+  const c=S.cond||{};
+  return {
+    t:cdOk(CD_T,c.t)?c.t:'day',
+    x:cdOk(CD_X,c.x)?c.x:'clear',
+    s:cdOk(CD_S,c.s)?c.s:cdSeasonNow(),
+    m:cdOk(CD_M,c.m)?c.m:'waxing',
+    d:cdOk(CD_D,c.d)?c.d:'high',
+    f:c.f===true
+  };
+}
+const cdSig=()=>{const c=cdGet();return [c.t,c.x,c.s,c.m,c.d,c.f?1:0].join('|');};
+function cdText(){
+  const c=cdGet();
+  const bits=[CD_LAB[c.t],CD_LAB[c.x],CD_LAB[c.s]];
+  if(c.t==='night')bits.push(CD_LAB[c.m]);
+  if(c.d==='low')bits.push('Low tide');
+  if(c.f)bits.push('Festival week');
+  return bits.join(', ');
+}
+
+/* ----- icons ----- */
+const CDI_CLOUD='<path d="M7 18a4 4 0 0 1-.6-7.96A6 6 0 0 1 18 9.5 4.3 4.3 0 0 1 17.5 18z"/>';
+const CDI={
+  dawn:'<path d="M3 19h18M7 19a5 5 0 0 1 10 0M12 4v5M9.5 6.5L12 4l2.5 2.5M4.6 10.6l1.4 1.4M19.4 10.6L18 12"/>',
+  day:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/>',
+  dusk:'<path d="M3 19h18M7 19a5 5 0 0 1 10 0M12 4v5M9.5 6.5L12 9l2.5-2.5M4.6 10.6l1.4 1.4M19.4 10.6L18 12"/>',
+  night:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+  clear:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/>',
+  cloudy:CDI_CLOUD,
+  rain:'<g transform="translate(0 -3)">'+CDI_CLOUD+'</g><path d="M8 19l-1 3M12 19l-1 3M16 19l-1 3"/>',
+  storm:'<g transform="translate(0 -3)">'+CDI_CLOUD+'</g><path d="M12.5 15l-2.5 4h4l-2.5 4"/>',
+  fog:'<path d="M3 7h13M6 11h15M3 15h13M8 19h11"/>',
+  snow:'<path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9M9.5 4.5L12 7l2.5-2.5M9.5 19.5L12 17l2.5 2.5"/>',
+  blizzard:'<path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9"/><path d="M2 5h5M17 20h5" />',
+  windy:'<path d="M3 9h10a3 3 0 1 0-3-3M3 14h14a3 3 0 1 1-3 3M3 19h6"/>',
+  spring:'<path d="M12 21V12M12 12c0-4 3-6.5 7.5-6.5 0 4.5-3 6.5-7.5 6.5zM12 16c0-3-2.2-5-6-5 0 3 2.2 5 6 5z"/>',
+  summer:'<circle cx="12" cy="12" r="3.5"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6L7 7M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/>',
+  autumn:'<path d="M5 19C5 10 10 5 20 5c0 10-5 15-13 15M5 19L14 10"/>',
+  winter:'<path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9"/>',
+  moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+  tide:'<path d="M3 9c3 0 3 2 6 2s3-2 6-2 3 2 6 2M3 15c3 0 3 2 6 2s3-2 6-2 3 2 6 2"/>',
+  festival:'<path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.4 6.6 19.5l1.2-6-4.5-4.2 6.1-.7z"/>',
+  fx:'<path d="M5 15a4 4 0 0 1-.4-8A6 6 0 0 1 16 8a3.6 3.6 0 0 1 .4 7.2M9 18l-.8 2.5M13 18l-.8 2.5"/>'
+};
+const cdIcon=k=>raw('<svg class="cdi" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+(CDI[k]||'')+'</svg>');
+
+/* ----- the strip under the title ----- */
+function cdChip(kind,label,icon){return h`<span class="td-chip" data-kind="${kind}">${cdIcon(icon||kind)}<b>${label}</b></span>`;}
+function cdSeg(label,key,list,cur){
+  return h`<div class="td-grp"><span class="fl">${label}</span><div class="seg" role="group" aria-label="${label}">${list.map(p=>h`<button data-act="cd_set" data-k="${key}" data-v="${p[0]}" aria-pressed="${String(cur===p[0])}">${p[1]}</button>`)}</div></div>`;
+}
+function todayHtml(){
+  if(S.noDb||!S.ready)return '';
+  const c=cdGet(),adm=!!S.me.admin,open=adm&&S.ui.cd.open,fxOn=wxOn();
+  return h`<section class="today" aria-label="Today in Sinnoh">
+    <div class="td-row">
+      <div class="td-chips" role="status" aria-live="polite" aria-label="Conditions now: ${cdText()}">
+        ${cdChip('t',CD_LAB[c.t],c.t)}${cdChip('x',CD_LAB[c.x],c.x)}${cdChip('s',CD_LAB[c.s],c.s)}${c.t==='night'?cdChip('m',CD_LAB[c.m],'moon'):''}${c.d==='low'?cdChip('d','Low tide','tide'):''}${c.f?cdChip('f','Festival week','festival'):''}
+      </div>
+      <div class="td-acts">
+        <button class="btn sm ghost" data-act="cd_fx" aria-pressed="${String(fxOn)}" title="Show weather and light effects on the screen">${cdIcon('fx')} Effects: ${fxOn?'on':'off'}</button>
+        ${adm?h`<button class="btn sm" data-act="cd_edit" aria-expanded="${String(open)}">${open?'Done':'Change'}</button>`:''}
+      </div>
+    </div>
+    ${open?h`<div class="td-edit">
+      ${cdSeg('Time of day','t',CD_T,c.t)}${cdSeg('Weather','x',CD_X,c.x)}${cdSeg('Season','s',CD_S,c.s)}${cdSeg('Moon','m',CD_M,c.m)}${cdSeg('Tide','d',CD_D,c.d)}
+      <div class="td-grp"><span class="fl">Quick</span><div class="row"><button class="btn sm" data-act="cd_adv">Next time of day</button><button class="btn sm" data-act="cd_roll">Roll the weather</button><button class="btn sm" data-act="cd_fest" aria-pressed="${String(c.f)}">Festival week: ${c.f?'on':'off'}</button></div></div>
+      <p class="sub">Everyone sees this strip and the weather on their screen. Your wild encounter tables use it too, so a rainy night gives different odds than a clear morning.</p>
+    </div>`:''}
+  </section>`;
+}
+function renderToday(){
+  const el=$('#today');
+  if(!el)return;
+  const html=todayHtml();
+  const s=html===''?'':html.s;
+  if(el.dataset.sig===s)return;
+  el.dataset.sig=s;
+  el.innerHTML=s;
+}
+function cdWeatherRoll(season){
+  const odds=CD_ODDS[season]||CD_ODDS.spring;
+  const keys=Object.keys(odds);
+  let r=Math.random()*keys.reduce((a,k)=>a+odds[k],0);
+  for(const k of keys){if(r<odds[k])return k;r-=odds[k];}
+  return 'clear';
+}
+function cdAct(b){
+  if(!S.me.admin&&b.dataset.act!=='cd_fx')return;
+  const d=b.dataset;
+  switch(d.act){
+    case 'cd_fx':wxSetOn(!wxOn());wxSync(true);renderToday();break;
+    case 'cd_edit':S.ui.cd.open=!S.ui.cd.open;renderToday();break;
+    case 'cd_set':{
+      const lists={t:CD_T,x:CD_X,s:CD_S,m:CD_M,d:CD_D};
+      if(lists[d.k]&&cdOk(lists[d.k],d.v)){edit('cd','conditions',d.k,d.v);}
+      cdChanged();break;}
+    case 'cd_adv':{
+      const order=CD_T.map(p=>p[0]),cur=cdGet().t;
+      edit('cd','conditions','t',order[(order.indexOf(cur)+1)%order.length]);
+      cdChanged();break;}
+    case 'cd_roll':{
+      const c=cdGet();
+      edit('cd','conditions','x',cdWeatherRoll(c.s));
+      cdChanged();break;}
+    case 'cd_fest':edit('cd','conditions','f',!cdGet().f);cdChanged();break;
+    default:break;
+  }
+}
+function cdChanged(){
+  /* the doc was edited locally; show it at once, then let the rest of the page catch up */
+  renderToday();wxSync();
+  if(S.tab==='place'||S.tab==='battle')scheduleRender();
+}
+
+/* ---------- the screen: tint, sun, stars, moon, rain, snow, fog, wind and lightning ----------
+   Everything sits above the page, ignores clicks, and stops when the tab is hidden. With "reduce motion" on, the picture is drawn once and does not move. */
+const WX={root:null,cv:null,cx:null,raf:0,last:0,sig:'',W:0,H:0,dpr:1,parts:[],stars:[],blobs:[],flash:0,nextFlash:0,kind:'',c:null,reduced:false};
+function wxOn(){try{return localStorage.getItem('stl.fx')!=='off';}catch(e){return true;}}
+function wxSetOn(v){try{localStorage.setItem('stl.fx',v?'on':'off');}catch(e){}}
+function wxReduce(){try{return !!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);}catch(e){return false;}}
+function wxInit(){
+  if(WX.root)return true;
+  if(!document.body)return false;
+  const r=document.createElement('div');
+  r.id='wxfx';r.className='wxfx';r.setAttribute('aria-hidden','true');
+  r.innerHTML='<div class="wxtint"></div><div class="wxsun"></div><canvas class="wxcv"></canvas>';
+  document.body.appendChild(r);
+  WX.root=r;WX.cv=r.querySelector('canvas');
+  try{WX.cx=WX.cv.getContext('2d');}catch(e){WX.cx=null;}
+  window.addEventListener('resize',()=>{WX.sig='';wxSync(true);});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)wxStop();else wxSync(true);});
+  return true;
+}
+function wxStop(){if(WX.raf){cancelAnimationFrame(WX.raf);WX.raf=0;}}
+function wxSize(){
+  const dpr=Math.min(window.devicePixelRatio||1,1.5);
+  WX.dpr=dpr;WX.W=window.innerWidth||800;WX.H=window.innerHeight||600;
+  WX.cv.width=Math.round(WX.W*dpr);WX.cv.height=Math.round(WX.H*dpr);
+  WX.cv.style.width=WX.W+'px';WX.cv.style.height=WX.H+'px';
+  if(WX.cx)WX.cx.setTransform(dpr,0,0,dpr,0,0);
+}
+const rr=(a,b)=>a+Math.random()*(b-a);
+function wxBuild(c){
+  const area=WX.W*WX.H,x=c.x;
+  WX.parts=[];WX.stars=[];WX.blobs=[];
+  const mk=(n,f)=>{for(let i=0;i<n;i++)WX.parts.push(f());};
+  if(x==='rain'||x==='storm'){
+    const heavy=x==='storm';
+    mk(clamp(Math.round(area/(heavy?5200:8200)),70,heavy?330:230),()=>({x:rr(-60,WX.W+60),y:rr(0,WX.H),l:rr(11,heavy?26:20),v:rr(heavy?820:640,heavy?1150:900),a:rr(.22,.5)}));
+  }else if(x==='snow'){
+    mk(clamp(Math.round(area/11000),45,170),()=>({x:rr(0,WX.W),y:rr(0,WX.H),r:rr(1,3),v:rr(35,85),ph:rr(0,6.28),a:rr(.55,.95)}));
+  }else if(x==='blizzard'){
+    mk(clamp(Math.round(area/4400),130,360),()=>({x:rr(0,WX.W),y:rr(0,WX.H),r:rr(.9,2.4),v:rr(150,280),vx:rr(-520,-330),a:rr(.6,.95)}));
+  }else if(x==='windy'){
+    mk(26,()=>({x:rr(0,WX.W),y:rr(0,WX.H),l:rr(18,40),v:rr(520,820),vy:rr(30,90),a:rr(.25,.5),h:Math.random()<.5?1:0}));
+  }
+  if(x==='fog'||x==='cloudy'){
+    const n=x==='fog'?6:4;
+    for(let i=0;i<n;i++)WX.blobs.push({x:rr(0,WX.W),y:rr(WX.H*.15,WX.H*.95),r:rr(.3,.55)*Math.max(WX.W,WX.H*1.2),v:rr(5,15)*(Math.random()<.5?-1:1),a:x==='fog'?rr(.1,.17):rr(.05,.09)});
+  }
+  if(c.t==='night'){
+    const n=(x==='clear'||x==='windy')?clamp(Math.round(area/9000),50,160):x==='cloudy'?clamp(Math.round(area/26000),12,50):0;
+    for(let i=0;i<n;i++)WX.stars.push({x:rr(0,WX.W),y:rr(0,WX.H*.8),r:rr(.4,1.5),ph:rr(0,6.28),a:rr(.35,.95)});
+  }
+}
+function wxMoon(cx,c){
+  if(c.t!=='night'||c.x==='storm'||c.x==='blizzard'||c.x==='fog'||c.x==='rain'||c.x==='snow')return;
+  const x=WX.W<640?54:86,y=WX.H<500?60:92,R=WX.W<640?15:22,ph=c.m;
+  cx.save();
+  cx.globalAlpha=c.x==='cloudy'?.5:.9;
+  const glow=cx.createRadialGradient(x,y,R*.6,x,y,R*3.2);
+  glow.addColorStop(0,ph==='new'?'rgba(150,170,230,.05)':'rgba(220,230,255,.28)');glow.addColorStop(1,'rgba(220,230,255,0)');
+  cx.fillStyle=glow;cx.beginPath();cx.arc(x,y,R*3.2,0,6.283);cx.fill();
+  if(ph==='full'){
+    cx.fillStyle='#F3F1DC';cx.beginPath();cx.arc(x,y,R,0,6.283);cx.fill();
+    cx.fillStyle='rgba(180,176,150,.35)';[[-.3,-.2,.22],[.25,.15,.17],[-.05,.38,.12]].forEach(k=>{cx.beginPath();cx.arc(x+k[0]*R,y+k[1]*R,k[2]*R,0,6.283);cx.fill();});
+  }else if(ph==='new'){
+    cx.strokeStyle='rgba(190,205,245,.55)';cx.lineWidth=1.4;cx.beginPath();cx.arc(x,y,R,0,6.283);cx.stroke();
+    cx.fillStyle='rgba(20,28,64,.55)';cx.beginPath();cx.arc(x,y,R-1,0,6.283);cx.fill();
+  }else{
+    /* a crescent: the lit side is on the right while the moon grows, on the left while it shrinks */
+    const dir=ph==='waxing'?1:-1;
+    cx.save();
+    cx.beginPath();cx.arc(x,y,R,0,6.283);cx.clip();
+    cx.fillStyle='#F3F1DC';
+    cx.beginPath();cx.rect(x-R,y-R,R*2,R*2);
+    cx.moveTo(x-dir*R*.55+R*.95,y);cx.arc(x-dir*R*.55,y,R*.95,0,6.283);
+    cx.fill('evenodd');
+    cx.restore();
+  }
+  cx.restore();
+}
+function wxDraw(dt,ts){
+  const cx=WX.cx,c=WX.c;
+  if(!cx||!c)return;
+  cx.clearRect(0,0,WX.W,WX.H);
+  /* stars */
+  if(WX.stars.length){
+    WX.stars.forEach(s=>{
+      const tw=WX.reduced?1:.65+.35*Math.sin(ts/900+s.ph);
+      cx.globalAlpha=s.a*tw;cx.fillStyle='#EEF2FF';cx.beginPath();cx.arc(s.x,s.y,s.r,0,6.283);cx.fill();
+    });
+    cx.globalAlpha=1;
+  }
+  wxMoon(cx,c);
+  /* fog and cloud banks */
+  if(WX.blobs.length){
+    const night=c.t==='night',col=night?'150,165,205':c.x==='cloudy'?'135,145,165':'236,240,246';
+    WX.blobs.forEach(b=>{
+      b.x+=b.v*dt;
+      if(b.v>0&&b.x-b.r>WX.W)b.x=-b.r;else if(b.v<0&&b.x+b.r<0)b.x=WX.W+b.r;
+      const g=cx.createRadialGradient(b.x,b.y,b.r*.1,b.x,b.y,b.r);
+      g.addColorStop(0,'rgba('+col+','+b.a+')');g.addColorStop(1,'rgba('+col+',0)');
+      cx.fillStyle=g;cx.fillRect(b.x-b.r,b.y-b.r,b.r*2,b.r*2);
+    });
+  }
+  /* rain and storm */
+  if(c.x==='rain'||c.x==='storm'){
+    const slant=c.x==='storm'?.32:.14;
+    cx.lineWidth=c.x==='storm'?1.5:1.2;cx.lineCap='round';
+    WX.parts.forEach(p=>{
+      p.y+=p.v*dt;p.x-=p.v*slant*dt;
+      if(p.y>WX.H+30){p.y=-p.l-rr(0,60);p.x=rr(-40,WX.W+90);}
+      if(p.x<-60)p.x+=WX.W+120;
+      cx.strokeStyle='rgba('+(c.t==='night'?'170,190,235':'120,150,205')+','+p.a+')';
+      cx.beginPath();cx.moveTo(p.x,p.y);cx.lineTo(p.x+p.l*slant,p.y-p.l);cx.stroke();
+    });
+    if(c.x==='storm'&&!WX.reduced){
+      if(ts>WX.nextFlash){WX.flash=1;WX.nextFlash=ts+rr(4200,10500);}
+      if(WX.flash>0){cx.fillStyle='rgba(235,240,255,'+(WX.flash*.42)+')';cx.fillRect(0,0,WX.W,WX.H);WX.flash=Math.max(0,WX.flash-dt*3.4);}
+    }
+  }
+  /* snow */
+  if(c.x==='snow'){
+    cx.fillStyle='#fff';
+    WX.parts.forEach(p=>{
+      p.y+=p.v*dt;p.ph+=dt*1.4;p.x+=Math.sin(p.ph)*18*dt;
+      if(p.y>WX.H+6){p.y=-6;p.x=rr(0,WX.W);}
+      cx.globalAlpha=p.a;cx.beginPath();cx.arc(p.x,p.y,p.r,0,6.283);cx.fill();
+    });
+    cx.globalAlpha=1;
+  }
+  if(c.x==='blizzard'){
+    cx.fillStyle='#fff';
+    WX.parts.forEach(p=>{
+      p.y+=p.v*dt;p.x+=p.vx*dt;
+      if(p.x<-8){p.x=WX.W+8;p.y=rr(0,WX.H);}
+      if(p.y>WX.H+6){p.y=-6;}
+      cx.globalAlpha=p.a;cx.beginPath();cx.arc(p.x,p.y,p.r,0,6.283);cx.fill();
+    });
+    cx.globalAlpha=1;
+  }
+  /* wind: leaves in autumn, loose petals and blades otherwise */
+  if(c.x==='windy'){
+    const col=c.s==='autumn'?'196,120,52':c.s==='spring'?'244,176,196':c.s==='winter'?'225,235,245':'170,200,140';
+    cx.lineWidth=2.2;cx.lineCap='round';
+    WX.parts.forEach(p=>{
+      p.x+=p.v*dt;p.y+=p.vy*dt+Math.sin(ts/400+p.x*.01)*.6;
+      if(p.x>WX.W+50){p.x=-50;p.y=rr(0,WX.H);}
+      if(p.y>WX.H+20)p.y=-20;
+      cx.strokeStyle='rgba('+col+','+p.a+')';
+      cx.beginPath();cx.moveTo(p.x,p.y);cx.lineTo(p.x-p.l,p.y-(p.h?3:1));cx.stroke();
+    });
+  }
+}
+function wxLoop(ts){
+  WX.raf=0;
+  if(document.hidden||!WX.root||WX.root.hidden)return;
+  const dt=Math.min(.06,Math.max(0,(ts-WX.last)/1000));
+  if(ts-WX.last>=WX.gap){WX.last=ts;wxDraw(dt,ts);}
+  WX.raf=requestAnimationFrame(wxLoop);
+}
+/* bring the screen in line with the conditions (cheap when nothing changed) */
+function wxSync(force){
+  if(!wxInit())return;
+  const on=wxOn()&&!S.noDb;
+  WX.root.hidden=!on;
+  if(!on){wxStop();WX.sig='';return;}
+  const red=wxReduce();
+  const sig=cdSig()+'|'+red+'|'+(window.innerWidth||0)+'x'+(window.innerHeight||0);
+  if(!force&&sig===WX.sig)return;
+  WX.sig=sig;WX.reduced=red;
+  const c=cdGet();WX.c=c;
+  const r=WX.root;
+  r.dataset.t=c.t;r.dataset.x=c.x;r.dataset.s=c.s;
+  wxStop();
+  wxSize();wxBuild(c);
+  WX.nextFlash=performance.now()+rr(2500,6000);
+  if(!WX.cx)return;
+  /* a clear day or a still sky has nothing that moves: draw it once and leave the screen alone */
+  const moving=WX.parts.length||WX.blobs.length;
+  WX.gap=moving?30:90;
+  if(red||!(moving||WX.stars.length)){wxDraw(0,0);return;}
+  WX.last=0;WX.raf=requestAnimationFrame(wxLoop);
+}
 /* ---------- Wild encounters ----------
-   A weighted list of Pokémon on a place's GM page: what can turn up there. Rolling it picks one (and how many), and the GM can add
-   the result to the battle as hidden foes. The list is kept in the same document as the place's GM notes (gm/place_<id>), which only
-   the GM can read, so the players never receive it. Nothing here needs a new database rule. */
-S.ui.enc=S.ui.enc||{res:{},pick:''};
-const ENC_MAX=30;
-TPL.enc=()=>({sp:'',w:10,lo:1,hi:1});
+   A place's GM page can hold a table of the Pokémon that turn up there. The table is kept in the same document as the place's GM notes
+   (gm/place_<id>), which only the GM can read, so the players never receive it and nothing here needs a new database rule.
+   The odds you see are the odds right now: they follow the shared Today bar (time of day, weather, season, moon, tide, festival week)
+   plus the situations the GM switches on by hand (a zone, a flag, a ferry day). Rolling gives a single encounter, a horde sized by the
+   place's Danger, a same-species swarm, or a catch while fishing. Some groups have an alpha. Every Pokémon carries the PTA book's
+   rarity (for the GM) and a realistic local rarity worked out from its odds right now. */
+S.ui.enc=Object.assign({res:{},pick:'',z:{},ed:{},tb:{},mo:{},np:'',df:'',imp:{mode:'add'}},S.ui.enc||{});
+const ENC_MAX=60;
+const ENC_OOR='Out-of-region';
+TPL.enc=()=>({sp:'',w:10,lo:1,hi:1,bk:'U'});
+const ENC_BK={C:['●','Common'],U:['◆','Uncommon'],R:['★','Rare'],L:['✦','Legendary']};
+const ENC_DIFF=[['easy','Easy',[0,1],'0–1 basic Pokémon per player'],['normal','Normal',[1,2],'1–2 basic or once-evolved per player'],['hard','Hard',[2,3],'2–3 per player, mostly evolved'],['danger','Dangerous',[3,4],'3–4 fully evolved per player']];
+const ENC_DG={1:'easy',2:'easy',3:'normal',4:'hard',5:'danger'};
+const ENC_HORDE_MAX=12;
+
+/* =========================== the odds (no page code in here) =========================== */
+const encKey=s=>String(s==null?'':s).trim().toLowerCase();
+/* does a modifier's "when" match the conditions c = {t,x,s,m,d,f}? every part named must match */
+function encWhenOk(w,c){
+  if(!w)return true;
+  const have={t:c.t,x:c.x,s:c.s,m:c.m,d:c.d,f:c.f?'on':'off'};
+  return Object.keys(w).every(k=>{const a=w[k];return !Array.isArray(a)||!a.length||a.indexOf(have[k])>=0;});
+}
+/* a modifier is on when its "when" matches and, for a situation the GM switches on by hand (z), the GM has switched it on */
+const encModOn=(m,c,z)=>encWhenOk(m.w,c)&&(!m.z||!!(z&&z[m.id]));
+function encEff(T,c,z){
+  const rows=(Array.isArray(T.enc)?T.enc:[]).filter(r=>r&&String(r.sp||'').trim());
+  let W=[];
+  const rowOf=sp=>rows.find(r=>encKey(r.sp)===encKey(sp))||null;
+  rows.forEach(r=>{const w=Math.max(0,num(r.w));W.push({k:encKey(r.sp),sp:String(r.sp).trim(),w,b:w,row:r});});
+  const eo=Math.max(0,num(T.eo));
+  W.push({k:'~oor',sp:ENC_OOR,w:eo,b:eo,oor:1,row:null});
+  const get=sp=>encKey(sp)===encKey(ENC_OOR)?W.find(e=>e.oor):W.find(e=>e.k===encKey(sp));
+  const ensure=(sp,bk)=>{let e=get(sp);if(!e){e={k:encKey(sp),sp:String(sp).trim(),w:0,b:0,row:rowOf(sp),bk};W.push(e);}return e;};
+  const sum=()=>W.reduce((a,e)=>a+e.w,0);
+  /* add v to the listed entries together, sharing it out in proportion to their weights */
+  const spread=(list,v)=>{
+    const tot=list.reduce((a,e)=>a+e.w,0);
+    if(!list.length)return;
+    list.forEach(e=>{e.w=Math.max(0,e.w+(tot>0?v*e.w/tot:v/list.length));});
+  };
+  let rt=1,nn=null,only='';
+  const fish=[],act=[];
+  (Array.isArray(T.em)?T.em:[]).forEach(m=>{
+    if(!m||!encModOn(m,c,z))return;
+    act.push(m);
+    if(m.rt!=null)rt*=Math.max(0,num(m.rt));
+    if(Array.isArray(m.nn)&&m.nn.length===2)nn=[num(m.nn[0]),num(m.nn[1])];
+    if(Array.isArray(m.fish))fish.push({id:m.id,lb:m.lb,list:m.fish,tx:m.tx||''});
+    if(Array.isArray(m.only)){
+      W=[];
+      m.only.forEach(o=>{
+        if(o.s===ENC_OOR)W.push({k:'~oor',sp:ENC_OOR,w:Math.max(0,num(o.w)),b:0,oor:1,row:null});
+        else W.push({k:encKey(o.s),sp:String(o.s).trim(),w:Math.max(0,num(o.w)),b:0,row:rowOf(o.s),bk:o.bk});
+      });
+      only=m.lb||'a special place';
+    }
+    const fx=Array.isArray(m.fx)?m.fx:[];
+    const named=new Set();
+    fx.forEach(f=>{if(f.s!=='*')(Array.isArray(f.s)?f.s:[f.s]).forEach(s=>named.add(encKey(s)));});
+    const before=sum();
+    fx.forEach(f=>{
+      const a=f.a,v=num(f.v);
+      if(f.s==='*'){
+        const tg=W.filter(e=>!e.oor&&!named.has(e.k)&&e.w>0);
+        if(a==='+'){if(f.each)tg.forEach(e=>{e.w=Math.max(0,e.w+v);});else spread(tg,v);}
+        else if(a==='x')tg.forEach(e=>{e.w=e.w*v;});
+        return;
+      }
+      const names=Array.isArray(f.s)?f.s:[f.s];
+      if(a==='>'){
+        const to=Array.isArray(f.to)?f.to:[];
+        if(!to.length)return;
+        names.forEach(n=>{
+          const e=get(n);
+          if(!e||e.w<=0)return;
+          const tot=e.w;e.w=0;
+          to.forEach(t=>{ensure(t).w+=tot/to.length;});
+        });
+        return;
+      }
+      if(a==='+'&&f.cb){spread(names.map(get).filter(Boolean),v);return;}
+      names.forEach(n=>{
+        let e=get(n);
+        if(a==='+'){if(!e&&v>0)e=ensure(n);if(e)e.w=Math.max(0,e.w+v);}
+        else if(a==='='){if(!e&&v>0)e=ensure(n);if(e)e.w=Math.max(0,v);}
+        else if(a==='x'){if(e)e.w=e.w*v;}
+      });
+    });
+    /* "taking from": whatever this modifier added or removed overall is paid for by (or handed to) the named species */
+    if(Array.isArray(m.tk)&&m.tk.length){
+      const delta=sum()-before;
+      const tg=m.tk.map(get).filter(Boolean);
+      const tot=tg.reduce((a,e)=>a+e.w,0);
+      if(tg.length&&Math.abs(delta)>1e-9){
+        if(delta>0){const take=Math.min(delta,tot);tg.forEach(e=>{e.w=Math.max(0,e.w-(tot>0?take*e.w/tot:0));});}
+        else tg.forEach(e=>{e.w+=tot>0?(-delta)*e.w/tot:(-delta)/tg.length;});
+      }
+    }
+  });
+  const total=sum();
+  const baseTotal=rows.reduce((a,r)=>a+Math.max(0,num(r.w)),0)+eo;
+  W.forEach(e=>{e.p=total>0?e.w/total*100:0;e.bp=baseTotal>0?e.b/baseTotal*100:0;});
+  return {W,total,rt,nn,fish,act,only};
+}
+function encPickW(list){
+  const tot=list.reduce((a,e)=>a+e.w,0);
+  if(tot<=0)return null;
+  let r=Math.random()*tot,last=null;
+  for(let i=0;i<list.length;i++){
+    if(list[i].w<=0)continue;
+    last=list[i];
+    if(r<list[i].w)return list[i];
+    r-=list[i].w;
+  }
+  return last;
+}
+const encRand=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const encGrp=r=>{const lo=clamp(Math.round(num(r&&r.lo))||1,1,8);const hi=clamp(Math.round(num(r&&r.hi))||lo,lo,8);return encRand(lo,hi);};
+/* what a table's Danger asks for: easy, normal, hard or danger */
+const encDiffOf=T=>ENC_DG[clamp(Math.round(num(T.dg))||1,1,5)]||'easy';
+/* how many wild Pokémon a horde is: the GM Guide's range per player, for each player */
+function encHordeN(diff,players){
+  const d=ENC_DIFF.find(x=>x[0]===diff)||ENC_DIFF[1];
+  let n=0;
+  for(let i=0;i<Math.max(1,players);i++)n+=encRand(d[2][0],d[2][1]);
+  return clamp(n,1,ENC_HORDE_MAX);
+}
+function encVisitor(T){
+  const ev=Array.isArray(T.ev)?T.ev.filter(v=>v&&v.sp):[];
+  if(!ev.length)return null;
+  const die=T.evd==='d8'?8:6;
+  const roll=encRand(1,die);
+  const v=ev[(roll-1)%ev.length];
+  return {sp:v.sp,o:v.o||'',y:v.y||'',roll,die};
+}
+/* how common something is here, in plain words, from its chance among everything that turns up right now */
+const encPct=p=>p>=5?Math.round(p):Math.round(p*10)/10;
+function encLocal(p){return p>=15?'Abundant':p>=8?'Common':p>=4?'Uncommon':p>=2?'Rare':p>0?'Very rare':'Not around now';}
+/* the "no encounter" gates: a reduced rate (rt) and a d6 range of nothing (nn) */
+function encGate(E){
+  if(E.rt<=0)return 'No random encounters in these conditions.';
+  if(E.rt<1&&Math.random()>=E.rt)return 'Quiet. At '+Math.round(E.rt*100)+'% of the usual rate, nothing stirs this time.';
+  if(E.nn){
+    const d=encRand(1,6);
+    if(d>=E.nn[0]&&d<=E.nn[1])return 'd6 → '+d+'. The place is still: nothing at all turns up.';
+  }
+  return '';
+}
+function encLine(T,e,n,E,alphaOk){
+  const r=e.row||{};
+  const L={sp:e.sp,n,a:0,p:Math.round(e.p*10)/10,bk:r.bk||e.bk||'',wl:num(r.wl),so:r.so?1:0,al:num(r.al)};
+  if(alphaOk&&num(r.al)>0&&Math.random()*100<num(r.al))L.a=1;
+  return L;
+}
+const encMerge=(lines,L)=>{
+  const o=lines.find(x=>x.sp===L.sp&&!x.vi&&!L.vi&&x.a===L.a);
+  if(o)o.n+=L.n;else lines.push(L);
+};
+/* one roll. mode: enc (a group), horde, swarm, or fish (with the fishing modifier's id). Returns {lines, none, why, ...} */
+function encRollT(T,c,z,o){
+  o=o||{};
+  const E=encEff(T,c,z);
+  const out={kind:o.mode||'enc',lines:[],none:false,why:'',E:{rt:E.rt,nn:E.nn,only:E.only}};
+  const mode=out.kind;
+  if(mode==='fish'){
+    const f=E.fish.find(x=>x.id===o.fid);
+    if(!f||!f.list.length){out.none=true;out.why=f&&f.tx?f.tx:'Nothing to catch here.';return out;}
+    const L=f.list.map(x=>({sp:x.s,w:Math.max(0,num(x.w)),oor:x.s===ENC_OOR,bk:x.bk,k:encKey(x.s),row:null}));
+    const tot=L.reduce((a,x)=>a+x.w,0);
+    const pick=encPickW(L);
+    if(!pick){out.none=true;out.why='Nothing bites.';return out;}
+    out.fishLb=f.lb;
+    if(pick.oor){
+      const v=encVisitor(T);
+      if(!v){out.none=true;out.why='Nothing bites.';return out;}
+      out.lines.push({sp:v.sp,n:1,a:0,p:Math.round(pick.w/tot*1000)/10,bk:'',wl:0,vi:v});
+    }else{
+      const r=(T.enc||[]).find(x=>encKey(x.sp)===pick.k)||{};
+      out.lines.push({sp:pick.sp,n:1,a:0,p:Math.round(pick.w/tot*1000)/10,bk:pick.bk||r.bk||'',wl:num(r.wl),so:0,al:0});
+    }
+    return out;
+  }
+  const gate=encGate(E);
+  if(gate){out.none=true;out.why=gate;return out;}
+  const pool=E.W.filter(e=>e.w>0);
+  if(!pool.length){out.none=true;out.why='This table has nothing in it to roll.';return out;}
+  if(mode==='swarm'){
+    const sw=pool.filter(e=>e.row&&e.row.sw&&!e.oor);
+    const e=encPickW(sw);
+    if(!e){out.none=true;out.why='Nothing here comes in swarms.';return out;}
+    const L=encLine(T,e,encRand(3,6),E,true);
+    out.lines.push(L);
+    return out;
+  }
+  const visit=e=>{
+    const v=encVisitor(T);
+    if(!v)return null;
+    return {sp:v.sp,n:1,a:0,p:Math.round(e.p*10)/10,bk:'',wl:0,vi:v};
+  };
+  if(mode==='horde'){
+    const N=o.n||1;
+    let got=0,guard=0,alphaDone=false;
+    while(got<N&&guard++<60){
+      const e=encPickW(pool);
+      if(!e)break;
+      let L;
+      if(e.oor){L=visit(e);if(!L)continue;}
+      else{
+        const n=Math.min(encGrp(e.row),N-got);
+        L=encLine(T,e,n,E,!alphaDone);
+        if(L.a)alphaDone=true;
+      }
+      got+=L.n;
+      encMerge(out.lines,L);
+    }
+    out.n=got;
+    return out;
+  }
+  const e=encPickW(pool);
+  if(e.oor){
+    const L=visit(e);
+    if(!L){out.none=true;out.why='A stranger might have passed through, but nothing the table names.';return out;}
+    out.lines.push(L);
+    return out;
+  }
+  out.lines.push(encLine(T,e,encGrp(e.row),E,true));
+  return out;
+}
+/* parsing and writing a modifier's effects as plain lines, for the editor.
+   Pikachu +8 · Pikachu =10 · Pikachu x2 · Pikachu > Raichu, Raichu, Pichu · Swinub / Snover -15 (shared) · * -33 (shared by the rest) · * each -2 */
+function encFxParse(text){
+  const out=[],bad=[];
+  String(text||'').split(/\n/).forEach(raw0=>{
+    let s=raw0.trim();
+    if(!s)return;
+    let m;
+    if((m=s.match(/^(.+?)\s+>\s+(.+)$/))){
+      const src=m[1].split(/\s*\/\s*/).map(x=>x.trim()).filter(Boolean);
+      out.push({s:src.length>1?src:src[0],a:'>',to:m[2].split(',').map(x=>x.trim()).filter(Boolean)});
+      return;
+    }
+    m=s.match(/^(.+?)\s*(=|x|\+|-)\s*(\d+(?:\.\d+)?)\s*$/i);
+    if(!m){bad.push(s);return;}
+    let names=m[1].trim(),each=false;
+    if(/^\*\s+each$/i.test(names)){names='*';each=true;}
+    const op=m[2].toLowerCase();
+    let v=Number(m[3]);
+    let a=op==='x'?'x':op==='='?'=':'+';
+    if(op==='-')v=-v;
+    const list=names.split(/\s*\/\s*/).map(x=>x.trim()).filter(Boolean);
+    const f={s:list.length>1?list:list[0],a,v};
+    if(list.length>1&&a==='+')f.cb=1;
+    if(each)f.each=1;
+    out.push(f);
+  });
+  return {fx:out,bad};
+}
+function encFxText(fx){
+  return (fx||[]).map(f=>{
+    const nm=Array.isArray(f.s)?f.s.join(' / '):f.s;
+    if(f.a==='>')return nm+' > '+(f.to||[]).join(', ');
+    if(f.a==='=')return nm+' ='+f.v;
+    if(f.a==='x')return nm+' x'+f.v;
+    return (f.s==='*'&&f.each?'* each':nm)+' '+(num(f.v)<0?'-':'+')+Math.abs(num(f.v));
+  }).join('\n');
+}
+/* =========================== end of the odds =========================== */
 
 const encGp=pid=>S.gmPl[pid]||{};
-const encRows=pid=>{const e=encGp(pid).enc;return Array.isArray(e)?e:[];};
-const encOk=x=>!!(x&&String(x.sp||'').trim()&&num(x.w)>0);
-const encValid=pid=>encRows(pid).filter(encOk);
-const encTotal=rows=>rows.reduce((a,x)=>a+num(x.w),0);
-const encPct=(x,total)=>total>0?Math.round(num(x.w)/total*1000)/10:0;
-/* the places that have a table with something usable in it */
-const encPlaces=()=>Object.keys(S.gmPl||{}).filter(id=>PD_BY[id]&&encValid(id).length).map(id=>PD_BY[id]).sort(natural);
-
-/* one roll of a place's table: which Pokémon, how many, and how likely that was */
-function encRoll(pid){
-  const rows=encValid(pid);
-  if(!rows.length)return null;
-  const total=encTotal(rows);
-  let r=Math.random()*total,pick=rows[rows.length-1];
-  for(let i=0;i<rows.length;i++){
-    const w=num(rows[i].w);
-    if(r<w){pick=rows[i];break;}
-    r-=w;
-  }
-  const lo=clamp(Math.round(num(pick.lo))||1,1,8);
-  const hi=clamp(Math.round(num(pick.hi))||lo,lo,8);
-  const n=lo+Math.floor(Math.random()*(hi-lo+1));
-  return {sp:String(pick.sp).trim(),n,pct:encPct(pick,total)};
+/* a place's tables: the main one, then any extra ones (a landmark inside the same page) */
+function encTabs(pid){
+  const g=encGp(pid);
+  const out=[{k:0,nm:'',pre:'',T:g}];
+  (Array.isArray(g.ex)?g.ex:[]).forEach((e,i)=>out.push({k:i+1,nm:(e&&e.nm)||'Another table',pre:'ex.'+i+'.',T:e||{}}));
+  return out;
 }
+const encTab=(pid,k)=>{const t=encTabs(pid);return t[k!=null&&t[k]?k:(S.ui.enc.tb[pid]||0)]||t[0];};
+const encRows=T=>Array.isArray(T.enc)?T.enc:[];
+const encOk=x=>!!(x&&String(x.sp||'').trim()&&num(x.w)>0);
+const encValid=pid=>encRows(encGp(pid)).filter(encOk);
+const encTotal=rows=>rows.reduce((a,x)=>a+num(x.w),0);
+/* the places with something to roll, each table as its own entry */
+function encPlaces(){
+  const out=[];
+  Object.keys(S.gmPl||{}).forEach(id=>{
+    const f=PD_BY[id];
+    if(!f)return;
+    encTabs(id).forEach(t=>{if(encRows(t.T).some(encOk))out.push({v:id+(t.k?'#'+t.k:''),id,k:t.k,name:f.name+(t.k?' · '+t.nm:'')});});
+  });
+  return out.sort(natural);
+}
+const encRef=v=>{const p=String(v||'').split('#');return {id:p[0],k:p[1]?+p[1]:0};};
+const encZ=(pid,k)=>{const key=pid+'|'+k;return S.ui.enc.z[key]||(S.ui.enc.z[key]={});};
+const encPlayers=()=>clamp(Math.round(num(S.ui.enc.np))||tids().length||1,1,8);
+const encDiffNow=T=>{const d=S.ui.enc.df;return ENC_DIFF.some(x=>x[0]===d)?d:encDiffOf(T);};
+
+function encRollRef(pid,k,mode,fid){
+  const t=encTab(pid,k);
+  const T=t.T;
+  const o={mode,fid};
+  if(mode==='horde')o.n=encHordeN(encDiffNow(T),encPlayers());
+  const r=encRollT(T,cdGet(),encZ(pid,t.k),o);
+  r.pid=pid;r.k=t.k;r.cond=cdText();
+  if(mode==='horde'){r.diff=encDiffNow(T);r.players=encPlayers();r.want=o.n;}
+  return r;
+}
+
+/* ----- adding what turned up to the battle ----- */
+const encKindWord={enc:'encounter',horde:'horde',swarm:'swarm',fish:'catch'};
 async function encToBattle(pid,res){
-  if(!S.me.admin||!res)return;
+  if(!S.me.admin||!res||res.none)return;
   const f=PD_BY[pid];
-  await btAddFoeSp(res.sp,res.n,'','Wild encounter at '+(f?f.name:'a place'));
+  const where=(f?f.name:'a place')+(res.k?' · '+encTab(pid,res.k).nm:'');
+  for(const L of res.lines){
+    const note='Wild '+(encKindWord[res.kind]||'encounter')+' at '+where+(L.vi?' (visitor'+(L.vi.o?' from '+L.vi.o:'')+')':'')+(L.a?' · ALPHA':'');
+    if(L.n-L.a>0)await btAddFoeSp(L.sp,L.n-L.a,'',note);
+    if(L.a)await btAddFoeSp(L.sp,1,'',note,{alpha:true});
+  }
   render();
 }
 
 /* ----- the panel on a place's page ----- */
-const encResult=(pid,r)=>h`<div class="ctres encres" role="status" aria-live="polite"><span class="k">ENCOUNTER</span><div class="big">${r.sp}${r.n>1?h` ×${r.n}`:''}</div><div class="sub">${r.pct}% chance</div>
-  <div class="row"><button class="btn primary sm" data-act="en_tobattle" data-id="${pid}">Add to the battle</button><button class="btn sm" data-act="en_roll" data-id="${pid}">Roll again</button></div></div>`;
+const encMd=s=>raw(esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>'));
+const encBk=bk=>ENC_BK[bk]?h`<span class="pill encbk" title="Rarity in the PTA books (GM only)">${ENC_BK[bk][0]} ${ENC_BK[bk][1]}</span>`:'';
+const encWlText=(gp,w)=>{const who=gp.wln||'A player';return w===3?who+' wants an alpha':w===2?who+' really wants this':who+' is interested';};
+function encNeeds(w){
+  if(!w)return '';
+  const bits=[];
+  ['t','x','s','m','d','f'].forEach(k=>{
+    const a=w[k];
+    if(!Array.isArray(a)||!a.length)return;
+    bits.push(a.map(v=>k==='f'?(v==='on'?'Festival week':'Not festival week'):(CD_LAB[v]||v)).join(' or '));
+  });
+  return bits.join(' + ');
+}
+function encResult(pid,r){
+  const f=PD_BY[pid],gp=encGp(pid);
+  if(r.none)return h`<div class="ctres encres" role="status" aria-live="polite"><span class="k">NOTHING</span><div class="big">Nothing turns up</div><div class="sub">${r.why}</div><div class="sub">${r.cond}</div>
+    <div class="row"><button class="btn sm" data-act="en_roll" data-id="${pid}" data-k="${r.k}" data-m="${r.kind}" data-f="${r.fid||''}">Roll again</button></div></div>`;
+  const lead=r.lines[0];
+  const title=r.lines.map(L=>(L.a?'Alpha ':'')+L.sp+(L.n>1?' ×'+L.n:'')).join(', ');
+  const wl=r.lines.filter(L=>L.wl>0&&(!L.vi));
+  const diff=r.kind==='horde'?ENC_DIFF.find(x=>x[0]===r.diff):null;
+  return h`<div class="ctres encres" role="status" aria-live="polite"><span class="k">${(encKindWord[r.kind]||'encounter').toUpperCase()}${r.fishLb?' · '+r.fishLb.toUpperCase():''}</span>
+    <div class="big">${title}</div>
+    ${r.lines.map(L=>h`<div class="encline">${L.a?h`<span class="pill encal">ALPHA</span> `:''}<b>${L.sp}</b>${L.n>1?' ×'+L.n:''}
+      ${L.vi?h`<span class="sub">Out-of-region visitor${L.vi.o?' from '+L.vi.o:''} (d${L.vi.die} → ${L.vi.roll}). ${L.vi.y}</span>`
+        :h`<span class="sub">${encPct(L.p)}% here · ${encLocal(L.p)}</span> ${encBk(L.bk)}${L.so?h` <span class="pill">herd or pack</span>`:''}${L.wl>0?h` <span class="pill encwl w${L.wl}">${encWlText(gp,L.wl)}</span>`:''}`}</div>`)}
+    ${r.kind==='horde'?h`<div class="sub">A horde for ${r.players} ${r.players===1?'player':'players'} on ${diff?diff[1]:'Normal'}: ${diff?diff[3]:''} (${r.want} wanted${r.n!==r.want?', '+r.n+' rolled':''}).</div>`:''}
+    ${r.kind==='swarm'?h`<div class="sub">A swarm of one kind. 3–6 of them.</div>`:''}
+    <div class="sub">${r.cond}${r.E&&r.E.only?' · '+r.E.only:''}</div>
+    ${lead&&lead.a?h`<div class="sub">Alpha: HP doubled, +5 Attack and Special Attack, the better defense raised to 15, and the Alpha Aura moves are added when it joins the battle. It can lead the others.</div>`:''}
+    <div class="row"><button class="btn primary sm" data-act="en_tobattle" data-id="${pid}">Add to the battle</button>
+      <button class="btn sm" data-act="en_roll" data-id="${pid}" data-k="${r.k}" data-m="${r.kind}" data-f="${r.fid||''}">Roll again</button>
+      ${lead&&!lead.vi?h`<button class="btn sm ghost" data-act="en_alpha" data-id="${pid}">${lead.a?'Make it a normal one':'Make one an alpha'}</button>`:''}</div></div>`;
+}
+function encRowView(gp,e,sorted){
+  const r=e.row||{};
+  const wl=num(r.wl);
+  const bk=r.bk||e.bk||'';
+  return h`<li class="encr ${e.p<=0?'zero':''}">
+    <span class="encn"><b>${e.sp}</b>${r.so?h` <span class="pill">herd or pack</span>`:''}${r.sw?h` <span class="pill">swarms</span>`:''}${num(r.al)>0?h` <span class="pill encal" title="Chance that a group of these has an alpha">alpha ${num(r.al)}%</span>`:''}${wl>0?h` <span class="pill encwl w${wl}">${encWlText(gp,wl)}</span>`:''}</span>
+    <span class="encp" style="--p:${Math.min(100,Math.round(e.p))}%"><b>${encPct(e.p)}%</b> now${Math.abs(e.p-e.bp)>=0.5?h` <small>(${encPct(e.bp)}% usually)</small>`:''}</span>
+    <span class="encl">${encLocal(e.p)}</span>
+    ${encBk(bk)}
+    <span class="sub encg">${num(r.lo)||1}${num(r.hi)>num(r.lo)?'–'+num(r.hi):''} at a time${r.n?' · '+r.n:''}</span>
+  </li>`;
+}
+function encEditRow(pid,pre,gp,T,x,i,len){
+  const p=pre+'enc.'+i+'.';
+  return h`<div class="encrow ${String(x.sp||'').trim()?'':'off'}">
+    ${fText('Pokémon','gp',pid,p+'sp',gp,{list:'dl-species',cls:'c-sp'})}
+    ${fNum('Weight','gp',pid,p+'w',gp,{min:0,max:1000})}
+    ${fNum('Min','gp',pid,p+'lo',gp,{min:1,max:8})}
+    ${fNum('Max','gp',pid,p+'hi',gp,{min:1,max:8})}
+    ${fNum('Alpha %','gp',pid,p+'al',gp,{min:0,max:100})}
+    ${fSel('Book rarity','gp',pid,p+'bk',gp,[['C','● Common'],['U','◆ Uncommon'],['R','★ Rare']],{blank:'Not set'})}
+    ${fSel('Wanted','gp',pid,p+'wl',gp,[['1','Interested'],['2','Really wants'],['3','Wants an alpha']],{blank:'No'})}
+    <div class="fld"><span class="fl">Groups</span><span class="row">${fCheck('Herd','gp',pid,p+'so',gp)}${fCheck('Swarm','gp',pid,p+'sw',gp)}</span></div>
+    ${fText('Note','gp',pid,p+'n',gp,{cls:'c-nt'})}
+    ${rowBtns('gp',pid,pre+'enc',i,len,false)}</div>`;
+}
+function encModEditor(pid,pre,gp,T,m,i,len){
+  const p=pre+'em.'+i+'.';
+  const w=m.w||{};
+  const groups=[['t','Time',CD_T],['x','Weather',CD_X],['s','Season',CD_S],['m','Moon',CD_M],['d','Tide',CD_D],['f','Festival',[['on','Festival week'],['off','Not festival week']]]];
+  const key=pid+'|'+pre+'|'+i;
+  const open=!!S.ui.enc.mo[key];
+  const head=h`<button class="encsum" data-act="en_mo" data-key="${key}" aria-expanded="${String(open)}"><b>${m.lb||'New situation'}</b> <span class="sub">${m.z?'switched on by hand':'automatic'}${encNeeds(m.w)?' · '+encNeeds(m.w):''}</span></button>`;
+  if(!open)return h`<div class="encmod">${head}</div>`;
+  return h`<div class="encmod">${head}
+    <div class="fgrid">${fText('Name','gp',pid,p+'lb',gp,{})}${fCheck('Switch on by hand (a situation, like a zone)','gp',pid,p+'z',gp)}
+      ${fNum('Encounter rate ×','gp',pid,p+'rt',gp,{min:0,max:1})}</div>
+    ${groups.map(g=>h`<div class="fld"><span class="fl">${g[1]}</span><div class="row evchips">${g[2].map(op=>h`<button class="chip enchip" data-act="en_wh" data-id="${pid}" data-pre="${pre}" data-i="${i}" data-w="${g[0]}" data-v="${op[0]}" aria-pressed="${String((w[g[0]]||[]).indexOf(op[0])>=0)}">${op[1]}</button>`)}</div></div>`)}
+    <p class="sub">Leave a group empty to match anything. Everything named must match at once.</p>
+    <label class="fld"><span class="fl">What it changes (one per line)</span><textarea data-encfx="${esc(pid+'|'+pre+'|'+i)}" rows="4" data-nr>${raw('\n')}${encFxText(m.fx)}</textarea></label>
+    <p class="sub">Examples: <code>Pikachu +8</code> · <code>Pikachu =10</code> · <code>Pikachu x2</code> · <code>Pikachu &gt; Raichu, Pichu</code> (becomes) · <code>Swinub / Snover -15</code> (shared) · <code>* -10</code> (shared by the rest) · <code>* each -2</code>.</p>
+    <label class="fld"><span class="fl">Taking from (species names, comma separated)</span><input type="text" data-encl="${esc(pid+'|'+pre+'|'+i+'|tk')}" value="${(m.tk||[]).join(', ')}" data-nr></label>
+    ${fArea('Note for you','gp',pid,p+'tx',gp,{rows:2})}
+    ${(m.fish||m.only)?h`<p class="sub">This one also carries a fixed list of ${m.only?'what lives there':'what bites'} that came with the encounter data.</p>`:''}
+    <div class="row"><button class="btn sm danger" data-act="del" ${bp('gp',pid,pre+'em')} data-i="${i}">Delete this</button>${rowBtns('gp',pid,pre+'em',i,len,false)}</div>
+  </div>`;
+}
 function encPanel(f){
-  const pid=f.id,gp=encGp(pid),rows=encRows(pid),valid=encValid(pid),total=encTotal(valid);
+  const pid=f.id,gp=encGp(pid);
+  const tabs=encTabs(pid);
+  const t=encTab(pid);
+  const T=t.T,pre=t.pre;
+  const rows=encRows(T);
+  const c=cdGet();
+  const z=encZ(pid,t.k);
+  const E=encEff(T,c,z);
   const res=S.ui.enc.res[pid];
-  return h`<section class="panel encp"><div class="ph"><h2>Wild encounters</h2><span class="pill gm">GM only</span><span class="sub">${rows.length} of ${ENC_MAX}</span></div>
-    <p class="sub">What can turn up here. Each Pokémon has a weight: a weight of 30 out of a total of 100 is a 30% chance. Min and Max say how many appear at once. The players never see this list.</p>
-    ${rows.length?h`<div class="enclist">${rows.map((x,i)=>{
-      const p='enc.'+i+'.';
-      return h`<div class="encrow ${encOk(x)?'':'off'}">
-        ${fText('Pokémon','gp',pid,p+'sp',gp,{list:'dl-species'})}
-        ${fNum('Weight','gp',pid,p+'w',gp,{min:0,max:1000})}
-        ${fNum('Min','gp',pid,p+'lo',gp,{min:1,max:8})}
-        ${fNum('Max','gp',pid,p+'hi',gp,{min:1,max:8})}
-        <span class="pill encpct">${encOk(x)?encPct(x,total)+'%':'not used'}</span>
-        ${rowBtns('gp',pid,'enc',i,rows.length,false)}</div>`;
-    })}</div>`:h`<p class="sub">Nothing here yet. Add the Pokémon that live in this place.</p>`}
-    <div class="row"><button class="btn sm" data-act="en_new" data-id="${pid}" ${rows.length>=ENC_MAX?raw('disabled'):''}>Add a Pokémon</button>${valid.length?h`<button class="btn primary sm" data-act="en_roll" data-id="${pid}">Roll an encounter</button>`:''}</div>
+  const ed=!!S.ui.enc.ed[pid];
+  const mods=Array.isArray(T.em)?T.em:[];
+  const chips=mods.filter(m=>m.z);
+  const autos=mods.filter(m=>!m.z);
+  const autoOn=autos.filter(m=>encWhenOk(m.w,c));
+  const autoOff=autos.filter(m=>!encWhenOk(m.w,c));
+  const shown=E.W.filter(e=>e.sp&&(e.w>0||e.b>0)&&!e.oor).sort((a,b)=>b.p-a.p||b.bp-a.bp);
+  const oor=E.W.find(e=>e.oor);
+  const diff=encDiffNow(T);
+  const dd=ENC_DIFF.find(x=>x[0]===diff)||ENC_DIFF[1];
+  const hasSw=E.W.some(e=>e.w>0&&e.row&&e.row.sw&&!e.oor);
+  const used=!!T.eoUsed;
+  return h`<section class="panel encp"><div class="ph"><h2>Wild encounters</h2><span class="pill gm">GM only</span>
+      <span class="pill" title="How dangerous this place is. It sets the size of a horde.">Danger ${Math.round(num(T.dg))||1} · ${ENC_DIFF.find(x=>x[0]===encDiffOf(T))[1]}</span>
+      ${T.dr?h`<span class="pill status">Draft: check it</span>`:''}
+      <div class="acts"><button class="btn sm ${ed?'primary':''}" data-act="en_edit" data-id="${pid}" aria-pressed="${String(ed)}">${ed?'Done editing':'Edit table'}</button></div></div>
+    ${tabs.length>1?h`<div class="seg" role="group" aria-label="Table">${tabs.map(x=>h`<button data-act="en_tab" data-id="${pid}" data-k="${x.k}" aria-pressed="${String(x.k===t.k)}">${x.k?x.nm:f.name}</button>`)}</div>`:''}
+    ${T.dr?h`<p class="sub bad">This table was drafted from the nearest places${Array.isArray(T.nb)&&T.nb.length?' ('+T.nb.join(', ')+')':''} because the notes had no list for it. Read it over and change what does not fit.</p>`:''}
+    <p class="sub encnow"><b>Right now:</b> ${cdText()}. The chances below use the conditions on the Today bar${chips.length?' and the situations you switch on':''}.</p>
+    ${chips.length?h`<div class="fld"><span class="fl">Situations here</span><div class="row evchips">${chips.map(m=>{
+      const on=!!z[m.id],ok=encWhenOk(m.w,c);
+      return h`<button class="chip enchip" data-act="en_zone" data-id="${pid}" data-k="${t.k}" data-m="${m.id}" aria-pressed="${String(on)}" title="${m.tx||''}">${m.lb}${on&&!ok?h` <small>(waits for ${encNeeds(m.w)})</small>`:(!on&&encNeeds(m.w)?h` <small>(${encNeeds(m.w)})</small>`:'')}</button>`;})}</div></div>`:''}
+    ${E.act.length?h`<div class="encfx"><span class="fl">In effect now</span><ul class="mini-list">${E.act.map(m=>h`<li><b>${m.lb}</b>${m.tx?h` <span class="sub">${encMd(m.tx)}</span>`:''}${m.nt?h` <span class="sub">${m.nt}</span>`:''}</li>`)}</ul>
+      ${E.rt<1?h`<p class="sub">Encounter rate ${E.rt<=0?'none':'×'+Math.round(E.rt*100)/100}.</p>`:''}${E.nn?h`<p class="sub">On a d6 of ${E.nn[0]}–${E.nn[1]}, nothing happens.</p>`:''}</div>`:''}
+    ${autoOff.length?h`<details class="encoff"><summary>${autoOff.length} other ${autoOff.length===1?'condition':'conditions'} change this table</summary><ul class="mini-list">${autoOff.map(m=>h`<li><b>${m.lb}</b> <span class="sub">needs ${encNeeds(m.w)||'a switch'}${m.tx?' · '+m.tx.replace(/\*\*/g,''):''}</span></li>`)}</ul></details>`:''}
+    ${shown.length?h`<ul class="enclist2" aria-label="What can turn up now">${shown.map(e=>encRowView(gp,e))}</ul>`:h`<p class="sub">Nothing here yet. Add the Pokémon that live in this place.</p>`}
+    ${oor&&oor.w>0?h`<p class="sub">${encPct(oor.p)}% of the time it is a visitor from another region. Roll ${T.evd==='d8'?'d8':'d6'} on the visitor list (${(T.ev||[]).length} listed).</p>`:''}
+    ${(Array.isArray(T.ev)&&T.ev.length)?h`<details class="encoff"><summary>Visitors from other regions</summary><ol class="mini-list">${T.ev.map(v=>h`<li><b>${v.sp}</b> <span class="sub">${v.o?'('+v.o+') ':''}${v.y||''}</span></li>`)}</ol></details>`:''}
+    ${T.eon?h`<div class="mgd encone"><b>Once per campaign</b> ${used?h`<span class="pill">Used</span>`:''}<p class="sub">${encMd(T.eon)}</p><div class="row"><button class="btn sm" data-act="en_used" data-id="${pid}" data-k="${t.k}">${used?'Mark as not used':'Mark as used'}</button></div></div>`:''}
+    <div class="fgrid encroll">
+      <label class="fld"><span class="fl">Players</span><input type="number" min="1" max="8" data-u="enc.np" value="${S.ui.enc.np===''?'':encPlayers()}" placeholder="${tids().length||1}" data-nr></label>
+      <label class="fld"><span class="fl">Horde difficulty</span><select data-u="enc.df"><option value="" ${S.ui.enc.df?'':raw('selected')}>From Danger (${ENC_DIFF.find(x=>x[0]===encDiffOf(T))[1]})</option>${ENC_DIFF.map(x=>h`<option value="${x[0]}" ${S.ui.enc.df===x[0]?raw('selected'):''}>${x[1]}</option>`)}</select></label>
+    </div>
+    <p class="sub">A horde for ${encPlayers()} ${encPlayers()===1?'player':'players'} on ${dd[1]} is ${dd[2][0]*encPlayers()}–${Math.min(ENC_HORDE_MAX,dd[2][1]*encPlayers())} wild Pokémon (${dd[3]}).</p>
+    <div class="row"><button class="btn primary sm" data-act="en_roll" data-id="${pid}" data-k="${t.k}" data-m="enc" ${shown.length?'':raw('disabled')}>Roll an encounter</button>
+      <button class="btn sm" data-act="en_roll" data-id="${pid}" data-k="${t.k}" data-m="horde" ${shown.length?'':raw('disabled')}>Roll a horde</button>
+      <button class="btn sm" data-act="en_roll" data-id="${pid}" data-k="${t.k}" data-m="swarm" ${hasSw?'':raw('disabled')}>Roll a swarm</button>
+      ${E.fish.map(fm=>h`<button class="btn sm" data-act="en_roll" data-id="${pid}" data-k="${t.k}" data-m="fish" data-f="${fm.id}">Cast a line · ${fm.lb}</button>`)}</div>
     ${res?encResult(pid,res):''}
-    ${fArea('Notes for this table','gp',pid,'encNote',gp,{rows:2,ph:'e.g. Only in tall grass. Roll once every ten minutes.'})}
+    ${ed?h`<div class="enced"><h3>Edit this table</h3>
+      <p class="sub">A weight of 30 out of a total of about 100 is a 30% chance. A weight of 0 means it only turns up when a condition adds it. Min and Max say how many come at once. Alpha % is the chance that a group has an alpha. The players never see any of this.</p>
+      <div class="fgrid">${fNum('Danger (1–5)','gp',pid,pre+'dg',gp,{min:1,max:5})}${fNum('Visitor weight','gp',pid,pre+'eo',gp,{min:0,max:100})}
+        <label class="fld"><span class="fl">Visitor die</span><select ${bd('gp',pid,pre+'evd')}>${[['d6','d6'],['d8','d8']].map(o=>h`<option value="${o[0]}" ${T.evd===o[0]?raw('selected'):''}>${o[1]}</option>`)}</select></label>
+        ${pre===''?fText('Name for the player you track','gp',pid,'wln',gp,{ph:'e.g. Implala'}):''}</div>
+      ${rows.length?h`<div class="enclist">${rows.map((x,i)=>encEditRow(pid,pre,gp,T,x,i,rows.length))}</div>`:h`<p class="sub">No rows yet.</p>`}
+      <div class="row"><button class="btn sm" data-act="en_new" data-id="${pid}" data-k="${t.k}" ${rows.length>=ENC_MAX?raw('disabled'):''}>Add a Pokémon</button>
+        <span class="sub">${rows.length} of ${ENC_MAX}</span></div>
+      <h3>Conditions and situations</h3>
+      ${mods.map((m,i)=>encModEditor(pid,pre,gp,T,m,i,mods.length))}
+      <div class="row"><button class="btn sm" data-act="en_mnew" data-id="${pid}" data-k="${t.k}">Add a condition</button></div>
+    </div>`:''}
+    ${fArea('Notes for this table','gp',pid,pre+'encNote',gp,{rows:2,ph:'e.g. Only in tall grass. Roll once every ten minutes.'})}
   </section>`;
 }
 
@@ -4012,12 +4976,105 @@ function encPanel(f){
 function encBattlePanel(){
   const pl=encPlaces();
   const e=S.ui.enc;
-  if(!pl.length)return h`<div class="mgd"><b>Wild encounter</b><p class="sub">Roll from a place's table of Pokémon and add what turns up as foes. To make a table, open a place from the Map page and use <b>Wild encounters</b> (GM only).</p></div>`;
-  const cur=pl.some(p=>p.id===e.pick)?e.pick:pl[0].id;
+  if(!pl.length)return h`<div class="mgd"><b>Wild encounter</b><p class="sub">Roll from a place's table of Pokémon and add what turns up as foes. Import the encounter data in GM Desk, or make a table from a place's page on the Map (GM only).</p></div>`;
+  const cur=pl.some(p=>p.v===e.pick)?e.pick:pl[0].v;
   return h`<div class="mgd"><b>Wild encounter</b>
-    <p class="sub">Roll from a place's table and add what turns up as foes. They start hidden, like any foe.</p>
-    <div class="fgrid"><label class="fld"><span class="fl">Where</span><select data-u="enc.pick">${pl.map(p=>h`<option value="${p.id}" ${p.id===cur?raw('selected'):''}>${p.name}</option>`)}</select></label></div>
-    <div class="row"><button class="btn primary sm" data-act="en_rollbattle" data-id="${cur}">Roll and add to the battle</button></div></div>`;
+    <p class="sub">Roll from a place's table and add what turns up as foes. The odds follow the Today bar (${cdText()}). They start hidden, like any foe.</p>
+    <div class="fgrid"><label class="fld"><span class="fl">Where</span><select data-u="enc.pick">${pl.map(p=>h`<option value="${p.v}" ${p.v===cur?raw('selected'):''}>${p.name}</option>`)}</select></label></div>
+    <div class="row"><button class="btn primary sm" data-act="en_rollbattle" data-v="${cur}" data-m="enc">Roll and add</button>
+      <button class="btn sm" data-act="en_rollbattle" data-v="${cur}" data-m="horde">Horde</button>
+      <button class="btn sm" data-act="en_rollbattle" data-v="${cur}" data-m="swarm">Swarm</button></div></div>`;
+}
+
+/* ----- GM Desk: import and export ----- */
+function encDesk(){
+  const im=S.ui.enc.imp||{};
+  const have=Object.keys(S.gmPl||{}).filter(id=>PD_BY[id]&&encRows(encGp(id)).length).length;
+  return h`<section class="panel"><div class="ph"><h2>Encounter data</h2><span class="pill gm">GM only</span>
+      <div class="acts"><button class="btn sm" data-act="en_pick" ${im.busy?raw('disabled'):''}>Import encounter data</button>
+        <button class="btn sm ghost" data-act="en_exp" ${S.dl&&have?'':raw('disabled')}>Download tables</button>
+        <button class="btn sm ghost" data-act="en_csv" ${S.dl&&have?'':raw('disabled')}>Rarity sheet (CSV)</button></div></div>
+    <p class="sub">${have?have+' places have a table of wild Pokémon.':'No places have a table yet.'} Choose <b>sinnoh-encounter-data.json</b> from the update download. Every place gets its Pokémon with their chances, the PTA book rarity, hordes, swarms, alphas, and how the chances shift with time of day, weather, season, moon, tide and festival week. The tables go into your private GM notes, not into the public site.</p>
+    <div class="row evchips" role="group" aria-label="When a place already has a table"><button class="chip enchip" data-act="en_mode" data-v="add" aria-pressed="${String(im.mode!=='replace')}">Only places without a table</button><button class="chip enchip" data-act="en_mode" data-v="replace" aria-pressed="${String(im.mode==='replace')}">Replace every table</button></div>
+    <p class="sub">${im.mode==='replace'?'Every place in the file gets the new table. Tables you wrote yourself are overwritten. Your GM notes on each place are kept.':'Places where you already wrote a table keep it. Your GM notes are always kept.'}</p>
+    ${im.busy?h`<progress class="ptaprog" max="${num(im.total)}" value="${num(im.done)}" aria-label="Import progress"></progress>`:''}
+    ${im.msg?h`<p class="sub ${im.bad?'bad':''}" role="status">${im.msg}</p>`:''}
+  </section>`;
+}
+/* what goes into a place's GM document */
+function encDocOf(p,wln){
+  const o={};
+  ['dg','enc','em','ev','evd','eo','eon','dr','nb','nm','ex'].forEach(k=>{if(p[k]!==undefined)o[k]=p[k];});
+  if(!p.dr)o.dr=false;
+  o.eoUsed=false;
+  if(wln)o.wln=String(wln);
+  o.ei=Date.now();
+  return o;
+}
+async function encImport(file){
+  const im=S.ui.enc.imp=S.ui.enc.imp||{mode:'add'};
+  const say=(msg,bad)=>{im.msg=msg;im.bad=!!bad;im.busy=false;scheduleRender();};
+  let d=null;
+  try{d=JSON.parse(await file.text());}catch(e){}
+  if(!d||d.format!=='sinnoh-encounters'||!d.places||typeof d.places!=='object'){say('That is not the encounter data file. Use sinnoh-encounter-data.json from the update download.',true);return;}
+  const mode=im.mode==='replace'?'replace':'add';
+  const ids=Object.keys(d.places).filter(id=>PD_BY[id]&&d.places[id]&&Array.isArray(d.places[id].enc));
+  const todo=ids.filter(id=>mode==='replace'||!encRows(encGp(id)).length);
+  const skipped=ids.length-todo.length;
+  if(!todo.length){say('Nothing to import. All '+ids.length+' places already have a table. Choose “Replace every table” to overwrite them.',true);return;}
+  im.busy=true;im.done=0;im.total=todo.length;im.msg='Importing…';im.bad=false;scheduleRender();
+  try{
+    let batch=S.db.batch(),n=0;
+    for(const id of todo){
+      batch.set(S.db.collection('gm').doc('place_'+id),encDocOf(d.places[id],d.wln),{merge:true});
+      n++;
+      if(n>=15){await batch.commit();im.done+=n;n=0;batch=S.db.batch();scheduleRender();}
+    }
+    if(n){await batch.commit();im.done+=n;}
+  }catch(e){say('The import stopped ('+((e&&e.code)||'error')+'). Some of it may be saved. Run it again to finish.',true);return;}
+  say('Imported tables for '+todo.length+' places'+(skipped?'; kept '+skipped+' that already had one':'')+'.',false);
+}
+function encExport(){
+  if(!S.dl)return;
+  const places={};
+  Object.keys(S.gmPl||{}).forEach(id=>{
+    const g=S.gmPl[id];
+    if(!PD_BY[id]||!encRows(g).length)return;
+    const o={};
+    ['dg','enc','em','ev','evd','eo','eon','dr','nb','nm','ex'].forEach(k=>{if(g[k]!==undefined)o[k]=g[k];});
+    places[id]=o;
+  });
+  const wln=Object.keys(S.gmPl).map(id=>S.gmPl[id].wln).find(x=>x)||'';
+  return S.dl.save({filename:'sinnoh-encounter-data.json',data:JSON.stringify({format:'sinnoh-encounters',v:2,wln,places})}).catch(e=>{if(!e||e.code!=='declined')toast('Could not offer the download');});
+}
+function encCsv(){
+  if(!S.dl)return;
+  const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
+  const lines=[['Place','Table','Pokemon','PTA book rarity','Usual chance %','Group','Herd or pack','Swarms','Alpha chance %','Wanted','Note'].map(q).join(',')];
+  const c={t:'day',x:'clear',s:'spring',m:'waxing',d:'high',f:false};
+  encPlaces().forEach(pl=>{
+    const t=encTab(pl.id,pl.k),T=t.T,gp=encGp(pl.id);
+    const E=encEff(T,c,{});
+    E.W.filter(e=>!e.oor&&(e.b>0)).sort((a,b)=>b.bp-a.bp).forEach(e=>{
+      const r=e.row||{};
+      lines.push([PD_BY[pl.id].name,t.k?t.nm:'',e.sp,ENC_BK[r.bk]?ENC_BK[r.bk][1]:'',Math.round(e.bp*10)/10,(num(r.lo)||1)+(num(r.hi)>num(r.lo)?'-'+num(r.hi):''),r.so?'yes':'',r.sw?'yes':'',num(r.al)||'',num(r.wl)>0?encWlText(gp,num(r.wl)):'',r.n||''].map(q).join(','));
+    });
+  });
+  return S.dl.save({filename:'sinnoh-pokemon-rarity.csv',data:'﻿'+lines.join('\r\n'),mime:'text/csv'}).catch(e=>{if(!e||e.code!=='declined')toast('Could not offer the download');});
+}
+/* text boxes that are not plain fields */
+function encFxEdit(t){
+  const p=String(t.dataset.encfx).split('|');
+  const r=encFxParse(t.value);
+  edit('gp',p[0],p[1]+'em.'+p[2]+'.fx',r.fx);
+  if(r.bad.length)toast('Could not read: '+r.bad.slice(0,2).join(' · ')+(r.bad.length>2?' …':''));
+  render();
+}
+function encListEdit(t){
+  const p=String(t.dataset.encl).split('|');
+  const list=t.value.split(',').map(x=>x.trim()).filter(Boolean);
+  edit('gp',p[0],p[1]+'em.'+p[2]+'.'+p[3],list.length?list:null);
+  render();
 }
 
 async function encAct(b){
@@ -4025,30 +5082,78 @@ async function encAct(b){
   const d=b.dataset,pid=d.id;
   switch(d.act){
     case 'en_new':{
-      const arr=encRows(pid).slice();
+      const t=encTab(pid,+d.k||0);
+      const arr=encRows(t.T).slice();
       if(arr.length>=ENC_MAX)break;
       arr.push(TPL.enc());
-      edit('gp',pid,'enc',arr);
+      edit('gp',pid,t.pre+'enc',arr);
+      render();
+      break;}
+    case 'en_mnew':{
+      const t=encTab(pid,+d.k||0);
+      const arr=(Array.isArray(t.T.em)?t.T.em:[]).slice();
+      let n=1;while(arr.some(m=>m.id==='m'+n))n++;
+      arr.push({id:'m'+n,lb:'New condition',fx:[],tx:''});
+      S.ui.enc.mo[pid+'|'+t.pre+'|'+(arr.length-1)]=true;
+      edit('gp',pid,t.pre+'em',arr);
+      render();
+      break;}
+    case 'en_wh':{
+      const pre=d.pre||'';
+      const T=pre?(encGp(pid).ex||[])[+pre.split('.')[1]]:encGp(pid);
+      const m=T&&(T.em||[])[+d.i];
+      if(!m)break;
+      const w=Object.assign({},m.w||{});
+      const a=(w[d.w]||[]).slice();
+      const at=a.indexOf(d.v);
+      if(at>=0)a.splice(at,1);else a.push(d.v);
+      if(a.length)w[d.w]=a;else delete w[d.w];
+      edit('gp',pid,pre+'em.'+d.i+'.w',Object.keys(w).length?w:null);
+      render();
+      break;}
+    case 'en_edit':S.ui.enc.ed[pid]=!S.ui.enc.ed[pid];render();break;
+    case 'en_mo':S.ui.enc.mo[d.key]=!S.ui.enc.mo[d.key];render();break;
+    case 'en_tab':S.ui.enc.tb[pid]=+d.k||0;delete S.ui.enc.res[pid];render();break;
+    case 'en_zone':{
+      const z=encZ(pid,+d.k||0);
+      z[d.m]=!z[d.m];
+      render();
+      break;}
+    case 'en_used':{
+      const t=encTab(pid,+d.k||0);
+      edit('gp',pid,t.pre+'eoUsed',!t.T.eoUsed);
       render();
       break;}
     case 'en_roll':{
-      const r=encRoll(pid);
-      if(!r){toast('Add a Pokémon with a weight above 0 first.');break;}
+      const r=encRollRef(pid,+d.k||0,d.m||'enc',d.f);
+      r.fid=d.f||'';
       S.ui.enc.res[pid]=r;
+      render();
+      break;}
+    case 'en_alpha':{
+      const r=S.ui.enc.res[pid];
+      if(!r||r.none||!r.lines.length)break;
+      const L=r.lines[0];
+      L.a=L.a?0:1;
       render();
       break;}
     case 'en_tobattle':{
       const r=S.ui.enc.res[pid];
-      if(!r)break;
+      if(!r||r.none)break;
       delete S.ui.enc.res[pid];
       await encToBattle(pid,r);
       setTab('battle');
       break;}
     case 'en_rollbattle':{
-      const r=encRoll(pid);
-      if(!r){toast('That place has nothing in its table yet.');break;}
-      await encToBattle(pid,r);
+      const ref=encRef(d.v);
+      const r=encRollRef(ref.id,ref.k,d.m||'enc','');
+      if(r.none){toast(r.why||'Nothing turns up.');break;}
+      await encToBattle(ref.id,r);
       break;}
+    case 'en_pick':{const fp=$('#encfile');if(fp)fp.click();break;}
+    case 'en_mode':S.ui.enc.imp.mode=d.v==='replace'?'replace':'add';render();break;
+    case 'en_exp':encExport();break;
+    case 'en_csv':encCsv();break;
     default:break;
   }
 }
@@ -4935,14 +6040,14 @@ function ntRowFill(t){
 function ntFoeFrom(id,nt,m){
   const hp=m.hp||{cur:20,max:20};
   const mx=Math.max(1,num(hp.max));
-  return {nick:m.nick||'',sp:m.sp||'',ty:[(m.ty||[])[0]||'',(m.ty||[])[1]||''],sz:m.sz||'Medium',wt:m.wt||'Medium',
+  return Object.assign({nick:m.nick||'',sp:m.sp||'',ty:[(m.ty||[])[0]||'',(m.ty||[])[1]||''],sz:m.sz||'Medium',wt:m.wt||'Medium',
     hp:{cur:clamp(num(hp.cur)>0?num(hp.cur):mx,1,mx),max:mx},
     base:Object.assign({atk:3,def:3,spa:3,spd:3,spe:3},m.base),bonus:Object.assign(zeroStats(),m.bonus),stages:zeroStats(),st:'',
     notes:m.notes||'',sk:m.sk||'',ps:(m.ps||[]).map(x=>Object.assign({},x)),mv:(m.mv||[]).map(x=>Object.assign({},x,{used:0})),
     item:m.item||'',up:m.up||'',down:m.down||'',natureName:m.natureName||'',gender:m.gender||'',shiny:m.shiny===true,
     mega:m.mega?JSON.parse(JSON.stringify(m.mega)):null,megaOn:false,
     sh:{name:num(m.sh&&m.sh.name),pic:num(m.sh&&m.sh.pic),types:num(m.sh&&m.sh.types),st:0,hp:0,item:num(m.sh&&m.sh.item),mega:0},
-    pn:foeLetter(),nt:id,ni:m.id,own:ntName(nt)};
+    pn:foeLetter(),nt:id,ni:m.id,own:ntName(nt)},m.hpx?{hpx:num(m.hpx)}:{});
 }
 function ntToBattle(id,mid,quiet){
   if(!S.me.admin)return;
@@ -6934,9 +8039,9 @@ function monBody(uid,m,ro,pos,len){
     ${evoPanel(uid,m,ro)}
     ${fText('Skills','p',id,'skills',m,{ro,ph:'Short list, separated by commas'})}
     ${ro?'':psHint(uid,m)}
-    <div class="list"><div class="ph"><h2>Passives</h2>${ro||ps.length>=TPL_MAX.passives?'':h`<button class="btn sm" data-act="add" ${bp('p',id,'passives')} data-tpl="passive">Add passive</button>`}<span class="sub">${ps.length} of ${TPL_MAX.passives}</span></div>
+    <div class="list"><div class="ph"><h2>Passives</h2>${ro||ps.length>=TPL_MAX.passives?'':h`<button class="btn sm" data-act="add" ${bp('p',id,'passives')} data-tpl="passive">Add passive</button>`}<span class="sub">${ps.length>TPL_MAX.passives?ps.length+' (usual limit '+TPL_MAX.passives+')':ps.length+' of '+TPL_MAX.passives}</span></div>
       ${ps.map((x,i)=>h`<div class="item"><div class="irow two">${fText('Passive','p',id,'passives.'+i+'.name',m,{ro,list:'dl-passives'})}${rowBtns('p',id,'passives',i,ps.length,ro)}</div>${fArea('Effect','p',id,'passives.'+i+'.text',m,{ro})}</div>`)}</div>
-    <div class="list"><div class="ph"><h2>Moves</h2>${ro||mv.length>=TPL_MAX.moves?'':h`<button class="btn sm" data-act="add" ${bp('p',id,'moves')} data-tpl="move">Add move</button>`}<span class="sub">${mv.length} of ${TPL_MAX.moves}</span></div>
+    <div class="list"><div class="ph"><h2>Moves</h2>${ro||mv.length>=TPL_MAX.moves?'':h`<button class="btn sm" data-act="add" ${bp('p',id,'moves')} data-tpl="move">Add move</button>`}<span class="sub">${mv.length>TPL_MAX.moves?mv.length+' (usual limit '+TPL_MAX.moves+')':mv.length+' of '+TPL_MAX.moves}</span></div>
       ${mv.map((x,i)=>moveRow(id,m,x,i,ro))}</div>
     ${csPanel(id,m,ro)}
     ${fArea('Notes','p',id,'notes',m,{ro,rows:3})}
@@ -7207,11 +8312,12 @@ function gmTab(){
       ${fArea('Pinned note for the party','meta','table','pinned',S.meta,{rows:3,cls:'wide',ph:'Shown at the top of the Overview'})}
     </div>
     <p class="sub">The banner is changed from the Overview page, the map from the Map page, and NPCs with portraits are added on the People page. Their secret notes are only visible to you.</p></section>
+  ${hpxDesk()}
   ${CFG?tableAccess():''}
   ${awardForm()}${awardHistory()}
   ${megaDesk()}
   ${giveDesk()}
-  ${evoDesk()}${evoLogDesk()}${ptaDesk()}
+  ${evoDesk()}${evoLogDesk()}${ptaDesk()}${encDesk()}
   <section class="panel"><div class="ph"><h2>Party snapshot</h2></div>
     <p>${top?h`Highest badge count: <b class="mono">${top[1]}</b> (${tName(S.trainers[top[0]])}).`:'No trainers yet.'}</p>
     <p class="sub">Loyalty and NPC secrets are stored where only editors can read them. Players never receive that data.</p></section>
@@ -7680,6 +8786,7 @@ function render(){
   const bv0=$('#bmview');
   const bprev=bv0?[bv0.scrollLeft,bv0.scrollTop]:null;
   renderHead();
+  renderToday();wxSync();
   const sh=$('#shell');
   sh.classList.toggle('nav-open',!!S.ui.navOpen);
   sh.classList.toggle('no-side',!!S.noDb);
@@ -7836,6 +8943,8 @@ function act(b,e){
   if(d.act&&d.act.indexOf('dx_')===0){dxAct(b,e);return;}
   if(d.act&&d.act.indexOf('ct_')===0){ctAct(b,e);return;}
   if(d.act&&d.act.indexOf('en_')===0){encAct(b);return;}
+  if(d.act&&d.act.indexOf('hpx_')===0){hpxAct(b);return;}
+  if(d.act&&d.act.indexOf('cd_')===0){cdAct(b);return;}
   if(d.act&&d.act.indexOf('sp_')===0){shAct(b);return;}
   if(d.act&&d.act.indexOf('rb_')===0){ribAct(b);return;}
   if(d.act&&d.act.indexOf('nt_')===0){ntAct(b,e);return;}
@@ -8159,6 +9268,14 @@ document.addEventListener('change',async e=>{
   if(t&&t.dataset&&t.dataset.b&&onSpeciesChange(t))return;
   if(t&&t.dataset&&t.dataset.evot!=null){evoTarget(t.dataset.pid,t.value);return;}
   if(t&&t.classList&&t.classList.contains('ptz')){ntFrameZoom(t,true);return;}
+  if(t&&t.dataset&&t.dataset.encfx!=null){if(S.me.admin)encFxEdit(t);return;}
+  if(t&&t.dataset&&t.dataset.encl!=null){if(S.me.admin)encListEdit(t);return;}
+  if(t&&t.id==='encfile'){
+    const f=t.files&&t.files[0];
+    try{t.value='';}catch(err){}
+    if(f&&S.me.admin)encImport(f);
+    return;
+  }
   if(t&&t.id==='ptafile'){
     const f=t.files&&t.files[0];
     try{t.value='';}catch(err){}
