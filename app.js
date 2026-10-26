@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-25 · Double HP and the Option B contest';
+const BUILD='2026-10-25 · A second wish list in the encounter tables';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -4509,14 +4509,22 @@ function wxSync(force){
    plus the situations the GM switches on by hand (a zone, a flag, a ferry day). Rolling gives a single encounter, a horde sized by the
    place's Danger, a same-species swarm, or a catch while fishing. Some groups have an alpha. Every Pokémon carries the PTA book's
    rarity (for the GM) and a realistic local rarity worked out from its odds right now. */
-S.ui.enc=Object.assign({res:{},pick:'',z:{},ed:{},tb:{},mo:{},np:'',df:'',imp:{mode:'add'}},S.ui.enc||{});
+S.ui.enc=Object.assign({res:{},pick:'',z:{},ed:{},tb:{},mo:{},np:'',df:'',imp:{mode:'add'},wo:{}},S.ui.enc||{});
 const ENC_MAX=60;
 const ENC_OOR='Out-of-region';
 TPL.enc=()=>({sp:'',w:10,lo:1,hi:1,bk:'U'});
 const ENC_BK={C:['●','Common'],U:['◆','Uncommon'],R:['★','Rare'],L:['✦','Legendary']};
+/* the players whose wishes are tracked. Each has a level on a row (wl, wl2: 1 interested, 2 really wants, 3 wants an alpha), a name on the place's GM page (wln, wln2) and, if you like, a reason (wr, wr2) */
+const ENC_WISH=[{l:'wl',n:'wln',r:'wr',d:'A player'},{l:'wl2',n:'wln2',r:'wr2',d:'A second player'}];
+const encWishOf=(o,gp)=>{
+  const out=[];
+  ENC_WISH.forEach((w,i)=>{const lv=Math.round(Number(o&&o[w.l]))||0;if(lv>0)out.push({i,lv:Math.min(3,lv),who:String((gp&&gp[w.n])||w.d),why:String((o&&o[w.r])||'')});});
+  return out;
+};
 const ENC_DIFF=[['easy','Easy',[0,1],'0–1 basic Pokémon per player'],['normal','Normal',[1,2],'1–2 basic or once-evolved per player'],['hard','Hard',[2,3],'2–3 per player, mostly evolved'],['danger','Dangerous',[3,4],'3–4 fully evolved per player']];
 const ENC_DG={1:'easy',2:'easy',3:'normal',4:'hard',5:'danger'};
 const ENC_HORDE_MAX=12;
+const ENC_LEVELS=[['1','Interested'],['2','Really wants'],['3','Wants an alpha']];
 
 /* =========================== the odds (no page code in here) =========================== */
 const encKey=s=>String(s==null?'':s).trim().toLowerCase();
@@ -4637,7 +4645,7 @@ function encVisitor(T){
   const die=T.evd==='d8'?8:6;
   const roll=encRand(1,die);
   const v=ev[(roll-1)%ev.length];
-  return {sp:v.sp,o:v.o||'',y:v.y||'',roll,die};
+  return {sp:v.sp,o:v.o||'',y:v.y||'',roll,die,wl:num(v.wl),wl2:num(v.wl2),wr:v.wr||'',wr2:v.wr2||''};
 }
 /* how common something is here, in plain words, from its chance among everything that turns up right now */
 const encPct=p=>p>=5?Math.round(p):Math.round(p*10)/10;
@@ -4654,7 +4662,7 @@ function encGate(E){
 }
 function encLine(T,e,n,E,alphaOk){
   const r=e.row||{};
-  const L={sp:e.sp,n,a:0,p:Math.round(e.p*10)/10,bk:r.bk||e.bk||'',wl:num(r.wl),so:r.so?1:0,al:num(r.al)};
+  const L={sp:e.sp,n,a:0,p:Math.round(e.p*10)/10,bk:r.bk||e.bk||'',wl:num(r.wl),wl2:num(r.wl2),wr:r.wr||'',wr2:r.wr2||'',so:r.so?1:0,al:num(r.al)};
   if(alphaOk&&num(r.al)>0&&Math.random()*100<num(r.al))L.a=1;
   return L;
 }
@@ -4679,10 +4687,10 @@ function encRollT(T,c,z,o){
     if(pick.oor){
       const v=encVisitor(T);
       if(!v){out.none=true;out.why='Nothing bites.';return out;}
-      out.lines.push({sp:v.sp,n:1,a:0,p:Math.round(pick.w/tot*1000)/10,bk:'',wl:0,vi:v});
+      out.lines.push({sp:v.sp,n:1,a:0,p:Math.round(pick.w/tot*1000)/10,bk:'',wl:v.wl,wl2:v.wl2,wr:v.wr,wr2:v.wr2,vi:v});
     }else{
       const r=(T.enc||[]).find(x=>encKey(x.sp)===pick.k)||{};
-      out.lines.push({sp:pick.sp,n:1,a:0,p:Math.round(pick.w/tot*1000)/10,bk:pick.bk||r.bk||'',wl:num(r.wl),so:0,al:0});
+      out.lines.push({sp:pick.sp,n:1,a:0,p:Math.round(pick.w/tot*1000)/10,bk:pick.bk||r.bk||'',wl:num(r.wl),wl2:num(r.wl2),wr:r.wr||'',wr2:r.wr2||'',so:0,al:0});
     }
     return out;
   }
@@ -4701,7 +4709,7 @@ function encRollT(T,c,z,o){
   const visit=e=>{
     const v=encVisitor(T);
     if(!v)return null;
-    return {sp:v.sp,n:1,a:0,p:Math.round(e.p*10)/10,bk:'',wl:0,vi:v};
+    return {sp:v.sp,n:1,a:0,p:Math.round(e.p*10)/10,bk:'',wl:v.wl,wl2:v.wl2,wr:v.wr,wr2:v.wr2,vi:v};
   };
   if(mode==='horde'){
     const N=o.n||1;
@@ -4770,6 +4778,54 @@ function encFxText(fx){
     return (f.s==='*'&&f.each?'* each':nm)+' '+(num(f.v)<0?'-':'+')+Math.abs(num(f.v));
   }).join('\n');
 }
+/* bringing the wishes of a newer file into a table the GM already has. Only wishes move: a wished Pokémon is added if the table lacks it,
+   and the wish and its reason are set where the GM has none. Weights, notes and everything else the GM set are left alone. */
+const ENC_WISHKEYS=['wl','wl2','wr','wr2'];
+const encWished=r=>!!r&&(num(r.wl)>0||num(r.wl2)>0);
+function encMergeList(curList,incList,add){
+  const out=(Array.isArray(curList)?curList:[]).map(r=>Object.assign({},r));
+  let added=0,marked=0;
+  (Array.isArray(incList)?incList:[]).forEach(n=>{
+    if(!n||!String(n.sp||'').trim()||!encWished(n))return;
+    const o=out.find(r=>encKey(r.sp)===encKey(n.sp));
+    if(o){
+      ENC_WISHKEYS.forEach(f=>{if(n[f]!==undefined&&(o[f]===undefined||o[f]===null||o[f]==='')){o[f]=n[f];if(f==='wl'||f==='wl2')marked++;}});
+    }else if(add&&out.length<ENC_MAX){
+      out.push(Object.assign({},n));added++;
+      marked+=(num(n.wl)>0?1:0)+(num(n.wl2)>0?1:0);
+    }
+  });
+  return {list:out,added,marked};
+}
+/* returns {patch, added, marked, changed}; patch holds only the fields that changed, ready for a merge-write */
+function encMergeDoc(cur,inc,names){
+  cur=cur||{};inc=inc||{};names=names||{};
+  const patch={};let added=0,marked=0;
+  const m=encMergeList(cur.enc,inc.enc,true);
+  const v=Array.isArray(cur.ev)?encMergeList(cur.ev,inc.ev,false):null;
+  if(m.added||m.marked||(v&&v.marked)){
+    patch.enc=m.list;added+=m.added;marked+=m.marked;
+    if(v&&v.marked){patch.ev=v.list;marked+=v.marked;}
+  }
+  if(Array.isArray(cur.ex)&&Array.isArray(inc.ex)){
+    let hit=false;
+    const ex=cur.ex.map(e=>{
+      const n=inc.ex.find(x=>x&&e&&x.nm===e.nm);
+      if(!n||!e)return e;
+      const a=encMergeList(e.enc,n.enc,true),b=Array.isArray(e.ev)?encMergeList(e.ev,n.ev,false):null;
+      if(!(a.added||a.marked||(b&&b.marked)))return e;
+      hit=true;added+=a.added;marked+=a.marked+(b?b.marked:0);
+      return Object.assign({},e,{enc:a.list},b&&b.marked?{ev:b.list}:{});
+    });
+    if(hit)patch.ex=ex;
+  }
+  const touched=Object.keys(patch).length>0;
+  if(touched||added||marked){
+    if(names.wln&&!cur.wln)patch.wln=String(names.wln);
+    if(names.wln2&&!cur.wln2)patch.wln2=String(names.wln2);
+  }
+  return {patch,added,marked,changed:touched};
+}
 /* =========================== end of the odds =========================== */
 
 const encGp=pid=>S.gmPl[pid]||{};
@@ -4828,7 +4884,9 @@ async function encToBattle(pid,res){
 /* ----- the panel on a place's page ----- */
 const encMd=s=>raw(esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>'));
 const encBk=bk=>ENC_BK[bk]?h`<span class="pill encbk" title="Rarity in the PTA books (GM only)">${ENC_BK[bk][0]} ${ENC_BK[bk][1]}</span>`:'';
-const encWlText=(gp,w)=>{const who=gp.wln||'A player';return w===3?who+' wants an alpha':w===2?who+' really wants this':who+' is interested';};
+const encWlText=(gp,w,i)=>{const k=ENC_WISH[i||0];const who=(gp&&gp[k.n])||k.d;return w===3?who+' wants an alpha':w===2?who+' really wants this':who+' is interested';};
+/* the wish pills for a row, a visitor or a result line; with the reasons if asked */
+const encWishPills=(gp,o,why)=>encWishOf(o,gp).map(x=>h` <span class="pill encwl w${x.lv} p${x.i+1}" ${why||!x.why?'':raw('title="'+esc(x.why)+'"')}>${encWlText(gp,x.lv,x.i)}</span>${why&&x.why?h` <span class="sub">${x.why}</span>`:''}`);
 function encNeeds(w){
   if(!w)return '';
   const bits=[];
@@ -4845,13 +4903,12 @@ function encResult(pid,r){
     <div class="row"><button class="btn sm" data-act="en_roll" data-id="${pid}" data-k="${r.k}" data-m="${r.kind}" data-f="${r.fid||''}">Roll again</button></div></div>`;
   const lead=r.lines[0];
   const title=r.lines.map(L=>(L.a?'Alpha ':'')+L.sp+(L.n>1?' ×'+L.n:'')).join(', ');
-  const wl=r.lines.filter(L=>L.wl>0&&(!L.vi));
   const diff=r.kind==='horde'?ENC_DIFF.find(x=>x[0]===r.diff):null;
   return h`<div class="ctres encres" role="status" aria-live="polite"><span class="k">${(encKindWord[r.kind]||'encounter').toUpperCase()}${r.fishLb?' · '+r.fishLb.toUpperCase():''}</span>
     <div class="big">${title}</div>
     ${r.lines.map(L=>h`<div class="encline">${L.a?h`<span class="pill encal">ALPHA</span> `:''}<b>${L.sp}</b>${L.n>1?' ×'+L.n:''}
-      ${L.vi?h`<span class="sub">Out-of-region visitor${L.vi.o?' from '+L.vi.o:''} (d${L.vi.die} → ${L.vi.roll}). ${L.vi.y}</span>`
-        :h`<span class="sub">${encPct(L.p)}% here · ${encLocal(L.p)}</span> ${encBk(L.bk)}${L.so?h` <span class="pill">herd or pack</span>`:''}${L.wl>0?h` <span class="pill encwl w${L.wl}">${encWlText(gp,L.wl)}</span>`:''}`}</div>`)}
+      ${L.vi?h`<span class="sub">Out-of-region visitor${L.vi.o?' from '+L.vi.o:''} (d${L.vi.die} → ${L.vi.roll}). ${L.vi.y}</span>${encWishPills(gp,L,true)}`
+        :h`<span class="sub">${encPct(L.p)}% here · ${encLocal(L.p)}</span> ${encBk(L.bk)}${L.so?h` <span class="pill">herd or pack</span>`:''}${encWishPills(gp,L,true)}`}</div>`)}
     ${r.kind==='horde'?h`<div class="sub">A horde for ${r.players} ${r.players===1?'player':'players'} on ${diff?diff[1]:'Normal'}: ${diff?diff[3]:''} (${r.want} wanted${r.n!==r.want?', '+r.n+' rolled':''}).</div>`:''}
     ${r.kind==='swarm'?h`<div class="sub">A swarm of one kind. 3–6 of them.</div>`:''}
     <div class="sub">${r.cond}${r.E&&r.E.only?' · '+r.E.only:''}</div>
@@ -4862,10 +4919,9 @@ function encResult(pid,r){
 }
 function encRowView(gp,e,sorted){
   const r=e.row||{};
-  const wl=num(r.wl);
   const bk=r.bk||e.bk||'';
   return h`<li class="encr ${e.p<=0?'zero':''}">
-    <span class="encn"><b>${e.sp}</b>${r.so?h` <span class="pill">herd or pack</span>`:''}${r.sw?h` <span class="pill">swarms</span>`:''}${num(r.al)>0?h` <span class="pill encal" title="Chance that a group of these has an alpha">alpha ${num(r.al)}%</span>`:''}${wl>0?h` <span class="pill encwl w${wl}">${encWlText(gp,wl)}</span>`:''}</span>
+    <span class="encn"><b>${e.sp}</b>${r.so?h` <span class="pill">herd or pack</span>`:''}${r.sw?h` <span class="pill">swarms</span>`:''}${num(r.al)>0?h` <span class="pill encal" title="Chance that a group of these has an alpha">alpha ${num(r.al)}%</span>`:''}${encWishPills(gp,r)}</span>
     <span class="encp" style="--p:${Math.min(100,Math.round(e.p))}%"><b>${encPct(e.p)}%</b> now${Math.abs(e.p-e.bp)>=0.5?h` <small>(${encPct(e.bp)}% usually)</small>`:''}</span>
     <span class="encl">${encLocal(e.p)}</span>
     ${encBk(bk)}
@@ -4881,7 +4937,9 @@ function encEditRow(pid,pre,gp,T,x,i,len){
     ${fNum('Max','gp',pid,p+'hi',gp,{min:1,max:8})}
     ${fNum('Alpha %','gp',pid,p+'al',gp,{min:0,max:100})}
     ${fSel('Book rarity','gp',pid,p+'bk',gp,[['C','● Common'],['U','◆ Uncommon'],['R','★ Rare']],{blank:'Not set'})}
-    ${fSel('Wanted','gp',pid,p+'wl',gp,[['1','Interested'],['2','Really wants'],['3','Wants an alpha']],{blank:'No'})}
+    ${fSel(gp.wln2?'Wanted by '+(gp.wln||'player 1'):'Wanted','gp',pid,p+'wl',gp,ENC_LEVELS,{blank:'No'})}
+    ${fSel('Wanted by '+(gp.wln2||'player 2'),'gp',pid,p+'wl2',gp,ENC_LEVELS,{blank:'No'})}
+    ${num(x.wl)>0?fText('Why '+(gp.wln||'player 1')+' wants it','gp',pid,p+'wr',gp,{cls:'c-nt'}):''}${num(x.wl2)>0?fText('Why '+(gp.wln2||'player 2')+' wants it','gp',pid,p+'wr2',gp,{cls:'c-nt'}):''}
     <div class="fld"><span class="fl">Groups</span><span class="row">${fCheck('Herd','gp',pid,p+'so',gp)}${fCheck('Swarm','gp',pid,p+'sw',gp)}</span></div>
     ${fText('Note','gp',pid,p+'n',gp,{cls:'c-nt'})}
     ${rowBtns('gp',pid,pre+'enc',i,len,false)}</div>`;
@@ -4944,7 +5002,7 @@ function encPanel(f){
     ${autoOff.length?h`<details class="encoff"><summary>${autoOff.length} other ${autoOff.length===1?'condition':'conditions'} change this table</summary><ul class="mini-list">${autoOff.map(m=>h`<li><b>${m.lb}</b> <span class="sub">needs ${encNeeds(m.w)||'a switch'}${m.tx?' · '+m.tx.replace(/\*\*/g,''):''}</span></li>`)}</ul></details>`:''}
     ${shown.length?h`<ul class="enclist2" aria-label="What can turn up now">${shown.map(e=>encRowView(gp,e))}</ul>`:h`<p class="sub">Nothing here yet. Add the Pokémon that live in this place.</p>`}
     ${oor&&oor.w>0?h`<p class="sub">${encPct(oor.p)}% of the time it is a visitor from another region. Roll ${T.evd==='d8'?'d8':'d6'} on the visitor list (${(T.ev||[]).length} listed).</p>`:''}
-    ${(Array.isArray(T.ev)&&T.ev.length)?h`<details class="encoff"><summary>Visitors from other regions</summary><ol class="mini-list">${T.ev.map(v=>h`<li><b>${v.sp}</b> <span class="sub">${v.o?'('+v.o+') ':''}${v.y||''}</span></li>`)}</ol></details>`:''}
+    ${(Array.isArray(T.ev)&&T.ev.length)?h`<details class="encoff"><summary>Visitors from other regions</summary><ol class="mini-list">${T.ev.map(v=>h`<li><b>${v.sp}</b> <span class="sub">${v.o?'('+v.o+') ':''}${v.y||''}</span>${encWishPills(gp,v,true)}</li>`)}</ol></details>`:''}
     ${T.eon?h`<div class="mgd encone"><b>Once per campaign</b> ${used?h`<span class="pill">Used</span>`:''}<p class="sub">${encMd(T.eon)}</p><div class="row"><button class="btn sm" data-act="en_used" data-id="${pid}" data-k="${t.k}">${used?'Mark as not used':'Mark as used'}</button></div></div>`:''}
     <div class="fgrid encroll">
       <label class="fld"><span class="fl">Players</span><input type="number" min="1" max="8" data-u="enc.np" value="${S.ui.enc.np===''?'':encPlayers()}" placeholder="${tids().length||1}" data-nr></label>
@@ -4960,7 +5018,8 @@ function encPanel(f){
       <p class="sub">A weight of 30 out of a total of about 100 is a 30% chance. A weight of 0 means it only turns up when a condition adds it. Min and Max say how many come at once. Alpha % is the chance that a group has an alpha. The players never see any of this.</p>
       <div class="fgrid">${fNum('Danger (1–5)','gp',pid,pre+'dg',gp,{min:1,max:5})}${fNum('Visitor weight','gp',pid,pre+'eo',gp,{min:0,max:100})}
         <label class="fld"><span class="fl">Visitor die</span><select ${bd('gp',pid,pre+'evd')}>${[['d6','d6'],['d8','d8']].map(o=>h`<option value="${o[0]}" ${T.evd===o[0]?raw('selected'):''}>${o[1]}</option>`)}</select></label>
-        ${pre===''?fText('Name for the player you track','gp',pid,'wln',gp,{ph:'e.g. Implala'}):''}</div>
+        ${pre===''?fText('Name for the player you track','gp',pid,'wln',gp,{ph:'e.g. Implala'}):''}
+        ${pre===''?fText('Name for a second player','gp',pid,'wln2',gp,{ph:'e.g. the second character'}):''}</div>
       ${rows.length?h`<div class="enclist">${rows.map((x,i)=>encEditRow(pid,pre,gp,T,x,i,rows.length))}</div>`:h`<p class="sub">No rows yet.</p>`}
       <div class="row"><button class="btn sm" data-act="en_new" data-id="${pid}" data-k="${t.k}" ${rows.length>=ENC_MAX?raw('disabled'):''}>Add a Pokémon</button>
         <span class="sub">${rows.length} of ${ENC_MAX}</span></div>
@@ -4987,27 +5046,63 @@ function encBattlePanel(){
 }
 
 /* ----- GM Desk: import and export ----- */
+/* who wants what, and where it turns up: one list per tracked player, from each table's usual chances */
+function encWishIndex(){
+  const c={t:'day',x:'clear',s:'spring',m:'waxing',d:'high',f:false};
+  const res=ENC_WISH.map(()=>({}));
+  encPlaces().forEach(pl=>{
+    const t=encTab(pl.id,pl.k);
+    const E=encEff(t.T,c,{});
+    E.W.filter(e=>!e.oor&&e.b>0).forEach(e=>{
+      const r=e.row||{};
+      ENC_WISH.forEach((w,i)=>{
+        const lv=num(r[w.l]);
+        if(lv<=0)return;
+        const o=res[i][e.sp]||(res[i][e.sp]={sp:e.sp,lv:0,why:'',places:[]});
+        o.lv=Math.max(o.lv,lv);
+        if(!o.why&&r[w.r])o.why=String(r[w.r]);
+        o.places.push({name:pl.name,p:e.bp});
+      });
+    });
+  });
+  return res.map(m=>Object.keys(m).map(k=>m[k]).sort((a,b)=>a.sp<b.sp?-1:a.sp>b.sp?1:0));
+}
+const encWishName=i=>Object.keys(S.gmPl||{}).map(id=>(S.gmPl[id]||{})[ENC_WISH[i].n]).find(x=>x)||'';
+function encWishList(x){
+  const gp={};
+  gp[ENC_WISH[x.i].n]=x.name;
+  return h`<ul class="mini-list encwish" aria-label="${x.name||ENC_WISH[x.i].d}: wished Pokémon">${x.list.map(o=>{
+    const ps=o.places.slice().sort((a,b)=>b.p-a.p);
+    return h`<li><b>${o.sp}</b>${o.lv>1?h` <span class="pill encwl w${o.lv} p${x.i+1}">${encWlText(gp,o.lv,x.i)}</span>`:''} <span class="sub">${o.why?o.why+' · ':''}${ps.slice(0,4).map(p=>p.name+' '+encPct(p.p)+'%').join(', ')}${ps.length>4?' and '+(ps.length-4)+' more':''}</span></li>`;})}</ul>`;
+}
 function encDesk(){
   const im=S.ui.enc.imp||{};
   const have=Object.keys(S.gmPl||{}).filter(id=>PD_BY[id]&&encRows(encGp(id)).length).length;
+  const wo=S.ui.enc.wo||{};
+  const idx=have?encWishIndex():null;
+  const wishes=idx?ENC_WISH.map((w,i)=>idx[i].length?{i,name:encWishName(i),list:idx[i]}:null).filter(Boolean):[];
+  const mode=im.mode==='replace'?'replace':im.mode==='wish'?'wish':'add';
   return h`<section class="panel"><div class="ph"><h2>Encounter data</h2><span class="pill gm">GM only</span>
       <div class="acts"><button class="btn sm" data-act="en_pick" ${im.busy?raw('disabled'):''}>Import encounter data</button>
         <button class="btn sm ghost" data-act="en_exp" ${S.dl&&have?'':raw('disabled')}>Download tables</button>
         <button class="btn sm ghost" data-act="en_csv" ${S.dl&&have?'':raw('disabled')}>Rarity sheet (CSV)</button></div></div>
     <p class="sub">${have?have+' places have a table of wild Pokémon.':'No places have a table yet.'} Choose <b>sinnoh-encounter-data.json</b> from the update download. Every place gets its Pokémon with their chances, the PTA book rarity, hordes, swarms, alphas, and how the chances shift with time of day, weather, season, moon, tide and festival week. The tables go into your private GM notes, not into the public site.</p>
-    <div class="row evchips" role="group" aria-label="When a place already has a table"><button class="chip enchip" data-act="en_mode" data-v="add" aria-pressed="${String(im.mode!=='replace')}">Only places without a table</button><button class="chip enchip" data-act="en_mode" data-v="replace" aria-pressed="${String(im.mode==='replace')}">Replace every table</button></div>
-    <p class="sub">${im.mode==='replace'?'Every place in the file gets the new table. Tables you wrote yourself are overwritten. Your GM notes on each place are kept.':'Places where you already wrote a table keep it. Your GM notes are always kept.'}</p>
+    <div class="row evchips" role="group" aria-label="When a place already has a table"><button class="chip enchip" data-act="en_mode" data-v="add" aria-pressed="${String(mode==='add')}">Only places without a table</button><button class="chip enchip" data-act="en_mode" data-v="wish" aria-pressed="${String(mode==='wish')}">Add wishes to existing tables</button><button class="chip enchip" data-act="en_mode" data-v="replace" aria-pressed="${String(mode==='replace')}">Replace every table</button></div>
+    <p class="sub">${mode==='replace'?'Every place in the file gets the new table. Tables you wrote yourself are overwritten. Your GM notes on each place are kept.':mode==='wish'?'Use this after an update that brings new wished Pokémon. A place with a table gets only the wished Pokémon it lacks and the wish marks (and reasons) it does not have; the chances, notes and conditions you set are left alone. Places without a table get the whole table. Your GM notes are always kept.':'Places where you already wrote a table keep it. Your GM notes are always kept.'}</p>
     ${im.busy?h`<progress class="ptaprog" max="${num(im.total)}" value="${num(im.done)}" aria-label="Import progress"></progress>`:''}
     ${im.msg?h`<p class="sub ${im.bad?'bad':''}" role="status">${im.msg}</p>`:''}
+    ${wishes.length?h`<div class="encwishes"><h3>Wished Pokémon</h3><p class="sub">Where each Pokémon a player wants turns up, with its usual chance there.</p>
+      ${wishes.map(x=>h`<div class="fld"><button class="btn sm ${wo[x.i]?'primary':''}" data-act="en_wo" data-i="${x.i}" aria-expanded="${String(!!wo[x.i])}">${x.name||ENC_WISH[x.i].d} · ${x.list.length} Pokémon</button>${wo[x.i]?encWishList(x):''}</div>`)}</div>`:''}
   </section>`;
 }
 /* what goes into a place's GM document */
-function encDocOf(p,wln){
+function encDocOf(p,wln,wln2){
   const o={};
   ['dg','enc','em','ev','evd','eo','eon','dr','nb','nm','ex'].forEach(k=>{if(p[k]!==undefined)o[k]=p[k];});
   if(!p.dr)o.dr=false;
   o.eoUsed=false;
   if(wln)o.wln=String(wln);
+  if(wln2)o.wln2=String(wln2);
   o.ei=Date.now();
   return o;
 }
@@ -5017,22 +5112,46 @@ async function encImport(file){
   let d=null;
   try{d=JSON.parse(await file.text());}catch(e){}
   if(!d||d.format!=='sinnoh-encounters'||!d.places||typeof d.places!=='object'){say('That is not the encounter data file. Use sinnoh-encounter-data.json from the update download.',true);return;}
-  const mode=im.mode==='replace'?'replace':'add';
+  const mode=im.mode==='replace'?'replace':im.mode==='wish'?'wish':'add';
+  const names={wln:d.wln,wln2:d.wln2};
   const ids=Object.keys(d.places).filter(id=>PD_BY[id]&&d.places[id]&&Array.isArray(d.places[id].enc));
-  const todo=ids.filter(id=>mode==='replace'||!encRows(encGp(id)).length);
-  const skipped=ids.length-todo.length;
-  if(!todo.length){say('Nothing to import. All '+ids.length+' places already have a table. Choose “Replace every table” to overwrite them.',true);return;}
-  im.busy=true;im.done=0;im.total=todo.length;im.msg='Importing…';im.bad=false;scheduleRender();
+  /* what would be written: {id, doc, fresh|added|marked} */
+  const plan=[];
+  let skipped=0;
+  ids.forEach(id=>{
+    const has=encRows(encGp(id)).length>0;
+    if(mode==='replace'||!has){plan.push({id,doc:encDocOf(d.places[id],d.wln,d.wln2),fresh:1});return;}
+    if(mode==='wish'){
+      const m=encMergeDoc(encGp(id),d.places[id],names);
+      if(m.changed)plan.push({id,doc:Object.assign(m.patch,{ei:Date.now()}),added:m.added,marked:m.marked});
+      else skipped++;
+      return;
+    }
+    skipped++;
+  });
+  if(!plan.length){
+    if(mode==='wish'){say('Nothing to add. Your tables already have every Pokémon and wish in this file.',false);return;}
+    const more=ids.some(id=>encRows(encGp(id)).length&&encMergeDoc(encGp(id),d.places[id],names).changed);
+    say('Nothing to import. All '+ids.length+' places already have a table.'+(more?' This file does carry wished Pokémon your tables do not have yet: choose “Add wishes to existing tables” and import again.':' Choose “Replace every table” to overwrite them.'),!more);
+    return;
+  }
+  im.busy=true;im.done=0;im.total=plan.length;im.msg='Importing…';im.bad=false;scheduleRender();
   try{
     let batch=S.db.batch(),n=0;
-    for(const id of todo){
-      batch.set(S.db.collection('gm').doc('place_'+id),encDocOf(d.places[id],d.wln),{merge:true});
+    for(const x of plan){
+      batch.set(S.db.collection('gm').doc('place_'+x.id),x.doc,{merge:true});
       n++;
       if(n>=15){await batch.commit();im.done+=n;n=0;batch=S.db.batch();scheduleRender();}
     }
     if(n){await batch.commit();im.done+=n;}
   }catch(e){say('The import stopped ('+((e&&e.code)||'error')+'). Some of it may be saved. Run it again to finish.',true);return;}
-  say('Imported tables for '+todo.length+' places'+(skipped?'; kept '+skipped+' that already had one':'')+'.',false);
+  if(mode==='wish'){
+    const fresh=plan.filter(x=>x.fresh).length,upd=plan.length-fresh;
+    const add=plan.reduce((a,x)=>a+(x.added||0),0),mk=plan.reduce((a,x)=>a+(x.marked||0),0);
+    say('Updated '+upd+' places: added '+add+' Pokémon and marked '+mk+' wishes'+(fresh?'; imported '+fresh+' new tables':'')+'. Weights and notes you wrote were left alone.',false);
+    return;
+  }
+  say('Imported tables for '+plan.length+' places'+(skipped?'; kept '+skipped+' that already had one':'')+'.',false);
 }
 function encExport(){
   if(!S.dl)return;
@@ -5045,7 +5164,8 @@ function encExport(){
     places[id]=o;
   });
   const wln=Object.keys(S.gmPl).map(id=>S.gmPl[id].wln).find(x=>x)||'';
-  return S.dl.save({filename:'sinnoh-encounter-data.json',data:JSON.stringify({format:'sinnoh-encounters',v:2,wln,places})}).catch(e=>{if(!e||e.code!=='declined')toast('Could not offer the download');});
+  const wln2=Object.keys(S.gmPl).map(id=>S.gmPl[id].wln2).find(x=>x)||'';
+  return S.dl.save({filename:'sinnoh-encounter-data.json',data:JSON.stringify(Object.assign({format:'sinnoh-encounters',v:3,wln},wln2?{wln2}:{},{places}))}).catch(e=>{if(!e||e.code!=='declined')toast('Could not offer the download');});
 }
 function encCsv(){
   if(!S.dl)return;
@@ -5057,7 +5177,7 @@ function encCsv(){
     const E=encEff(T,c,{});
     E.W.filter(e=>!e.oor&&(e.b>0)).sort((a,b)=>b.bp-a.bp).forEach(e=>{
       const r=e.row||{};
-      lines.push([PD_BY[pl.id].name,t.k?t.nm:'',e.sp,ENC_BK[r.bk]?ENC_BK[r.bk][1]:'',Math.round(e.bp*10)/10,(num(r.lo)||1)+(num(r.hi)>num(r.lo)?'-'+num(r.hi):''),r.so?'yes':'',r.sw?'yes':'',num(r.al)||'',num(r.wl)>0?encWlText(gp,num(r.wl)):'',r.n||''].map(q).join(','));
+      lines.push([PD_BY[pl.id].name,t.k?t.nm:'',e.sp,ENC_BK[r.bk]?ENC_BK[r.bk][1]:'',Math.round(e.bp*10)/10,(num(r.lo)||1)+(num(r.hi)>num(r.lo)?'-'+num(r.hi):''),r.so?'yes':'',r.sw?'yes':'',num(r.al)||'',encWishOf(r,gp).map(x=>encWlText(gp,x.lv,x.i)+(x.why?' ('+x.why+')':'')).join('; '),r.n||''].map(q).join(','));
     });
   });
   return S.dl.save({filename:'sinnoh-pokemon-rarity.csv',data:'﻿'+lines.join('\r\n'),mime:'text/csv'}).catch(e=>{if(!e||e.code!=='declined')toast('Could not offer the download');});
@@ -5151,7 +5271,8 @@ async function encAct(b){
       await encToBattle(ref.id,r);
       break;}
     case 'en_pick':{const fp=$('#encfile');if(fp)fp.click();break;}
-    case 'en_mode':S.ui.enc.imp.mode=d.v==='replace'?'replace':'add';render();break;
+    case 'en_mode':S.ui.enc.imp.mode=d.v==='replace'?'replace':d.v==='wish'?'wish':'add';render();break;
+    case 'en_wo':{const wo=S.ui.enc.wo=S.ui.enc.wo||{};wo[d.i]=!wo[d.i];render();break;}
     case 'en_exp':encExport();break;
     case 'en_csv':encCsv();break;
     default:break;
