@@ -402,6 +402,14 @@ What the fog hides from the players: a foe you have shown stays out of their cop
 - Squares are counted for you, and walls stop shapes and tokens, but movement costs, the effects of other terrain, cover, doors and real line of sight are not applied: you judge those. A wall is a whole square, and "line of effect" is a straight line between square centres, so a corner case may need your ruling. The terrain, markers and shapes are there to show everyone what you decided.
 - **Download my backup** includes the map's settings, terrain, markers and foe positions for the GM, but not the picture or the library. Keep the original picture files.
 
+## The Trainer Gear look (Update 28)
+
+The whole site now looks like a handheld device: a red shell with the screen inside it, a side rail with an icon for every page, a status strip, and cleaner panels and cards, in a light or a night theme (the moon button still switches them). Only the look changed. Every page, button and saved document works as before, and the Firestore rules and `backend.js` are untouched.
+
+- **Phones.** The shell shrinks to a slim frame and the rail becomes the **Menu** drawer, as before.
+- **Where it lives.** The look is one block of styles at the end of the style sheet in `index.html` (search for "Trainer Gear look"), plus a small wrapper around the page. To go back to the old look, put your previous `index.html` back; nothing else depends on it.
+- **Not changed yet.** The phone home screen of app tiles and the sample screens in the design mock-up are not part of this update.
+
 ## NPC categories and sorting (Update 27)
 
 Every person on **People** and every NPC on **NPC Trainers** now belongs to a **kind**: Gym Leader, League, Rival, Trainer, Coordinator, Ranger, Researcher, Farm and co-op, Healer, Shopkeeper, Local official or Other. The GM's NPC Trainers page also has **Villain faction**, a kind only the GM ever sees.

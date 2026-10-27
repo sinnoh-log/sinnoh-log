@@ -1079,9 +1079,104 @@ html.lbx-on,html.lbx-on body{overflow:hidden}
 .enced{border-top:1px dashed var(--line);margin-top:12px;padding-top:6px}
 .encroll{margin-top:10px}
 @media (max-width:700px){.encr{grid-template-columns:minmax(0,1fr) auto}.encr .encn{grid-column:1/-1}.encr .encl{justify-self:end}}
+
+/* ===== Update 28: Trainer Gear look. A handheld shell, a rail with icons, new type and colours. Nothing here changes how a page works. ===== */
+:root{
+  --bg:#E8EEF8; --lat:transparent; --panel:#E9F1F7; --raised:#FFFFFF; --field:#FFFFFF;
+  --ink:#172447; --muted:#4F6485; --line:#BCCDE3; --line-soft:#DCE6F3;
+  --accent:#B92345; --accent-ink:#FFFFFF; --accent-soft:#FBE4E9;
+  --frame:#A9BCD8; --frame-in:transparent; --frame-sh:#BCCDE3; --cursor:#B92345;
+  --rail:#DCE8F4; --bar:#D2E2ED; --head:#F9FCFF; --rail-hover:#C9DAEC;
+  --f-pix:'Chakra Petch','Trebuchet MS',system-ui,sans-serif; --f-num:'Chakra Petch',ui-monospace,monospace;
+  --f-body:'IBM Plex Sans','Segoe UI',system-ui,-apple-system,sans-serif;
+  --shadow:0 2px 0 rgba(36,56,122,.18),0 10px 24px rgba(20,32,63,.12);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0B1224; --panel:#121C3B; --raised:#1A2650; --field:#0F1836;
+  --ink:#E8EEFF; --muted:#A9B8E3; --line:#2F427F; --line-soft:#24346B;
+  --accent:#C8324E; --accent-ink:#FFFFFF; --accent-soft:#3A2040;
+  --frame:#3A4F96; --frame-in:transparent; --frame-sh:#2F427F; --cursor:#FF6B7D;
+  --rail:#0F1A38; --bar:#1A2650; --head:#16224A; --rail-hover:#1F2E5E}}
+:root[data-theme="dark"]{
+  --bg:#0B1224; --panel:#121C3B; --raised:#1A2650; --field:#0F1836;
+  --ink:#E8EEFF; --muted:#A9B8E3; --line:#2F427F; --line-soft:#24346B;
+  --accent:#C8324E; --accent-ink:#FFFFFF; --accent-soft:#3A2040;
+  --frame:#3A4F96; --frame-in:transparent; --frame-sh:#2F427F; --cursor:#FF6B7D;
+  --rail:#0F1A38; --bar:#1A2650; --head:#16224A; --rail-hover:#1F2E5E}
+body{background-image:none;background-color:var(--bg);padding:20px 16px 40px}
+/* the handheld */
+.dev{max-width:1320px;margin:0 auto;background:linear-gradient(135deg,#E84E51,#B92345 48%,#741A35);border-radius:36px;padding:14px 14px 12px;border:3px solid #89283D;box-shadow:0 24px 48px rgba(20,30,70,.28),inset 0 4px 5px rgba(255,186,178,.7),inset 0 -6px 8px #66172B}
+.dev-top{display:flex;justify-content:space-between;align-items:center;padding:0 14px 9px;color:#FFE5E3;font:700 11px var(--f-body);letter-spacing:.2em}
+.dev-on{display:inline-flex;align-items:center;gap:8px}
+.dev-on i{width:8px;height:8px;border-radius:50%;background:#A2E5D1;box-shadow:0 0 8px #C1FFEC}
+.dev-frame{background:#192542;padding:10px;border:6px solid #43243C;border-radius:22px;box-shadow:inset 0 4px 12px rgba(0,0,0,.6)}
+.shell{max-width:none;margin:0;gap:0;padding-bottom:0;grid-template-columns:236px minmax(0,1fr);background:var(--panel);border-radius:10px;overflow:clip;min-height:70vh}
+.side{top:0;padding:16px 10px 20px;gap:14px;background:var(--rail);border-right:1px solid var(--line)}
+.stage{padding:0 0 28px}
+main{padding:18px 22px 0}
+.brand b{font:700 16px/1.15 var(--f-pix);letter-spacing:.04em}
+.logo::before{border-radius:50%;transform:none;inset:4px;background:radial-gradient(circle at 32% 30%,#BDE6FF 0,#36A3F2 38%,#0C4AA6 100%);border:3px solid #F4F7FF;box-shadow:0 0 0 2px #7A1C20}
+.logo i{color:#fff;font:700 9px var(--f-pix);letter-spacing:.05em;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.nt{font:700 11px var(--f-pix);letter-spacing:.18em;padding:6px 10px 4px;text-transform:uppercase}
+.nv{padding:0 10px 0 38px;min-height:44px;border-radius:10px;font:500 15px var(--f-body);color:var(--ink)}
+.nv::before{left:11px;border:0;width:20px;height:20px;opacity:.9;background:currentColor;-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;transform:translateY(-50%)}
+.nv:hover{background:var(--rail-hover)}
+.nv:hover::before{opacity:.9}
+.nv[aria-current="page"]{background:var(--accent);color:var(--accent-ink);box-shadow:none;font-weight:600}
+.nv[aria-current="page"]::before{opacity:1}
+.nv .n{background:var(--accent-soft);color:var(--accent);font:700 12px var(--f-body)}
+.nv[aria-current="page"] .n{background:#fff;color:var(--accent)}
+.nv[data-tab=overview]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 11l9-8 9 8M5 10v10h14V10'/%3E%3C/svg%3E")}
+.nv[data-tab=journal],.nv[data-tab=leads]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3zM9 8h6M9 12h6'/%3E%3C/svg%3E")}
+.nv[data-tab=timeline]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v18M12 7h6M12 12H6M12 17h6'/%3E%3C/svg%3E")}
+.nv[data-tab=people],.nv[data-tab=account]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='8' r='3.5'/%3E%3Cpath d='M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 5.2a3.5 3.5 0 010 5.6M18 14.8c2 .6 3.2 2.2 3.5 4.7'/%3E%3C/svg%3E")}
+.nv[data-tab=map]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s7-6.2 7-11.5A7 7 0 005 9.5C5 14.8 12 21 12 21z'/%3E%3Ccircle cx='12' cy='9.5' r='2.5'/%3E%3C/svg%3E")}
+.nv[data-tab=trainer],.nv[data-tab=npc]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='7' r='3.5'/%3E%3Cpath d='M5 21c0-4 3-6.5 7-6.5s7 2.5 7 6.5z'/%3E%3C/svg%3E")}
+.nv[data-tab=pokemon]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M3 12h6M15 12h6'/%3E%3Ccircle cx='12' cy='12' r='2.5'/%3E%3C/svg%3E")}
+.nv[data-tab=dex]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='3' width='16' height='18' rx='2'/%3E%3Cpath d='M8 8h8M8 12h8M8 16h5'/%3E%3C/svg%3E")}
+.nv[data-tab=battle]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 5l14 14M19 5L5 19M4 7l3-3M17 20l3-3'/%3E%3C/svg%3E")}
+.nv[data-tab=contest]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.4 6.8 19.2l1-5.9L3.5 9.2l5.9-.8z'/%3E%3C/svg%3E")}
+.nv[data-tab=shop]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8h12l1 12H5zM9 8V6a3 3 0 016 0v2'/%3E%3C/svg%3E")}
+.nv[data-tab=gm]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2'/%3E%3C/svg%3E")}
+/* top bar becomes the screen's title strip */
+.bar{top:0;margin:0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:var(--head);box-shadow:none;padding:12px 22px}
+.bar-title{font:700 clamp(22px,3vw,28px)/1.1 var(--f-pix)}
+.eyebrow{font:700 11px/1.3 var(--f-body);letter-spacing:.14em;text-transform:uppercase}
+.today{margin:0;border:0;border-bottom:2px solid var(--line);border-radius:0;background:var(--bar);box-shadow:none;padding:8px 22px}
+/* panels, cards, buttons */
+.panel,.entry{border:1px solid var(--line);box-shadow:0 2px 0 var(--line);border-radius:14px}
+.ph h2{font:700 19px/1.2 var(--f-pix)}
+.entry h3{font:700 19px/1.2 var(--f-pix)}
+.btn{border:1px solid var(--line);border-bottom-width:3px;background:var(--raised);font:600 13.5px var(--f-body);min-height:36px}
+.btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.sm{min-height:32px}
+.btn.chk[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip{background:var(--accent-soft);color:var(--accent)}
+.pill{font:700 11.5px var(--f-body);border-radius:6px}
+.pill.cat{background:#D3F3DF;color:#145C3A;border-color:transparent}
+.pill.cat.ves{background:#FDE3E3;color:#8A1C1C}
+:root[data-theme="dark"] .pill.cat{background:#1F4B38;color:#BFF5D9}
+:root[data-theme="dark"] .pill.cat.ves{background:#4A1F26;color:#FFC9CF}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pill.cat{background:#1F4B38;color:#BFF5D9}:root:not([data-theme="light"]) .pill.cat.ves{background:#4A1F26;color:#FFC9CF}}
+input,select,textarea{border-radius:9px}
+/* narrower screens: a slimmer shell, the rail becomes the menu drawer */
+@media (min-width:880px){.shell{background:linear-gradient(90deg,var(--rail) 0,var(--rail) 235px,var(--line) 235px,var(--line) 236px,var(--panel) 236px)}.side{background:transparent;border-right:0}}
+@media (max-width:1100px){.dev{padding:10px 10px 8px;border-radius:28px}.dev-frame{padding:8px;border-width:5px}}
+@media (max-width:879px){
+  body{padding:0 0 24px}
+  .dev{border-radius:18px;padding:5px 5px 4px;border-width:2px}
+  .dev-top{padding:0 8px 4px;font-size:10px}
+  .dev-frame{padding:3px;border-width:3px;border-radius:14px}
+  .shell{grid-template-columns:minmax(0,1fr);overflow:visible}
+  .side{background:var(--rail);border-right:1px solid var(--line)}
+  .bar{padding:10px 12px}
+  main{padding:14px 10px 0}
+  .today{padding:8px 12px}
+}
 </style>
 <script>try{var __t=localStorage.getItem('stl.theme');if(__t==='light'||__t==='dark')document.documentElement.setAttribute('data-theme',__t);}catch(e){}</script>
-<div class="shell" id="shell">
+<div class="dev"><div class="dev-top" aria-hidden="true"><span>SINNOH · TRAINER GEAR</span><span class="dev-on"><i></i>ONLINE</span></div><div class="dev-frame"><div class="shell" id="shell">
   <aside class="side" id="side" aria-label="Campaign"></aside>
   <div class="scrim" data-act="menu"></div>
   <div class="stage">
@@ -1089,7 +1184,7 @@ html.lbx-on,html.lbx-on body{overflow:hidden}
     <div id="today" class="todaywrap"></div>
     <main id="main" tabindex="-1"><p class="loading">OPENING THE TABLE…</p></main>
   </div>
-</div>
+</div></div></div>
 <input type="file" id="filepick" class="sr" accept="image/*" tabindex="-1" aria-hidden="true">
 <input type="file" id="ptafile" class="sr" accept=".json,application/json" tabindex="-1" aria-hidden="true">
 <input type="file" id="encfile" class="sr" accept=".json,application/json" tabindex="-1" aria-hidden="true">
@@ -1112,5 +1207,5 @@ html.lbx-on,html.lbx-on body{overflow:hidden}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-10-25-More-tools-for-the-Game-Master"></script>
+<script src="app.js?v=2026-10-25-Trainer-Gear-look"></script>
 </body></html>
