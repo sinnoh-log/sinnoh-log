@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-25 · Trainer ID cards';
+const BUILD='2026-10-25 · Trainer ID cards and app tiles';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -8205,6 +8205,12 @@ function heroHtml(){
     ${S.me.admin?h`<div class="hero-act">${imgPicker('bn','banner','img',S.banner,1400,420,170000,false)}</div>`:''}
   </section>`;
 }
+/* phone home: app tiles (Update 30); hidden on wide screens by CSS */
+const TILES=[['trainer','Trainer'],['pokemon','Pokémon'],['dex','Pokédex'],['map','Map'],['journal','Journal'],['people','People'],['leads','Leads'],['battle','Battle'],['contest','Contests'],['shop','Shop']];
+function appTiles(){
+  const tl=TILES.concat(S.me.admin?[['npc','NPCs'],['gm','GM Desk']]:[]);
+  return h`<nav class="apptiles" aria-label="Apps">${tl.map(([k,l])=>h`<button class="at" data-act="tab" data-tab="${k}"><span class="atic" aria-hidden="true"></span><b>${l}</b>${tabCount(k)?h`<span class="n">${tabCount(k)}</span>`:''}</button>`)}</nav>`;
+}
 function overviewTab(){
   const ids=tids();
   const mine=S.me.id&&S.trainers[S.me.id];
@@ -8212,6 +8218,7 @@ function overviewTab(){
   const leads=entriesOf(S.leads).filter(l=>!l.status||l.status==='open'||l.status==='chasing').slice(0,5);
   const feed=feedItems();
   return h`${heroHtml()}
+    ${appTiles()}
     ${S.meta.pinned?h`<section class="pinned"><p class="eyebrow">From the GM</p><p class="prewrap">${S.meta.pinned}</p></section>`:''}
     ${!mine&&!S.me.admin&&S.me.id&&S.me.canWrite?h`<div class="banner">You have no trainer sheet yet. ${createCta()}</div>`:''}
     <div class="ov">
@@ -8328,6 +8335,25 @@ function itemsPanel(uid,t,ro){
     ${it.length?h`<div class="list">${it.map((x,i)=>h`<div class="item"><div class="irow ic">${itemTile(x.name)}${fText('Item','t',uid,'items.'+i+'.name',t,{ro,list:'dl-items'})}${fNum('Qty','t',uid,'items.'+i+'.qty',t,{ro,min:0})}${rowBtns('t',uid,'items',i,it.length,ro)}</div>${fText('Note','t',uid,'items.'+i+'.note',t,{ro})}${isKeyName(x.name)?h`<div class="kline">${keyChip(t)}<span class="sub">Lets your Pokémon Mega Evolve, once per battle.</span></div>`:''}</div>`)}</div>`:h`<p class="sub">Nothing carried yet.</p>`}
   </section>`;
 }
+/* the trainer sheet's ID card header (Update 30): a read-out of the fields edited below */
+function sheetCard(uid,t){
+  const bg=t.badges||{};
+  const hp=t.hp||{};
+  return h`<article class="panel idcard sheetcard idh${idHash(uid)%6}" aria-label="Trainer ID card">
+    <div class="idhead"><span>SINNOH LEAGUE · TRAINER ID</span><span>${idNo(uid)}</span></div>
+    <div class="scrow">
+      <div class="scpic">${pimg(t.img,tName(t),'tall')}</div>
+      <div class="scinfo"><h2>${tName(t)}</h2>
+        <p class="sub">${[t.cls,t.adv].filter(Boolean).join(' · ')||'Class not chosen'} · Level ${num(t.level)||1}</p>
+        <p class="sub">${t.hometown?t.hometown+' · ':''}Played by ${nm(uid)}</p>
+        <div class="row sp"><span class="dots" role="img" aria-label="${badgeCount(t)} of 8 badges">${BADGES.map(b=>h`<span class="dot ${bg[b[0]]?'on':''}" ${raw('style="--bc:'+BADGE_COL[b[0]]+'"')} title="${b[1]} Badge"></span>`)}</span><span class="mono sub">${badgeCount(t)}/8 badges</span></div>
+        <div class="schp"><span class="sub">HP</span><span class="mono"><b>${num(hp.cur)}</b> / ${num(hp.max)}</span></div>
+        ${hpBar(hp)}
+      </div>
+    </div>
+    <div class="idcode" aria-hidden="true"></div>
+  </article>`;
+}
 function trainerTab(){
   const uid=S.viewUid;
   const t=S.trainers[uid];
@@ -8336,6 +8362,7 @@ function trainerTab(){
   return h`${trainerPicker()}
     ${!S.trainers[S.me.id]&&!S.me.admin&&S.me.id&&S.me.canWrite?h`<div class="banner">You have no trainer sheet yet. ${createCta()}</div>`:''}
     ${ro?h`<div class="banner">Viewing ${tName(t)}. Only ${nm(uid)} and the GM can change this sheet.</div>`:''}
+    ${sheetCard(uid,t)}
     <div class="sheet">
       <div class="col">${identityPanel(uid,t,ro)}${vitalsPanel(uid,t,ro)}${honorsPanel(uid,t,ro)}</div>
       <div class="col">${skillsPanel(uid,t,ro)}${featuresPanel(uid,t,ro)}${itemsPanel(uid,t,ro)}</div>

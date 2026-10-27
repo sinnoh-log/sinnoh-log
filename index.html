@@ -1192,6 +1192,40 @@ input,select,textarea{border-radius:9px}
 .idst i{display:block;font:700 10px var(--f-body);font-style:normal;letter-spacing:.1em}
 .idst b{font:700 22px var(--f-num)}
 .idcode{height:30px;border-radius:4px;opacity:.7;background:repeating-linear-gradient(90deg,var(--ink) 0 2px,transparent 2px 5px,var(--ink) 5px 6px,transparent 6px 10px,var(--ink) 10px 13px,transparent 13px 16px)}
+
+/* Update 30: phone app tiles and the sheet ID card */
+.apptiles{display:none}
+.sheetcard{margin-bottom:14px}
+.scrow{display:grid;grid-template-columns:110px minmax(0,1fr);gap:16px;align-items:start}
+.scpic{width:110px;border-radius:12px;overflow:hidden;border:3px solid var(--panel);box-shadow:0 0 0 1px var(--line)}
+.scinfo{display:flex;flex-direction:column;gap:6px;min-width:0}
+.scinfo h2{margin:0;font:700 26px/1.1 var(--f-pix)}
+.schp{display:flex;justify-content:space-between;align-items:baseline}
+.sheetcard .idcode{margin-bottom:14px}
+.sheetcard .scrow{margin-top:4px}
+@media (max-width:420px){.scrow{grid-template-columns:84px minmax(0,1fr);gap:12px}.scpic{width:84px}.scinfo h2{font-size:22px}}
+@media (max-width:879px){
+  .apptiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 14px}
+  .at{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:76px;padding:8px 4px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);box-shadow:0 3px 0 var(--line);font:inherit;cursor:pointer}
+  .at b{font:700 11px var(--f-body);text-align:center}
+  .atic{width:26px;height:26px;background:var(--accent,#B92345);-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat}
+  .at .n{position:absolute;top:4px;right:6px;font:700 10px var(--f-body);color:var(--accent,#B92345)}
+  .at:active{transform:translateY(2px);box-shadow:0 1px 0 var(--line)}
+  .at:focus-visible{outline:3px solid var(--gold,#FFB736);outline-offset:2px}
+}
+@media (max-width:360px){.apptiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.at[data-tab=overview]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 11l9-8 9 8M5 10v10h14V10'/%3E%3C/svg%3E")}
+.at[data-tab=journal],.at[data-tab=leads]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3zM9 8h6M9 12h6'/%3E%3C/svg%3E")}
+.at[data-tab=timeline]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v18M12 7h6M12 12H6M12 17h6'/%3E%3C/svg%3E")}
+.at[data-tab=people],.at[data-tab=account]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='8' r='3.5'/%3E%3Cpath d='M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 5.2a3.5 3.5 0 010 5.6M18 14.8c2 .6 3.2 2.2 3.5 4.7'/%3E%3C/svg%3E")}
+.at[data-tab=map]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s7-6.2 7-11.5A7 7 0 005 9.5C5 14.8 12 21 12 21z'/%3E%3Ccircle cx='12' cy='9.5' r='2.5'/%3E%3C/svg%3E")}
+.at[data-tab=trainer],.at[data-tab=npc]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='7' r='3.5'/%3E%3Cpath d='M5 21c0-4 3-6.5 7-6.5s7 2.5 7 6.5z'/%3E%3C/svg%3E")}
+.at[data-tab=pokemon]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M3 12h6M15 12h6'/%3E%3Ccircle cx='12' cy='12' r='2.5'/%3E%3C/svg%3E")}
+.at[data-tab=dex]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='3' width='16' height='18' rx='2'/%3E%3Cpath d='M8 8h8M8 12h8M8 16h5'/%3E%3C/svg%3E")}
+.at[data-tab=battle]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 5l14 14M19 5L5 19M4 7l3-3M17 20l3-3'/%3E%3C/svg%3E")}
+.at[data-tab=contest]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.4 6.8 19.2l1-5.9L3.5 9.2l5.9-.8z'/%3E%3C/svg%3E")}
+.at[data-tab=shop]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8h12l1 12H5zM9 8V6a3 3 0 016 0v2'/%3E%3C/svg%3E")}
+.at[data-tab=gm]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2'/%3E%3C/svg%3E")}
 </style>
 <script>try{var __t=localStorage.getItem('stl.theme');if(__t==='light'||__t==='dark')document.documentElement.setAttribute('data-theme',__t);}catch(e){}</script>
 <div class="dev"><div class="dev-top" aria-hidden="true"><span>SINNOH · TRAINER GEAR</span><span class="dev-on"><i></i>ONLINE</span></div><div class="dev-frame"><div class="shell" id="shell">
@@ -1225,5 +1259,5 @@ input,select,textarea{border-radius:9px}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-10-25-Trainer-ID-cards"></script>
+<script src="app.js?v=2026-10-25-Trainer-ID-cards-and-app-tiles"></script>
 </body></html>

@@ -402,6 +402,12 @@ What the fog hides from the players: a foe you have shown stays out of their cop
 - Squares are counted for you, and walls stop shapes and tokens, but movement costs, the effects of other terrain, cover, doors and real line of sight are not applied: you judge those. A wall is a whole square, and "line of effect" is a straight line between square centres, so a corner case may need your ruling. The terrain, markers and shapes are there to show everyone what you decided.
 - **Download my backup** includes the map's settings, terrain, markers and foe positions for the GM, but not the picture or the library. Keep the original picture files.
 
+## Phone app tiles and the sheet ID card (Update 30)
+
+- **Phone home screen.** On a phone, the Overview now starts with a grid of app tiles: Trainer, Pokémon, Pokédex, Map, Journal, People, Leads, Battle, Contests and Shop (the GM also gets NPCs and GM Desk). Tap a tile to open that page. The Menu drawer still works. On a computer-sized screen the tiles are hidden, because the side rail already does the job.
+- **Trainer sheet ID card.** The **Trainer** page opens with a full-width ID card: portrait, name, class and level, hometown, who plays them, the eight badge slots, an HP bar and the code strip. It shows what you enter in the fields below it, which are unchanged.
+- Only the look changed. Nothing new is saved, and the Firestore rules and `backend.js` are untouched.
+
 ## Trainer ID cards (Update 29)
 
 On **Overview**, each trainer is now an ID card. The coloured header strip reads "Sinnoh League · Trainer ID" with a card number; the number and the colour come from the trainer's own id, so they never change. The front shows the portrait, name, class and level, who plays them, HP, the eight badges, contest ribbons and the party. **Flip card** turns it over to show the combat stats (HP, Atk, Def, SpA, SpD, Spe), hometown, class and ribbons. **Flip to front** turns it back. **Sheet** and **Pokémon** open the same pages as before. Which side of a card is showing is remembered only until you reload. Nothing new is saved, so the rules have not changed.
@@ -412,7 +418,7 @@ The whole site now looks like a handheld device: a red shell with the screen ins
 
 - **Phones.** The shell shrinks to a slim frame and the rail becomes the **Menu** drawer, as before.
 - **Where it lives.** The look is one block of styles at the end of the style sheet in `index.html` (search for "Trainer Gear look"), plus a small wrapper around the page. To go back to the old look, put your previous `index.html` back; nothing else depends on it.
-- **Not changed yet.** The phone home screen of app tiles and the sample screens in the design mock-up are not part of this update.
+- **Phone tiles.** Added in Update 30.
 
 ## NPC categories and sorting (Update 27)
 
