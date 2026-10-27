@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-25 · Trainer Gear look';
+const BUILD='2026-10-25 · Trainer ID cards';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -118,7 +118,7 @@ const S={
   megaOk:{},battle:{},battleGm:{},trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},gmNt:{},npcPub:{},shopPub:{},shopGm:{},
   awards:{},timeline:{},pins:{},banner:{},cond:{},places:{},gmPl:{},placeId:null,members:{},invite:null,mapChunks:{},mapSrc:'',room:null,peers:[],avatars:{},
   pick:null,names:{},save:{cls:'',text:'Saved'},rolls:[],_tsig:'',
-  ui:{open:{},lbx:null,adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},pop:null,megaPop:null,
+  ui:{open:{},flip:{},lbx:null,adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},pop:null,megaPop:null,
     award:{uids:{},type:'Gym Badge',badge:'coal',ribbon:null,title:'',note:'',levelUp:true}}
 };
 
@@ -8150,20 +8150,34 @@ function bm3Act(b,e){
 }
 
 /* ---------- overview ---------- */
+/* the trainer ID card: a number and a header colour worked out from the trainer's id, a front with the usual summary and a back with the combat stats */
+const idHash=u=>{let n=7;String(u).split('').forEach(c=>{n=(n*31+c.charCodeAt(0))%1000003;});return n;};
+const idNo=u=>{const n=idHash(u);return 'No. '+String(n%10000).padStart(4,'0')+'-'+String(Math.floor(n/10)%10000).padStart(4,'0');};
+const ID_STAT=[['atk','ATK'],['def','DEF'],['spa','SPA'],['spd','SPD'],['spe','SPE']];
 function trainerCard(uid){
   const t=S.trainers[uid];
   const mons=partyOf(uid);
   const bg=t.badges||{};
-  return h`<article class="panel tcard">
+  const back=!!S.ui.flip[uid];
+  const st=t.stats||{};
+  return h`<article class="panel tcard idcard idh${idHash(uid)%6}">
+    <div class="idhead"><span>SINNOH LEAGUE · TRAINER ID</span><span>${idNo(uid)}</span></div>
+    ${back?h`<div class="idback">
+      <div class="idstats">${[['hp','HP',num(t.hp&&t.hp.max)]].concat(ID_STAT.map(([k,l])=>[k,l,num(st[k])])).map(([k,l,v])=>h`<div class="idst"><i>${l}</i><b>${v}</b></div>`)}</div>
+      <div class="row sp"><span class="sub">Hometown</span><b>${t.hometown||'Not set'}</b></div>
+      <div class="row sp"><span class="sub">Class</span><b>${[t.cls,t.adv].filter(Boolean).join(' · ')||'Not chosen'}</b></div>
+      <div class="row sp"><span class="sub">Contest ribbons</span><b>${ribBrief(t)}</b></div>
+      <div class="idcode" aria-hidden="true"></div>
+    </div>`:h`<div class="idfront">
     <button class="pbtn" data-act="view" data-uid="${uid}" data-tab="trainer" aria-label="Open sheet for ${tName(t)}">${pimg(t.img,tName(t),'tall')}</button>
     <div><h3>${tName(t)}</h3>
       <p class="sub">${[t.cls,t.adv].filter(Boolean).join(' · ')||'Class not chosen'} · Level ${num(t.level)||1}</p>
-      <p class="sub">Played by ${nm(uid)}</p></div>
+      <p class="sub">Played by ${nm(uid)}</p></div></div>
     <div class="hpline">${hpBar(t.hp)}<span class="mono">${num(t.hp&&t.hp.cur)}/${num(t.hp&&t.hp.max)}</span></div>
     <div class="row sp"><span class="dots" role="img" aria-label="${badgeCount(t)} of 8 badges">${BADGES.map(b=>h`<span class="dot ${bg[b[0]]?'on':''}" ${raw('style="--bc:'+BADGE_COL[b[0]]+'"')} title="${b[1]} Badge"></span>`)}</span><span class="mono sub">${badgeCount(t)}/8</span></div>
     <div class="row sp"><span class="sub">Contest ribbons</span><span class="mono sub">${ribBrief(t)}</span></div>
-    <ul class="team">${mons.length?mons.map(m=>h`<li>${monIcon(m)}<b>${mName(m)}</b>${genPill(m.gender)}${megaOn(m)?h`<span class="pill mega">Mega</span>`:''}${typeChips(m)}</li>`):h`<li class="sub">No Pokémon on hand</li>`}</ul>
-    <footer><button class="btn sm" data-act="view" data-uid="${uid}" data-tab="trainer">Sheet</button><button class="btn sm" data-act="view" data-uid="${uid}" data-tab="pokemon">Pokémon</button></footer>
+    <ul class="team">${mons.length?mons.map(m=>h`<li>${monIcon(m)}<b>${mName(m)}</b>${genPill(m.gender)}${megaOn(m)?h`<span class="pill mega">Mega</span>`:''}${typeChips(m)}</li>`):h`<li class="sub">No Pokémon on hand</li>`}</ul>`}
+    <footer><button class="btn sm" data-act="idflip" data-uid="${uid}" aria-pressed="${String(back)}">${back?'Flip to front':'Flip card'}</button><button class="btn sm" data-act="view" data-uid="${uid}" data-tab="trainer">Sheet</button><button class="btn sm" data-act="view" data-uid="${uid}" data-tab="pokemon">Pokémon</button></footer>
   </article>`;
 }
 function feedItems(){
@@ -9384,6 +9398,7 @@ function act(b,e){
   if(d.act&&d.act.indexOf('rb_')===0){ribAct(b);return;}
   if(d.act&&d.act.indexOf('nt_')===0){ntAct(b,e);return;}
   if(d.act&&d.act.indexOf('cf_')===0){cfAct(b);return;}
+  if(d.act==='idflip'){S.ui.flip[d.uid]=!S.ui.flip[d.uid];render();return;}
   if(d.act&&d.act.indexOf('bm_')===0){bmAct(b,e);return;}
   switch(d.act){
     case 'tab':S.ui.navOpen=false;setTab(d.tab);break;

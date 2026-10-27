@@ -402,6 +402,10 @@ What the fog hides from the players: a foe you have shown stays out of their cop
 - Squares are counted for you, and walls stop shapes and tokens, but movement costs, the effects of other terrain, cover, doors and real line of sight are not applied: you judge those. A wall is a whole square, and "line of effect" is a straight line between square centres, so a corner case may need your ruling. The terrain, markers and shapes are there to show everyone what you decided.
 - **Download my backup** includes the map's settings, terrain, markers and foe positions for the GM, but not the picture or the library. Keep the original picture files.
 
+## Trainer ID cards (Update 29)
+
+On **Overview**, each trainer is now an ID card. The coloured header strip reads "Sinnoh League · Trainer ID" with a card number; the number and the colour come from the trainer's own id, so they never change. The front shows the portrait, name, class and level, who plays them, HP, the eight badges, contest ribbons and the party. **Flip card** turns it over to show the combat stats (HP, Atk, Def, SpA, SpD, Spe), hometown, class and ribbons. **Flip to front** turns it back. **Sheet** and **Pokémon** open the same pages as before. Which side of a card is showing is remembered only until you reload. Nothing new is saved, so the rules have not changed.
+
 ## The Trainer Gear look (Update 28)
 
 The whole site now looks like a handheld device: a red shell with the screen inside it, a side rail with an icon for every page, a status strip, and cleaner panels and cards, in a light or a night theme (the moon button still switches them). Only the look changed. Every page, button and saved document works as before, and the Firestore rules and `backend.js` are untouched.

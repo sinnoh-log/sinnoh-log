@@ -1174,6 +1174,24 @@ input,select,textarea{border-radius:9px}
   main{padding:14px 10px 0}
   .today{padding:8px 12px}
 }
+
+/* trainer ID cards (Update 29) */
+.idcard{padding:0;gap:10px;overflow:hidden;box-shadow:0 5px 0 var(--line),0 12px 24px rgba(20,30,70,.14)}
+.idcard>*:not(.idhead){margin-left:16px;margin-right:16px}
+.idcard footer{margin-bottom:14px;flex-wrap:wrap}
+.idhead{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 16px;color:#fff;background:linear-gradient(90deg,var(--ida,#B92345),var(--idb,#741A35));font:700 11px var(--f-pix);letter-spacing:.14em}
+.idhead span:last-child{font:700 11px var(--f-body);letter-spacing:.08em;opacity:.92}
+.idhead span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.idhead span:first-child{font-size:10.5px;letter-spacing:.1em}
+.idh0{--ida:#B92345;--idb:#741A35}.idh1{--ida:#2457A6;--idb:#183C6C}.idh2{--ida:#2C7A4B;--idb:#17492C}
+.idh3{--ida:#6B3FA0;--idb:#3F2368}.idh4{--ida:#B8620B;--idb:#7A3F05}.idh5{--ida:#0F7C8A;--idb:#0A4B55}
+.idfront{display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;align-items:start}
+.idfront .pbtn{width:96px}
+.idback{display:flex;flex-direction:column;gap:10px}
+.idstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.idst{background:var(--lcd);color:var(--lcd-ink);border-radius:8px;padding:6px 8px;box-shadow:inset 0 0 0 2px var(--lcd-edge)}
+.idst i{display:block;font:700 10px var(--f-body);font-style:normal;letter-spacing:.1em}
+.idst b{font:700 22px var(--f-num)}
+.idcode{height:30px;border-radius:4px;opacity:.7;background:repeating-linear-gradient(90deg,var(--ink) 0 2px,transparent 2px 5px,var(--ink) 5px 6px,transparent 6px 10px,var(--ink) 10px 13px,transparent 13px 16px)}
 </style>
 <script>try{var __t=localStorage.getItem('stl.theme');if(__t==='light'||__t==='dark')document.documentElement.setAttribute('data-theme',__t);}catch(e){}</script>
 <div class="dev"><div class="dev-top" aria-hidden="true"><span>SINNOH · TRAINER GEAR</span><span class="dev-on"><i></i>ONLINE</span></div><div class="dev-frame"><div class="shell" id="shell">
@@ -1207,5 +1225,5 @@ input,select,textarea{border-radius:9px}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-10-25-Trainer-Gear-look"></script>
+<script src="app.js?v=2026-10-25-Trainer-ID-cards"></script>
 </body></html>
