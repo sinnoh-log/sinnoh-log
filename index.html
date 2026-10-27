@@ -1226,6 +1226,25 @@ input,select,textarea{border-radius:9px}
 .at[data-tab=contest]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.4 6.8 19.2l1-5.9L3.5 9.2l5.9-.8z'/%3E%3C/svg%3E")}
 .at[data-tab=shop]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8h12l1 12H5zM9 8V6a3 3 0 016 0v2'/%3E%3C/svg%3E")}
 .at[data-tab=gm]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2'/%3E%3C/svg%3E")}
+
+/* Update 31: more than one picture */
+.galopen{position:relative;display:block;padding:0;border:0;background:none;cursor:zoom-in;font:inherit;color:inherit;width:100%;border-radius:12px}
+.galopen:focus-visible,.galb:focus-visible{outline:3px solid var(--gold,#FFB736);outline-offset:2px}
+.galn{position:absolute;right:6px;bottom:6px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:rgba(10,18,50,.82);color:#fff;font:700 12px/22px var(--f-body);text-align:center}
+.pcard>.galopen{width:84px;flex:none}
+.pcard>.galopen .pimg{aspect-ratio:4/5}
+.scpic .galopen{border-radius:0}
+.gal{display:flex;flex-direction:column;gap:8px;margin-top:6px;min-width:0}
+.galt{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.galt li{display:flex;flex-direction:column;gap:4px;align-items:flex-start;width:84px}
+.galt li.on .galb{border-color:var(--accent)}
+.galb{display:block;width:84px;height:84px;padding:0;border:3px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel);cursor:zoom-in}
+.galb img{display:block;width:100%;height:100%;object-fit:cover}
+.galacts{display:flex;flex-direction:column;gap:4px;width:100%}
+.galacts .btn{min-height:32px;padding-inline:6px;font-size:12px;width:100%}
+.lbx-card figcaption{flex-wrap:wrap;justify-content:center}
+.lbx-c{font-weight:500;opacity:.85;font-size:13px}
+@media (pointer:coarse){.galacts .btn{min-height:40px}}
 </style>
 <script>try{var __t=localStorage.getItem('stl.theme');if(__t==='light'||__t==='dark')document.documentElement.setAttribute('data-theme',__t);}catch(e){}</script>
 <div class="dev"><div class="dev-top" aria-hidden="true"><span>SINNOH · TRAINER GEAR</span><span class="dev-on"><i></i>ONLINE</span></div><div class="dev-frame"><div class="shell" id="shell">
@@ -1259,5 +1278,5 @@ input,select,textarea{border-radius:9px}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-10-25-Trainer-ID-cards-and-app-tiles"></script>
+<script src="app.js?v=2026-10-25-More-pictures-per-character"></script>
 </body></html>

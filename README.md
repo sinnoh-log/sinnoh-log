@@ -402,6 +402,16 @@ What the fog hides from the players: a foe you have shown stays out of their cop
 - Squares are counted for you, and walls stop shapes and tokens, but movement costs, the effects of other terrain, cover, doors and real line of sight are not applied: you judge those. A wall is a whole square, and "line of effect" is a straight line between square centres, so a corner case may need your ruling. The terrain, markers and shapes are there to show everyone what you decided.
 - **Download my backup** includes the map's settings, terrain, markers and foe positions for the GM, but not the picture or the library. Keep the original picture files.
 
+## More than one picture (Update 31)
+
+Player characters (**Trainer** page), people (**People** page) and the GM's NPCs (**NPC Trainers**) can now hold several pictures.
+
+- **Add.** Under the portrait, **Add a picture** (or **Add another picture**) adds one more. A trainer or person holds up to six pictures in all; an NPC holds up to five, because NPC pictures are kept larger. The first picture you add becomes the main photo.
+- **Look through them.** A strip of small pictures sits under the portrait. Click any of them, or the portrait itself, to see it large. In the large view, **Previous** and **Next** (or the left and right arrow keys) move through the set, and Escape or a click closes it. Other players can browse a trainer's pictures too, but only the owner and the GM can change them.
+- **Choose the main photo.** **Use as main** under any picture makes it the photo shown on the ID card, the Overview and everywhere else. The old main photo stays in the strip. **Remove** deletes one. Removing the main photo promotes the next one.
+- **NPCs.** The extra pictures stay with the GM. Players only ever see the one picture you have chosen to show them (tick Picture), and changing the main photo updates that public copy. A new main photo starts centred in the frame.
+- Nothing about the rules changed, so the Firestore rules and `backend.js` are untouched. Pictures are small JPEGs stored on the same document as before, in a new `imgs` list beside `img`.
+
 ## Phone app tiles and the sheet ID card (Update 30)
 
 - **Phone home screen.** On a phone, the Overview now starts with a grid of app tiles: Trainer, Pokémon, Pokédex, Map, Journal, People, Leads, Battle, Contests and Shop (the GM also gets NPCs and GM Desk). Tap a tile to open that page. The Menu drawer still works. On a computer-sized screen the tiles are hidden, because the side rail already does the job.

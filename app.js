@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-25 · Trainer ID cards and app tiles';
+const BUILD='2026-10-25 · More pictures per character';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -6212,13 +6212,70 @@ function ntFrameZoom(t,commit){
   if(commit)ntFrameSave(id,c);
 }
 /* ----- the full picture, in front of the page ----- */
+/* ----- more pictures (Update 31): the main photo is the document's `img`; the others sit in `imgs` ----- */
+const GAL_MAX={t:5,ppl:5,gt:4};
+const GAL_CAP={t:60000,ppl:60000,gt:110000};
+function galDoc(sc,id){return sc==='gt'?(NTS()[id]||null):(typeof getLocal==='function'?getLocal(sc,id):null);}
+function galAlts(doc){return doc&&Array.isArray(doc.imgs)?doc.imgs.filter(ntImgOk):[];}
+function galList(doc){
+  const out=[];
+  if(doc&&ntImgOk(doc.img))out.push({src:doc.img,main:true,i:-1});
+  galAlts(doc).forEach((s,i)=>out.push({src:s,main:false,i}));
+  return out;
+}
+function galName(sc,doc){return sc==='t'?tName(doc):sc==='gt'?ntName(doc):(doc&&doc.name)||'Person';}
+/* a picture that opens the viewer, with a count when there is more than one; falls back to the plain portrait */
+function galOpen(sc,id,doc,cls){
+  const list=galList(doc),name=galName(sc,doc);
+  if(!list.length)return pimg('',name,cls);
+  return h`<button class="galopen" data-act="lbx" data-k="${sc+'|'+id}" aria-label="${'Enlarge the picture of '+name+(list.length>1?' ('+list.length+' pictures)':'')}" title="Enlarge">${pimg(doc.img||list[0].src,name,cls)}${list.length>1?h`<span class="galn" aria-hidden="true">${list.length}</span>`:''}</button>`;
+}
+function galPanel(sc,id,doc,ro){
+  const list=galList(doc);
+  if(ro&&list.length<2)return '';
+  const left=GAL_MAX[sc]-galAlts(doc).length;
+  return h`<div class="gal" role="group" aria-label="Pictures">
+    ${list.length?h`<ul class="galt">${list.map((e,k)=>h`<li class="${e.main?'on':''}"><button class="galb" data-act="lbx" data-k="${sc+'|'+id+'|'+k}" aria-label="${'Enlarge picture '+(k+1)+' of '+list.length+(e.main?' (the main photo)':'')}"><img src="${imgSrc(e.src)}" alt=""></button>${e.main?h`<span class="pill">Main</span>`:ro?'':h`<span class="galacts"><button class="btn sm" data-act="galUse" data-sc="${sc}" data-id="${id}" data-i="${e.i}">Use as main</button><button class="btn sm ghost" data-act="galRm" data-sc="${sc}" data-id="${id}" data-i="${e.i}" aria-label="${'Remove picture '+(k+1)}">Remove</button></span>`}</li>`)}</ul>`:''}
+    ${ro?'':left>0?h`<div class="row"><button class="btn sm" data-act="galPick" data-img="${sc+'|'+id+'|imgs'}" data-w="0" data-h="0" data-max="${sc==='gt'?900:640}" data-cap="${GAL_CAP[sc]}">${list.length?'Add another picture':'Add a picture'}</button><span class="sub">${list.length} of ${GAL_MAX[sc]+1}</span></div>`:h`<span class="sub">That is the most pictures one card can hold. Remove one to add another.</span>`}
+  </div>`;
+}
+function galAfter(sc,id){if(sc==='gt')ntPublish(id);}
+function galUse(sc,id,i){
+  const doc=galDoc(sc,id);if(!doc)return;
+  const alts=galAlts(doc),pick=alts[i];if(!pick)return;
+  if(ntImgOk(doc.img))alts[i]=doc.img;else alts.splice(i,1);
+  edit(sc,id,'img',pick);edit(sc,id,'imgs',alts);
+  if(sc==='gt')edit('gt',id,'imgc',{x:50,y:50,z:1});
+  galAfter(sc,id);render();
+}
+function galRm(sc,id,i){
+  const doc=galDoc(sc,id);if(!doc)return;
+  const alts=galAlts(doc);if(i<0||i>=alts.length)return;
+  alts.splice(i,1);edit(sc,id,'imgs',alts);render();
+}
+/* adds a new picture: becomes the main photo when there is none yet */
+function galAdd(sc,id,url){
+  const doc=galDoc(sc,id);if(!doc)return false;
+  if(!ntImgOk(doc.img)){edit(sc,id,'img',url);if(sc==='gt')edit('gt',id,'imgc',{x:50,y:50,z:1});galAfter(sc,id);return true;}
+  const alts=galAlts(doc);
+  if(alts.length>=GAL_MAX[sc])return false;
+  alts.push(url);edit(sc,id,'imgs',alts);return true;
+}
+/* ----- the full picture, in front of the page ----- */
+function lbxParts(k){const p=String(k||'').split('|');return {kind:p[0],id:p[1],i:Math.max(0,parseInt(p[2],10)||0)};}
 function lbxSrc(k){
-  const p=String(k||'').split('|'),id=p[1];
-  if(p[0]==='npc'){
+  const q=lbxParts(k),id=q.id;
+  if(q.kind==='npc'){
     const src=ntPicOf(id),pub=S.npcPub&&S.npcPub.n&&S.npcPub.n[id];
-    return src?{src,name:(pub&&pub.n)||'Trainer'}:null;
+    return src?{src,name:(pub&&pub.n)||'Trainer',i:0,n:1}:null;
   }
-  if(p[0]==='gt'&&S.me.admin){const nt=NTS()[id];return nt&&ntImgOk(nt.img)?{src:nt.img,name:ntName(nt)}:null;}
+  if(q.kind==='gt'&&!S.me.admin)return null;
+  if(q.kind==='gt'||q.kind==='t'||q.kind==='ppl'){
+    const doc=galDoc(q.kind,id),list=galList(doc);
+    if(!list.length)return null;
+    const i=Math.min(q.i,list.length-1);
+    return {src:list[i].src,name:galName(q.kind,doc),i,n:list.length,main:list[i].main};
+  }
   return null;
 }
 function lbxRender(){
@@ -6230,12 +6287,20 @@ function lbxRender(){
     if(!el.hidden){el.hidden=true;el.innerHTML='';document.documentElement.classList.remove('lbx-on');}
     return;
   }
-  const sig=S.ui.lbx+'|'+v.src.length+'|'+v.name;
+  const sig=S.ui.lbx+'|'+v.src.length+'|'+v.name+'|'+v.n;
   if(!el.hidden&&el.dataset.sig===sig)return;
   el.dataset.sig=sig;
   el.hidden=false;
   document.documentElement.classList.add('lbx-on');
-  el.innerHTML=h`<figure class="lbx-card" role="dialog" aria-modal="true" aria-label="${'Picture of '+v.name}"><img src="${imgSrc(v.src)}" alt="${'Picture of '+v.name}"><figcaption><b>${v.name}</b><button class="btn sm" id="lbx-x" data-act="lbxx">Close</button></figcaption></figure>`.s;
+  const nav=v.n>1;
+  el.innerHTML=h`<figure class="lbx-card" role="dialog" aria-modal="true" aria-label="${'Picture of '+v.name}"><img src="${imgSrc(v.src)}" alt="${'Picture of '+v.name}"><figcaption>${nav?h`<button class="btn sm" id="lbx-p" data-act="lbxn" data-dir="-1" aria-label="Previous picture">‹ Previous</button>`:''}<b>${v.name}${nav?h` <span class="lbx-c">${v.i+1} of ${v.n}${v.main?' · main':''}</span>`:''}</b>${nav?h`<button class="btn sm" id="lbx-n" data-act="lbxn" data-dir="1" aria-label="Next picture">Next ›</button>`:''}<button class="btn sm" id="lbx-x" data-act="lbxx">Close</button></figcaption></figure>`.s;
+}
+function lbxStep(dir,focusId){
+  const q=lbxParts(S.ui.lbx),v=lbxSrc(S.ui.lbx);
+  if(!v||v.n<2)return;
+  S.ui.lbx=q.kind+'|'+q.id+'|'+((v.i+dir+v.n)%v.n);
+  lbxRender();
+  const b=$('#'+(focusId||'lbx-n'));if(b)b.focus({preventScroll:true});
 }
 function lbxOpen(k){
   if(!lbxSrc(k))return;
@@ -6248,7 +6313,7 @@ function lbxClose(){
   const k=S.ui.lbx;
   S.ui.lbx=null;
   lbxRender();
-  if(k){const b=document.querySelector('[data-act="lbx"][data-k="'+CSS.escape(k)+'"]');if(b)b.focus({preventScroll:true});}
+  if(k){const q=lbxParts(k),base=q.kind+'|'+q.id;const b=document.querySelector('[data-act="lbx"][data-k="'+CSS.escape(base)+'"]')||document.querySelector('[data-act="lbx"][data-k^="'+CSS.escape(base+'|')+'"]');if(b)b.focus({preventScroll:true});}
 }
 /* writes the public copy only when it has changed. Hiding the NPC removes it. */
 function ntPublish(id){
@@ -6553,7 +6618,7 @@ function ntBody(id,nt){
       <div class="row evchips" role="group" aria-label="Also show">
         ${[['role','Role'],['place','Where you met'],['notes','Your notes'],['pic','Picture'],['cls','Level and class'],['stats','Stats'],['items','Items']].map(([k,l])=>h`<label class="chip chkc"><input type="checkbox" ${bd('gt',id,'rev.'+k)} ${num(r[k])?raw('checked'):''} ${on?'':raw('disabled')}><span>${l}</span></label>`)}</div>
       <p class="sub">Players now see: ${ntPreview(nt)}. It appears under <b>People</b>, in <b>Trainers you have met</b>. Their Pokémon appear there once you tick what to show for each one below.</p></div>
-    <div class="idrow"><div class="idimg">${ntImgOk(nt.img)?ntPortrait(nt.img,nt.imgc,'edit',h`data-id="${id}" tabindex="0" role="group" aria-label="Picture frame. Drag to move the picture, or use the arrow keys."`):pimg('',ntName(nt),'tall')}${imgPicker('gt',id,'img',nt,0,0,160000,false,900)}${ntImgOk(nt.img)?ntFramePanel(id,nt):''}<span class="sub">${ntImgOk(nt.img)?(num(r.pic)&&on?'The table sees this picture.':'Only you see this picture. Tick Picture above to show it.'):'A portrait for this NPC. It stays hidden until you tick Picture.'}</span></div>
+    <div class="idrow"><div class="idimg">${ntImgOk(nt.img)?ntPortrait(nt.img,nt.imgc,'edit',h`data-id="${id}" tabindex="0" role="group" aria-label="Picture frame. Drag to move the picture, or use the arrow keys."`):pimg('',ntName(nt),'tall')}${imgPicker('gt',id,'img',nt,0,0,160000,false,900)}${galPanel('gt',id,nt,false)}${ntImgOk(nt.img)?ntFramePanel(id,nt):''}<span class="sub">${ntImgOk(nt.img)?(num(r.pic)&&on?'The table sees this picture.':'Only you see this picture. Tick Picture above to show it.'):'A portrait for this NPC. It stays hidden until you tick Picture.'}</span></div>
     <div class="fgrid">
       ${fText('Name','gt',id,'name',nt,{cls:'wide'})}
       ${fText('Role or title','gt',id,'role',nt,{ph:'e.g. Gym Leader, Team Galactic grunt'})}
@@ -8239,7 +8304,7 @@ function overviewTab(){
 /* ---------- trainer tab ---------- */
 function identityPanel(uid,t,ro){
   return h`<section class="panel"><div class="ph"><h2>Trainer</h2><span class="sub">Played by ${nm(uid)}</span></div>
-    <div class="idrow"><div class="idimg">${pimg(t.img,tName(t),'tall')}${imgPicker('t',uid,'img',t,320,400,60000,ro)}</div>
+    <div class="idrow"><div class="idimg">${galOpen('t',uid,t,'tall')}${imgPicker('t',uid,'img',t,320,400,60000,ro)}${galPanel('t',uid,t,ro)}</div>
     <div class="fgrid">
       ${fText('Name','t',uid,'name',t,{ro,cls:'wide'})}
       ${fSel('Class','t',uid,'cls',t,Object.keys(CLASSES),{ro,blank:'Not chosen'})}
@@ -8342,7 +8407,7 @@ function sheetCard(uid,t){
   return h`<article class="panel idcard sheetcard idh${idHash(uid)%6}" aria-label="Trainer ID card">
     <div class="idhead"><span>SINNOH LEAGUE · TRAINER ID</span><span>${idNo(uid)}</span></div>
     <div class="scrow">
-      <div class="scpic">${pimg(t.img,tName(t),'tall')}</div>
+      <div class="scpic">${galOpen('t',uid,t,'tall')}</div>
       <div class="scinfo"><h2>${tName(t)}</h2>
         <p class="sub">${[t.cls,t.adv].filter(Boolean).join(' · ')||'Class not chosen'} · Level ${num(t.level)||1}</p>
         <p class="sub">${t.hometown?t.hometown+' · ':''}Played by ${nm(uid)}</p>
@@ -8559,7 +8624,7 @@ function personCard(p){
   const canE=canShared();
   if(open&&canE){
     return h`<article class="entry">
-      <div class="idrow"><div class="idimg">${pimg(p.img,p.name,'tall')}${imgPicker('ppl',p.id,'img',p,320,400,60000,false)}</div>
+      <div class="idrow"><div class="idimg">${galOpen('ppl',p.id,p,'tall')}${imgPicker('ppl',p.id,'img',p,320,400,60000,false)}${galPanel('ppl',p.id,p,false)}</div>
       <div class="fgrid">
         ${fText('Name','ppl',p.id,'name',p,{cls:'wide'})}
         ${fText('Role or title','ppl',p.id,'role',p)}
@@ -8575,7 +8640,7 @@ function personCard(p){
     </article>`;
   }
   return h`<article class="entry pcard">
-    ${pimg(p.img,p.name,'tall')}
+    ${galOpen('ppl',p.id,p,'tall')}
     <div class="pc-body">
     <div class="row sp"><h3>${p.pinned?'★ ':''}${p.name||'Unnamed person'}</h3><span class="pill ${p.att||'unknown'}">${attLabel(p.att)}</span></div>
     <div class="meta">${npcCatOf(p.cat,(p.role||'')+' '+(p.name||''),false)?h`<span class="pill cat">${npcCatName(npcCatOf(p.cat,(p.role||'')+' '+(p.name||''),false))}</span>`:''}${p.role?h`<span>${p.role}</span>`:''}${p.place?h`<span>Met at ${p.place}</span>`:''}${p.met?h`<span>Session ${p.met}</span>`:''}</div>
@@ -9465,13 +9530,19 @@ function act(b,e){
       edit('pin',d.id,'x',clamp(Math.round((num(p.x)+num(d.dx))*10000)/10000,0,1));
       edit('pin',d.id,'y',clamp(Math.round((num(p.y)+num(d.dy))*10000)/10000,0,1));
       render();break;}
+    case 'galPick':
     case 'pick':{
       S.pick={spec:d.img,w:+d.w||0,h:+d.h||0,max:+d.max||0,cap:+d.cap||60000};
       const fp=$('#filepick');
       if(fp){fp.value='';fp.click();}
       break;}
-    case 'rmImg':{const p=d.p.split('|');edit(p[0],p[1],p[2],'');if(p[0]==='gt'&&p[2]==='img')edit('gt',p[1],'imgc',{x:50,y:50,z:1});if(p[0]==='gt')ntPublish(p[1]);render();break;}
+    case 'rmImg':{const p=d.p.split('|');
+      const dd=p[2]==='img'&&(p[0]==='t'||p[0]==='ppl'||p[0]==='gt')?galDoc(p[0],p[1]):null,al=dd?galAlts(dd):[];
+      if(al.length){edit(p[0],p[1],'img',al[0]);edit(p[0],p[1],'imgs',al.slice(1));}else edit(p[0],p[1],p[2],'');if(p[0]==='gt'&&p[2]==='img')edit('gt',p[1],'imgc',{x:50,y:50,z:1});if(p[0]==='gt')ntPublish(p[1]);render();break;}
     case 'lbx':lbxOpen(d.k);break;
+    case 'lbxn':lbxStep(+d.dir||1,+d.dir<0?'lbx-p':'lbx-n');break;
+    case 'galUse':galUse(d.sc,d.id,+d.i);break;
+    case 'galRm':galRm(d.sc,d.id,+d.i);break;
     case 'lbxx':lbxClose();break;
     case 'rmMap':removeMap();break;
     case 'delTOpen':{
@@ -9773,6 +9844,7 @@ document.addEventListener('change',async e=>{
     let late='';
     if(parts[0]==='map'){if(!(await uploadMap(f)))late='Map saved. Its shape does not match the Sinnoh map, so hover highlights are off.';}
     else if(parts[0]==='bmap'){if(S.me.admin)await bmUpload(f);}
+    else if(parts[2]==='imgs'&&GAL_MAX[parts[0]]){const r=await fileToImage(f,{max:pk.max||640,cap:pk.cap});if(!galAdd(parts[0],parts[1],r.url))late='That card already holds the most pictures. Remove one first.';}
     else{const r=await fileToImage(f,{w:pk.w,h:pk.h,max:pk.max||undefined,cap:pk.cap});edit(parts[0],parts[1],parts[2],r.url);if(parts[0]==='gt'&&parts[2]==='img'){edit('gt',parts[1],'imgc',{x:50,y:50,z:1});}if(parts[0]==='gt')ntPublish(parts[1]);}
     if(!Q.size)setStatus('saved');
     render();
@@ -9809,7 +9881,8 @@ document.addEventListener('focusout',e=>{
 document.addEventListener('keydown',e=>{
   if(S.ui.lbx){
     if(e.key==='Escape'){e.preventDefault();lbxClose();return;}
-    if(e.key==='Tab'){e.preventDefault();const b=$('#lbx-x');if(b)b.focus({preventScroll:true});return;}
+    if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();lbxStep(e.key==='ArrowLeft'?-1:1,e.key==='ArrowLeft'?'lbx-p':'lbx-n');return;}
+    if(e.key==='Tab'){e.preventDefault();const bs=[...document.querySelectorAll('#lbx button')];const at=bs.indexOf(document.activeElement);const nx=bs.length?bs[(at+(e.shiftKey?-1:1)+bs.length)%bs.length]:null;if(nx)nx.focus({preventScroll:true});return;}
   }
   if(e.target&&e.target.classList&&e.target.classList.contains('ptr')&&e.target.classList.contains('edit')&&ntFrameKey(e.target,e))return;
   if(e.target&&e.target.classList&&(e.target.classList.contains('bmt')||e.target.classList.contains('bmk'))&&bmKey(e.target,e))return;
