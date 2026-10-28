@@ -1245,6 +1245,12 @@ input,select,textarea{border-radius:9px}
 .lbx-card figcaption{flex-wrap:wrap;justify-content:center}
 .lbx-c{font-weight:500;opacity:.85;font-size:13px}
 @media (pointer:coarse){.galacts .btn{min-height:40px}}
+
+/* Update 33: framing pictures on trainers and people */
+.pimg.pfr{position:relative;overflow:hidden}
+.pimg.pfr>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:var(--x,50%) var(--y,50%);transform:scale(var(--z,1));transform-origin:var(--x,50%) var(--y,50%);display:block;user-select:none;-webkit-user-drag:none;pointer-events:none}
+.idimg .ptr.edit{width:100%}
+@media (max-width:520px){.idimg:has(.ptr.edit){flex-direction:column;align-items:stretch}.idimg .ptr.edit{width:min(220px,100%);align-self:flex-start}}
 </style>
 <script>try{var __t=localStorage.getItem('stl.theme');if(__t==='light'||__t==='dark')document.documentElement.setAttribute('data-theme',__t);}catch(e){}</script>
 <div class="dev"><div class="dev-top" aria-hidden="true"><span>SINNOH · TRAINER GEAR</span><span class="dev-on"><i></i>ONLINE</span></div><div class="dev-frame"><div class="shell" id="shell">
@@ -1278,5 +1284,5 @@ input,select,textarea{border-radius:9px}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-10-25-More-pictures-per-character"></script>
+<script src="app.js?v=2026-10-25-Move-and-zoom-pictures"></script>
 </body></html>

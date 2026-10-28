@@ -402,6 +402,16 @@ What the fog hides from the players: a foe you have shown stays out of their cop
 - Squares are counted for you, and walls stop shapes and tokens, but movement costs, the effects of other terrain, cover, doors and real line of sight are not applied: you judge those. A wall is a whole square, and "line of effect" is a straight line between square centres, so a corner case may need your ruling. The terrain, markers and shapes are there to show everyone what you decided.
 - **Download my backup** includes the map's settings, terrain, markers and foe positions for the GM, but not the picture or the library. Keep the original picture files.
 
+## Moving and zooming trainer and people pictures (Update 33)
+
+The picture on a **Trainer** sheet and on a person in **People** now has the same frame as an NPC's: **drag** the picture to move it, use the **Zoom** slider to zoom in, or click the picture and use the **arrow keys** (hold Shift for bigger steps). **Reset frame** centres it again, and **View full picture** opens the whole thing.
+
+- The photo is now kept whole (up to 640 pixels, in its own shape) instead of being cut to a portrait when you upload it, so you can choose which part shows. The frame you set is what shows on the sheet card, the Overview ID card and the People list. The enlarged view always shows the whole picture.
+- A new main photo (an upload, **Use as main**, or the next one after a removal) starts centred at normal size.
+- Only the trainer's owner and the GM can move a trainer's picture; anyone at the table can move a person's, as with the rest of that card. Everyone else sees the framed result.
+- Pictures uploaded before this update were already cut to a portrait, so they show as before and can still be zoomed and moved a little. Upload them again to choose a different crop.
+- Nothing about the rules changed in this update.
+
 ## Sharper pictures (Update 32)
 
 Pictures used to look soft when enlarged, because the only copy was the small one kept on the card (a few dozen kilobytes, so a record never grows too big). Now each upload keeps **two** copies: the small one for cards, thumbnails and the strip, and a sharper one (up to 1600 pixels on the long side, and not cropped) used only in the enlarged view.

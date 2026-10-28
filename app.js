@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-25 · More pictures per character';
+const BUILD='2026-10-25 · Move and zoom pictures';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -672,8 +672,10 @@ function assembleMap(){
   }
   S.mapSrc=imgSrc(out);
 }
-function pimg(d,name,cls){
+function pimg(d,name,cls,crop){
   const s=imgSrc(d);
+  const fr=s&&crop?ntCrop(crop):null;
+  if(fr&&(fr.z!==1||fr.x!==50||fr.y!==50))return h`<span class="pimg ${cls||''} pfr" role="img" aria-label="${name||''}" ${raw('style="--x:'+fr.x+'%;--y:'+fr.y+'%;--z:'+fr.z+'"')}><img src="${s}" alt="" draggable="false"></span>`;
   if(s)return h`<img class="pimg ${cls||''}" src="${s}" alt="${name||''}">`;
   return h`<div class="pimg ${cls||''} ini" aria-hidden="true">${(String(name||'?').trim().charAt(0)||'?').toUpperCase()}</div>`;
 }
@@ -6133,18 +6135,28 @@ function ntPortrait(src,crop,cls,attrs){
   return h`<div class="ptr ${cls||''}" ${attrs||''} ${raw('style="--x:'+c.x+'%;--y:'+c.y+'%;--z:'+c.z+'"')}><img src="${u}" alt="" draggable="false"></div>`;
 }
 /* the frame controls under the GM's picture */
-function ntFramePanel(id,nt){
+function ntFramePanel(id,nt,sc){
+  sc=sc||'gt';
   const c=ntCrop(nt.imgc);
-  return h`<div class="ptfr"><label class="fld"><span class="fl">Zoom</span><input type="range" class="ptz" data-id="${id}" min="1" max="3" step="0.05" value="${c.z}" aria-label="Zoom the picture"></label>
-    <div class="row"><button class="btn sm" data-act="nt_fr0" data-id="${id}">Reset frame</button><button class="btn sm" data-act="lbx" data-k="${'gt|'+id}">View full picture</button></div>
+  return h`<div class="ptfr"><label class="fld"><span class="fl">Zoom</span><input type="range" class="ptz" data-sc="${sc}" data-id="${id}" min="1" max="3" step="0.05" value="${c.z}" aria-label="Zoom the picture"></label>
+    <div class="row"><button class="btn sm" data-act="${sc==='gt'?'nt_fr0':'fr0'}" data-sc="${sc}" data-id="${id}">Reset frame</button><button class="btn sm" data-act="lbx" data-k="${sc+'|'+id}">View full picture</button></div>
     <span class="sub">Drag the picture to move it. Arrow keys work too.</span></div>`;
 }
 /* ----- moving and zooming the picture in its frame ----- */
 let ntFrDrag=null,ntFrTimer=0;
-function ntFrameSave(id,c){
-  edit('gt',id,'imgc',ntCrop(c));
+/* who may move the picture: the GM for an NPC, the owner (or the GM) for a trainer, anyone at the table for a person */
+function frCan(sc,id){
+  if(sc==='gt')return !!S.me.admin;
+  if(sc==='t')return canEditT(id);
+  if(sc==='ppl')return canShared();
+  return false;
+}
+function ntFrameSave(id,c,sc){
+  sc=sc||'gt';
+  edit(sc,id,'imgc',ntCrop(c));
   clearTimeout(ntFrTimer);
-  ntFrTimer=setTimeout(()=>ntPublish(id),350);
+  /* an NPC's table copy is updated; the other pictures show up on the cards when the page redraws */
+  ntFrTimer=setTimeout(()=>{if(sc==='gt')ntPublish(id);else render();},350);
 }
 function ntFrameApply(f,c){
   const im=f&&f.querySelector('img');
@@ -6163,10 +6175,10 @@ function ntFrameGeom(f,z){
   return {ox:nw*k*z-r.width,oy:nh*k*z-r.height};
 }
 function ntFrameStart(f,e){
-  const id=f.dataset.id,nt=NTS()[id];
-  if(!nt||!S.me.admin)return;
+  const id=f.dataset.id,sc=f.dataset.sc||'gt',nt=galDoc(sc,id);
+  if(!nt||!frCan(sc,id))return;
   const c=ntCrop(nt.imgc);
-  ntFrDrag={id,f,x0:e.clientX,y0:e.clientY,c0:c,c,g:ntFrameGeom(f,c.z)};
+  ntFrDrag={id,sc,f,x0:e.clientX,y0:e.clientY,c0:c,c,g:ntFrameGeom(f,c.z)};
   try{f.setPointerCapture(e.pointerId);}catch(err){}
   try{f.focus({preventScroll:true});}catch(err){}
   f.classList.add('drag');
@@ -6186,11 +6198,11 @@ function ntFrameEnd(){
   if(!d)return;
   ntFrDrag=null;
   d.f.classList.remove('drag');
-  if(JSON.stringify(d.c)!==JSON.stringify(d.c0))ntFrameSave(d.id,d.c);
+  if(JSON.stringify(d.c)!==JSON.stringify(d.c0))ntFrameSave(d.id,d.c,d.sc);
 }
 function ntFrameKey(f,e){
-  const id=f.dataset.id,nt=NTS()[id];
-  if(!nt||!S.me.admin)return false;
+  const id=f.dataset.id,sc=f.dataset.sc||'gt',nt=galDoc(sc,id);
+  if(!nt||!frCan(sc,id))return false;
   const step=e.shiftKey?10:3;
   const dx={ArrowRight:-step,ArrowLeft:step}[e.key]||0,dy={ArrowDown:-step,ArrowUp:step}[e.key]||0;
   if(!dx&&!dy)return false;
@@ -6199,17 +6211,17 @@ function ntFrameKey(f,e){
   if(g.oy>0.5)c.y=clamp(c.y+dy,0,100);
   const n=ntCrop(c);
   ntFrameApply(f,n);
-  ntFrameSave(id,n);
+  ntFrameSave(id,n,sc);
   e.preventDefault();
   return true;
 }
 function ntFrameZoom(t,commit){
-  const id=t.dataset.id,nt=NTS()[id];
-  if(!nt||!S.me.admin)return;
+  const id=t.dataset.id,sc=t.dataset.sc||'gt',nt=galDoc(sc,id);
+  if(!nt||!frCan(sc,id))return;
   const c=ntCrop(Object.assign({},nt.imgc,{z:+t.value}));
   const f=t.closest('.idimg')&&t.closest('.idimg').querySelector('.ptr.edit');
   if(f)ntFrameApply(f,c);
-  if(commit)ntFrameSave(id,c);
+  if(commit)ntFrameSave(id,c,sc);
 }
 /* ----- sharp copies (Update 32): the small picture stays on the card's own document; a larger one sits in `pics`, named after the small one ----- */
 const HIRES=new Map(),HIRES_BUSY=new Set();
@@ -6270,8 +6282,14 @@ function galName(sc,doc){return sc==='t'?tName(doc):sc==='gt'?ntName(doc):(doc&&
 function galOpen(sc,id,doc,cls){
   const list=galList(doc),name=galName(sc,doc);
   if(!list.length)return pimg('',name,cls);
-  return h`<button class="galopen" data-act="lbx" data-k="${sc+'|'+id}" aria-label="${'Enlarge the picture of '+name+(list.length>1?' ('+list.length+' pictures)':'')}" title="Enlarge">${pimg(doc.img||list[0].src,name,cls)}${list.length>1?h`<span class="galn" aria-hidden="true">${list.length}</span>`:''}</button>`;
+  return h`<button class="galopen" data-act="lbx" data-k="${sc+'|'+id}" aria-label="${'Enlarge the picture of '+name+(list.length>1?' ('+list.length+' pictures)':'')}" title="Enlarge">${pimg(doc.img||list[0].src,name,cls,doc.img?doc.imgc:null)}${list.length>1?h`<span class="galn" aria-hidden="true">${list.length}</span>`:''}</button>`;
 }
+/* the picture area on an editor: a frame to drag and zoom when the viewer may change it, otherwise a picture that opens large */
+function picEditor(sc,id,doc,ro){
+  if(ro||!ntImgOk(doc.img))return galOpen(sc,id,doc,'tall');
+  return ntPortrait(doc.img,doc.imgc,'edit',h`data-sc="${sc}" data-id="${id}" tabindex="0" role="group" aria-label="Picture frame. Drag to move the picture, or use the arrow keys."`);
+}
+function picFrame(sc,id,doc,ro){return !ro&&ntImgOk(doc.img)?ntFramePanel(id,doc,sc):'';}
 function galPanel(sc,id,doc,ro){
   const list=galList(doc);
   if(ro&&list.length<2)return '';
@@ -6287,7 +6305,7 @@ function galUse(sc,id,i){
   const alts=galAlts(doc),pick=alts[i];if(!pick)return;
   if(ntImgOk(doc.img))alts[i]=doc.img;else alts.splice(i,1);
   edit(sc,id,'img',pick);edit(sc,id,'imgs',alts);
-  if(sc==='gt')edit('gt',id,'imgc',{x:50,y:50,z:1});
+  edit(sc,id,'imgc',{x:50,y:50,z:1});
   galAfter(sc,id);render();
 }
 function galRm(sc,id,i){
@@ -6298,7 +6316,7 @@ function galRm(sc,id,i){
 /* adds a new picture: becomes the main photo when there is none yet */
 function galAdd(sc,id,url){
   const doc=galDoc(sc,id);if(!doc)return false;
-  if(!ntImgOk(doc.img)){edit(sc,id,'img',url);if(sc==='gt')edit('gt',id,'imgc',{x:50,y:50,z:1});galAfter(sc,id);return true;}
+  if(!ntImgOk(doc.img)){edit(sc,id,'img',url);edit(sc,id,'imgc',{x:50,y:50,z:1});galAfter(sc,id);return true;}
   const alts=galAlts(doc);
   if(alts.length>=GAL_MAX[sc])return false;
   alts.push(url);edit(sc,id,'imgs',alts);return true;
@@ -6770,7 +6788,7 @@ function ntAct(b){
       edit('gt',d.id,'talents.'+d.key,(clamp(num((nt.talents||{})[d.key]),0,2)+1)%3);
       render();break;}
     case 'nt_roll':ntRoll(d.label,num(d.bonus),num(d.tal));break;
-    case 'nt_fr0':edit('gt',d.id,'imgc',{x:50,y:50,z:1});ntPublish(d.id);render();break;
+    case 'nt_fr0':{const sc=d.sc||'gt';edit(sc,d.id,'imgc',{x:50,y:50,z:1});if(sc==='gt')ntPublish(d.id);render();break;}
     case 'nt_recharge':edit('gt',d.id,'megaUsed',false);render();break;
     case 'nt_mgadd':case 'nt_mgform':case 'nt_mgreset':case 'nt_mgdrop':case 'nt_mgready':mgAct('nt',d.act.slice(3),d);break;
     case 'nt_mon':S.ui.nt.mon[d.mid]=!S.ui.nt.mon[d.mid];render();break;
@@ -8277,7 +8295,7 @@ function trainerCard(uid){
       <div class="row sp"><span class="sub">Contest ribbons</span><b>${ribBrief(t)}</b></div>
       <div class="idcode" aria-hidden="true"></div>
     </div>`:h`<div class="idfront">
-    <button class="pbtn" data-act="view" data-uid="${uid}" data-tab="trainer" aria-label="Open sheet for ${tName(t)}">${pimg(t.img,tName(t),'tall')}</button>
+    <button class="pbtn" data-act="view" data-uid="${uid}" data-tab="trainer" aria-label="Open sheet for ${tName(t)}">${pimg(t.img,tName(t),'tall',t.imgc)}</button>
     <div><h3>${tName(t)}</h3>
       <p class="sub">${[t.cls,t.adv].filter(Boolean).join(' · ')||'Class not chosen'} · Level ${num(t.level)||1}</p>
       <p class="sub">Played by ${nm(uid)}</p></div></div>
@@ -8347,7 +8365,7 @@ function overviewTab(){
 /* ---------- trainer tab ---------- */
 function identityPanel(uid,t,ro){
   return h`<section class="panel"><div class="ph"><h2>Trainer</h2><span class="sub">Played by ${nm(uid)}</span></div>
-    <div class="idrow"><div class="idimg">${galOpen('t',uid,t,'tall')}${imgPicker('t',uid,'img',t,400,500,80000,ro)}${galPanel('t',uid,t,ro)}</div>
+    <div class="idrow"><div class="idimg">${picEditor('t',uid,t,ro)}${imgPicker('t',uid,'img',t,0,0,90000,ro,640)}${picFrame('t',uid,t,ro)}${galPanel('t',uid,t,ro)}</div>
     <div class="fgrid">
       ${fText('Name','t',uid,'name',t,{ro,cls:'wide'})}
       ${fSel('Class','t',uid,'cls',t,Object.keys(CLASSES),{ro,blank:'Not chosen'})}
@@ -8667,7 +8685,7 @@ function personCard(p){
   const canE=canShared();
   if(open&&canE){
     return h`<article class="entry">
-      <div class="idrow"><div class="idimg">${galOpen('ppl',p.id,p,'tall')}${imgPicker('ppl',p.id,'img',p,400,500,80000,false)}${galPanel('ppl',p.id,p,false)}</div>
+      <div class="idrow"><div class="idimg">${picEditor('ppl',p.id,p,false)}${imgPicker('ppl',p.id,'img',p,0,0,90000,false,640)}${picFrame('ppl',p.id,p,false)}${galPanel('ppl',p.id,p,false)}</div>
       <div class="fgrid">
         ${fText('Name','ppl',p.id,'name',p,{cls:'wide'})}
         ${fText('Role or title','ppl',p.id,'role',p)}
@@ -9583,8 +9601,9 @@ function act(b,e){
       const dd=p[2]==='img'&&(p[0]==='t'||p[0]==='ppl'||p[0]==='gt')?galDoc(p[0],p[1]):null,al=dd?galAlts(dd):[];
       const was=dd&&dd.img;
       if(al.length){edit(p[0],p[1],'img',al[0]);edit(p[0],p[1],'imgs',al.slice(1));}else edit(p[0],p[1],p[2],'');
-      if(dd)picDrop(was);if(p[0]==='gt'&&p[2]==='img')edit('gt',p[1],'imgc',{x:50,y:50,z:1});if(p[0]==='gt')ntPublish(p[1]);render();break;}
+      if(dd)picDrop(was);if(GAL_MAX[p[0]]&&p[2]==='img')edit(p[0],p[1],'imgc',{x:50,y:50,z:1});if(p[0]==='gt')ntPublish(p[1]);render();break;}
     case 'lbx':lbxOpen(d.k);break;
+    case 'fr0':if(frCan(d.sc,d.id)){edit(d.sc,d.id,'imgc',{x:50,y:50,z:1});render();}break;
     case 'lbxn':lbxStep(+d.dir||1,+d.dir<0?'lbx-p':'lbx-n');break;
     case 'galUse':galUse(d.sc,d.id,+d.i);break;
     case 'galRm':galRm(d.sc,d.id,+d.i);break;
@@ -9890,7 +9909,7 @@ document.addEventListener('change',async e=>{
     if(parts[0]==='map'){if(!(await uploadMap(f)))late='Map saved. Its shape does not match the Sinnoh map, so hover highlights are off.';}
     else if(parts[0]==='bmap'){if(S.me.admin)await bmUpload(f);}
     else if(parts[2]==='imgs'&&GAL_MAX[parts[0]]){const r=await fileToImage(f,{max:pk.max||640,cap:pk.cap});if(galAdd(parts[0],parts[1],r.url)){late=await picStore(f,r.url);}else late='That card already holds the most pictures. Remove one first.';}
-    else{const r=await fileToImage(f,{w:pk.w,h:pk.h,max:pk.max||undefined,cap:pk.cap});const gd=GAL_MAX[parts[0]]&&parts[2]==='img'?galDoc(parts[0],parts[1]):null;const was=gd&&gd.img;edit(parts[0],parts[1],parts[2],r.url);if(gd){picDrop(was);late=await picStore(f,r.url);}if(parts[0]==='gt'&&parts[2]==='img'){edit('gt',parts[1],'imgc',{x:50,y:50,z:1});}if(parts[0]==='gt')ntPublish(parts[1]);}
+    else{const r=await fileToImage(f,{w:pk.w,h:pk.h,max:pk.max||undefined,cap:pk.cap});const gd=GAL_MAX[parts[0]]&&parts[2]==='img'?galDoc(parts[0],parts[1]):null;const was=gd&&gd.img;edit(parts[0],parts[1],parts[2],r.url);if(gd){picDrop(was);late=await picStore(f,r.url);}if(GAL_MAX[parts[0]]&&parts[2]==='img'){edit(parts[0],parts[1],'imgc',{x:50,y:50,z:1});}if(parts[0]==='gt')ntPublish(parts[1]);}
     if(!Q.size)setStatus('saved');
     render();
     if(late)toast(late);
