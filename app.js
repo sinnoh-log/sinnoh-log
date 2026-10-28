@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-25 · Move and zoom pictures';
+const BUILD='2026-10-25 · Trainer sheet sections';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -118,7 +118,7 @@ const S={
   megaOk:{},battle:{},battleGm:{},trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},gmNt:{},npcPub:{},shopPub:{},shopGm:{},
   awards:{},timeline:{},pins:{},banner:{},cond:{},places:{},gmPl:{},placeId:null,members:{},invite:null,mapChunks:{},mapSrc:'',room:null,peers:[],avatars:{},
   pick:null,names:{},save:{cls:'',text:'Saved'},rolls:[],_tsig:'',
-  ui:{open:{},flip:{},lbx:null,adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},pop:null,megaPop:null,
+  ui:{open:{},flip:{},sheetTab:'',lbx:null,adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},pop:null,megaPop:null,
     award:{uids:{},type:'Gym Badge',badge:'coal',ribbon:null,title:'',note:'',levelUp:true}}
 };
 
@@ -8480,20 +8480,32 @@ function sheetCard(uid,t){
     <div class="idcode" aria-hidden="true"></div>
   </article>`;
 }
+/* the sheet's sections (Update 34). On a phone one section shows at a time; on a wide screen "All" shows everything, as before. */
+const SHEET_TABS=[['stats','Stats & skills'],['feat','Features'],['bag','Bag'],['honors','Badges & ribbons'],['prof','Profile'],['all','All']];
+function sheetTabNow(){
+  const v=S.ui.sheetTab;
+  if(SHEET_TABS.some(x=>x[0]===v))return v;
+  return (window.innerWidth||1000)<880?'stats':'all';
+}
 function trainerTab(){
   const uid=S.viewUid;
   const t=S.trainers[uid];
   if(!t)return h`${trainerPicker()}${emptyTrainer()}`;
   const ro=!canEditT(uid);
+  const tab=sheetTabNow(),show=g=>tab==='all'||tab===g;
+  const c1=[show('prof')?identityPanel(uid,t,ro):'',show('stats')?vitalsPanel(uid,t,ro):'',show('honors')?honorsPanel(uid,t,ro):''];
+  const c2=[show('stats')?skillsPanel(uid,t,ro):'',show('feat')?featuresPanel(uid,t,ro):'',show('bag')?itemsPanel(uid,t,ro):''];
+  const n1=c1.filter(Boolean).length,n2=c2.filter(Boolean).length;
   return h`${trainerPicker()}
     ${!S.trainers[S.me.id]&&!S.me.admin&&S.me.id&&S.me.canWrite?h`<div class="banner">You have no trainer sheet yet. ${createCta()}</div>`:''}
     ${ro?h`<div class="banner">Viewing ${tName(t)}. Only ${nm(uid)} and the GM can change this sheet.</div>`:''}
     ${sheetCard(uid,t)}
-    <div class="sheet">
-      <div class="col">${identityPanel(uid,t,ro)}${vitalsPanel(uid,t,ro)}${honorsPanel(uid,t,ro)}</div>
-      <div class="col">${skillsPanel(uid,t,ro)}${featuresPanel(uid,t,ro)}${itemsPanel(uid,t,ro)}</div>
+    <div class="shtabs" role="group" aria-label="Sheet sections">${SHEET_TABS.map(([k,l])=>h`<button class="shtab" data-act="shtab" data-v="${k}" aria-pressed="${String(tab===k)}">${l}</button>`)}</div>
+    <div class="sheet ${n1&&n2?'':'one'}">
+      ${n1?h`<div class="col">${c1}</div>`:''}
+      ${n2?h`<div class="col">${c2}</div>`:''}
     </div>
-    ${ro?'':deleteTrainerPanel(uid,t)}`;
+    ${ro||!show('prof')?'':deleteTrainerPanel(uid,t)}`;
 }
 function deleteTrainerPanel(uid,t){
   const n=monsOf(uid).length;
@@ -9604,6 +9616,7 @@ function act(b,e){
       if(dd)picDrop(was);if(GAL_MAX[p[0]]&&p[2]==='img')edit(p[0],p[1],'imgc',{x:50,y:50,z:1});if(p[0]==='gt')ntPublish(p[1]);render();break;}
     case 'lbx':lbxOpen(d.k);break;
     case 'fr0':if(frCan(d.sc,d.id)){edit(d.sc,d.id,'imgc',{x:50,y:50,z:1});render();}break;
+    case 'shtab':S.ui.sheetTab=d.v;render();break;
     case 'lbxn':lbxStep(+d.dir||1,+d.dir<0?'lbx-p':'lbx-n');break;
     case 'galUse':galUse(d.sc,d.id,+d.i);break;
     case 'galRm':galRm(d.sc,d.id,+d.i);break;

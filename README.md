@@ -402,6 +402,15 @@ What the fog hides from the players: a foe you have shown stays out of their cop
 - Squares are counted for you, and walls stop shapes and tokens, but movement costs, the effects of other terrain, cover, doors and real line of sight are not applied: you judge those. A wall is a whole square, and "line of effect" is a straight line between square centres, so a corner case may need your ruling. The terrain, markers and shapes are there to show everyone what you decided.
 - **Download my backup** includes the map's settings, terrain, markers and foe positions for the GM, but not the picture or the library. Keep the original picture files.
 
+## Trainer sheet sections (Update 34)
+
+Under the ID card, the **Trainer** page now has a row of section buttons: **Stats & skills**, **Features**, **Bag**, **Badges & ribbons**, **Profile** and **All**.
+
+- **On a phone** the sheet opens on Stats & skills and shows one section at a time, so there is far less scrolling. The row slides sideways if it does not fit.
+- **On a wide screen** it opens on **All**, which shows every panel as before. You can still pick one section if you prefer.
+- **Profile** holds the name, class, hometown and the other identity fields, and the Delete this trainer panel (which also shows under All).
+- Your choice is remembered only until you reload. Nothing is saved and nothing about the rules changed.
+
 ## Moving and zooming trainer and people pictures (Update 33)
 
 The picture on a **Trainer** sheet and on a person in **People** now has the same frame as an NPC's: **drag** the picture to move it, use the **Zoom** slider to zoom in, or click the picture and use the **arrow keys** (hold Shift for bigger steps). **Reset frame** centres it again, and **View full picture** opens the whole thing.

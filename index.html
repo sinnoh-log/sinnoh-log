@@ -1251,6 +1251,13 @@ input,select,textarea{border-radius:9px}
 .pimg.pfr>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:var(--x,50%) var(--y,50%);transform:scale(var(--z,1));transform-origin:var(--x,50%) var(--y,50%);display:block;user-select:none;-webkit-user-drag:none;pointer-events:none}
 .idimg .ptr.edit{width:100%}
 @media (max-width:520px){.idimg:has(.ptr.edit){flex-direction:column;align-items:stretch}.idimg .ptr.edit{width:min(220px,100%);align-self:flex-start}}
+
+/* Update 34: trainer sheet sections */
+.sheet.one{grid-template-columns:minmax(0,1fr)}
+.shtabs{display:flex;gap:4px;padding:4px;margin:0 0 14px;background:var(--rail,#D2E2ED);border:1px solid var(--line);border-radius:12px;overflow-x:auto;scrollbar-width:thin}
+.shtab{flex:1 0 auto;min-height:44px;padding:0 14px;border:0;border-radius:9px;background:transparent;color:var(--muted,#4F6485);font:700 14px var(--f-body);white-space:nowrap;cursor:pointer}
+.shtab[aria-pressed=true]{background:var(--panel);color:var(--accent);box-shadow:0 1px 3px rgba(20,30,70,.25)}
+.shtab:focus-visible{outline:3px solid var(--gold,#FFB736);outline-offset:1px}
 </style>
 <script>try{var __t=localStorage.getItem('stl.theme');if(__t==='light'||__t==='dark')document.documentElement.setAttribute('data-theme',__t);}catch(e){}</script>
 <div class="dev"><div class="dev-top" aria-hidden="true"><span>SINNOH · TRAINER GEAR</span><span class="dev-on"><i></i>ONLINE</span></div><div class="dev-frame"><div class="shell" id="shell">
@@ -1284,5 +1291,5 @@ input,select,textarea{border-radius:9px}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-10-25-Move-and-zoom-pictures"></script>
+<script src="app.js?v=2026-10-25-Trainer-sheet-sections"></script>
 </body></html>
