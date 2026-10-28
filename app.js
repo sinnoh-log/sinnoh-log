@@ -6211,10 +6211,52 @@ function ntFrameZoom(t,commit){
   if(f)ntFrameApply(f,c);
   if(commit)ntFrameSave(id,c);
 }
+/* ----- sharp copies (Update 32): the small picture stays on the card's own document; a larger one sits in `pics`, named after the small one ----- */
+const HIRES=new Map(),HIRES_BUSY=new Set();
+function picId(str){
+  let h1=0xdeadbeef,h2=0x41c6ce57;
+  for(let i=0;i<str.length;i++){const c=str.charCodeAt(i);h1=Math.imul(h1^c,2654435761);h2=Math.imul(h2^c,1597334677);}
+  h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);
+  h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);
+  return 'h'+(h2>>>0).toString(16).padStart(8,'0')+(h1>>>0).toString(16).padStart(8,'0')+'-'+str.length;
+}
+/* the sharp copy for a small picture: the text if it is known, '' if there is none, undefined while it is still being fetched */
+function hiGet(thumb){
+  if(!ntImgOk(thumb)||!S.db)return '';
+  const id=picId(thumb);
+  if(HIRES.has(id))return HIRES.get(id);
+  if(!HIRES_BUSY.has(id)){
+    HIRES_BUSY.add(id);
+    Promise.resolve().then(()=>S.db.collection('pics').doc(id).get()).then(sn=>{
+      const d=sn&&sn.exists?(sn.data()||{}).d:'';
+      HIRES.set(id,typeof d==='string'&&JPEG_RE.test(d)?d:'');
+    },()=>{HIRES.set(id,'');}).then(()=>{HIRES_BUSY.delete(id);lbxRender();});
+  }
+  return undefined;
+}
+/* saves a sharper copy next to a freshly uploaded picture; returns a note for the person when it could not be kept */
+async function picStore(file,thumb){
+  try{
+    const r=await fileToImage(file,{max:1600,q:0.86,cap:380000});
+    if(r.url.length<=thumb.length*1.15)return '';
+    const id=picId(thumb);
+    await S.db.collection('pics').doc(id).set({owner:S.me.id,d:r.url,at:Date.now()});
+    HIRES.set(id,r.url);
+    return '';
+  }catch(e){
+    return e&&e.code==='permission-denied'?'Picture saved, but its sharp copy could not be kept. Publish the new firestore.rules to turn that on.':'';
+  }
+}
+function picDrop(thumb){
+  if(!ntImgOk(thumb)||!S.db)return;
+  const id=picId(thumb);
+  HIRES.delete(id);
+  try{Promise.resolve(S.db.collection('pics').doc(id).delete()).catch(()=>{});}catch(e){}
+}
 /* ----- the full picture, in front of the page ----- */
 /* ----- more pictures (Update 31): the main photo is the document's `img`; the others sit in `imgs` ----- */
 const GAL_MAX={t:5,ppl:5,gt:4};
-const GAL_CAP={t:60000,ppl:60000,gt:110000};
+const GAL_CAP={t:70000,ppl:70000,gt:110000};
 function galDoc(sc,id){return sc==='gt'?(NTS()[id]||null):(typeof getLocal==='function'?getLocal(sc,id):null);}
 function galAlts(doc){return doc&&Array.isArray(doc.imgs)?doc.imgs.filter(ntImgOk):[];}
 function galList(doc){
@@ -6251,7 +6293,7 @@ function galUse(sc,id,i){
 function galRm(sc,id,i){
   const doc=galDoc(sc,id);if(!doc)return;
   const alts=galAlts(doc);if(i<0||i>=alts.length)return;
-  alts.splice(i,1);edit(sc,id,'imgs',alts);render();
+  const gone=alts.splice(i,1)[0];edit(sc,id,'imgs',alts);picDrop(gone);render();
 }
 /* adds a new picture: becomes the main photo when there is none yet */
 function galAdd(sc,id,url){
@@ -6287,13 +6329,14 @@ function lbxRender(){
     if(!el.hidden){el.hidden=true;el.innerHTML='';document.documentElement.classList.remove('lbx-on');}
     return;
   }
-  const sig=S.ui.lbx+'|'+v.src.length+'|'+v.name+'|'+v.n;
+  const hi=hiGet(v.src);
+  const sig=S.ui.lbx+'|'+v.src.length+'|'+v.name+'|'+v.n+'|'+(hi?'h':hi===undefined?'w':'t');
   if(!el.hidden&&el.dataset.sig===sig)return;
   el.dataset.sig=sig;
   el.hidden=false;
   document.documentElement.classList.add('lbx-on');
   const nav=v.n>1;
-  el.innerHTML=h`<figure class="lbx-card" role="dialog" aria-modal="true" aria-label="${'Picture of '+v.name}"><img src="${imgSrc(v.src)}" alt="${'Picture of '+v.name}"><figcaption>${nav?h`<button class="btn sm" id="lbx-p" data-act="lbxn" data-dir="-1" aria-label="Previous picture">‹ Previous</button>`:''}<b>${v.name}${nav?h` <span class="lbx-c">${v.i+1} of ${v.n}${v.main?' · main':''}</span>`:''}</b>${nav?h`<button class="btn sm" id="lbx-n" data-act="lbxn" data-dir="1" aria-label="Next picture">Next ›</button>`:''}<button class="btn sm" id="lbx-x" data-act="lbxx">Close</button></figcaption></figure>`.s;
+  el.innerHTML=h`<figure class="lbx-card" role="dialog" aria-modal="true" aria-label="${'Picture of '+v.name}"><img src="${imgSrc(hi||v.src)}" alt="${'Picture of '+v.name}"><figcaption>${nav?h`<button class="btn sm" id="lbx-p" data-act="lbxn" data-dir="-1" aria-label="Previous picture">‹ Previous</button>`:''}<b>${v.name}${nav?h` <span class="lbx-c">${v.i+1} of ${v.n}${v.main?' · main':''}</span>`:''}</b>${nav?h`<button class="btn sm" id="lbx-n" data-act="lbxn" data-dir="1" aria-label="Next picture">Next ›</button>`:''}<button class="btn sm" id="lbx-x" data-act="lbxx">Close</button>${hi===undefined?h`<span class="lbx-c" role="status">Loading the sharp copy…</span>`:''}</figcaption></figure>`.s;
 }
 function lbxStep(dir,focusId){
   const q=lbxParts(S.ui.lbx),v=lbxSrc(S.ui.lbx);
@@ -8304,7 +8347,7 @@ function overviewTab(){
 /* ---------- trainer tab ---------- */
 function identityPanel(uid,t,ro){
   return h`<section class="panel"><div class="ph"><h2>Trainer</h2><span class="sub">Played by ${nm(uid)}</span></div>
-    <div class="idrow"><div class="idimg">${galOpen('t',uid,t,'tall')}${imgPicker('t',uid,'img',t,320,400,60000,ro)}${galPanel('t',uid,t,ro)}</div>
+    <div class="idrow"><div class="idimg">${galOpen('t',uid,t,'tall')}${imgPicker('t',uid,'img',t,400,500,80000,ro)}${galPanel('t',uid,t,ro)}</div>
     <div class="fgrid">
       ${fText('Name','t',uid,'name',t,{ro,cls:'wide'})}
       ${fSel('Class','t',uid,'cls',t,Object.keys(CLASSES),{ro,blank:'Not chosen'})}
@@ -8624,7 +8667,7 @@ function personCard(p){
   const canE=canShared();
   if(open&&canE){
     return h`<article class="entry">
-      <div class="idrow"><div class="idimg">${galOpen('ppl',p.id,p,'tall')}${imgPicker('ppl',p.id,'img',p,320,400,60000,false)}${galPanel('ppl',p.id,p,false)}</div>
+      <div class="idrow"><div class="idimg">${galOpen('ppl',p.id,p,'tall')}${imgPicker('ppl',p.id,'img',p,400,500,80000,false)}${galPanel('ppl',p.id,p,false)}</div>
       <div class="fgrid">
         ${fText('Name','ppl',p.id,'name',p,{cls:'wide'})}
         ${fText('Role or title','ppl',p.id,'role',p)}
@@ -9538,7 +9581,9 @@ function act(b,e){
       break;}
     case 'rmImg':{const p=d.p.split('|');
       const dd=p[2]==='img'&&(p[0]==='t'||p[0]==='ppl'||p[0]==='gt')?galDoc(p[0],p[1]):null,al=dd?galAlts(dd):[];
-      if(al.length){edit(p[0],p[1],'img',al[0]);edit(p[0],p[1],'imgs',al.slice(1));}else edit(p[0],p[1],p[2],'');if(p[0]==='gt'&&p[2]==='img')edit('gt',p[1],'imgc',{x:50,y:50,z:1});if(p[0]==='gt')ntPublish(p[1]);render();break;}
+      const was=dd&&dd.img;
+      if(al.length){edit(p[0],p[1],'img',al[0]);edit(p[0],p[1],'imgs',al.slice(1));}else edit(p[0],p[1],p[2],'');
+      if(dd)picDrop(was);if(p[0]==='gt'&&p[2]==='img')edit('gt',p[1],'imgc',{x:50,y:50,z:1});if(p[0]==='gt')ntPublish(p[1]);render();break;}
     case 'lbx':lbxOpen(d.k);break;
     case 'lbxn':lbxStep(+d.dir||1,+d.dir<0?'lbx-p':'lbx-n');break;
     case 'galUse':galUse(d.sc,d.id,+d.i);break;
@@ -9844,8 +9889,8 @@ document.addEventListener('change',async e=>{
     let late='';
     if(parts[0]==='map'){if(!(await uploadMap(f)))late='Map saved. Its shape does not match the Sinnoh map, so hover highlights are off.';}
     else if(parts[0]==='bmap'){if(S.me.admin)await bmUpload(f);}
-    else if(parts[2]==='imgs'&&GAL_MAX[parts[0]]){const r=await fileToImage(f,{max:pk.max||640,cap:pk.cap});if(!galAdd(parts[0],parts[1],r.url))late='That card already holds the most pictures. Remove one first.';}
-    else{const r=await fileToImage(f,{w:pk.w,h:pk.h,max:pk.max||undefined,cap:pk.cap});edit(parts[0],parts[1],parts[2],r.url);if(parts[0]==='gt'&&parts[2]==='img'){edit('gt',parts[1],'imgc',{x:50,y:50,z:1});}if(parts[0]==='gt')ntPublish(parts[1]);}
+    else if(parts[2]==='imgs'&&GAL_MAX[parts[0]]){const r=await fileToImage(f,{max:pk.max||640,cap:pk.cap});if(galAdd(parts[0],parts[1],r.url)){late=await picStore(f,r.url);}else late='That card already holds the most pictures. Remove one first.';}
+    else{const r=await fileToImage(f,{w:pk.w,h:pk.h,max:pk.max||undefined,cap:pk.cap});const gd=GAL_MAX[parts[0]]&&parts[2]==='img'?galDoc(parts[0],parts[1]):null;const was=gd&&gd.img;edit(parts[0],parts[1],parts[2],r.url);if(gd){picDrop(was);late=await picStore(f,r.url);}if(parts[0]==='gt'&&parts[2]==='img'){edit('gt',parts[1],'imgc',{x:50,y:50,z:1});}if(parts[0]==='gt')ntPublish(parts[1]);}
     if(!Q.size)setStatus('saved');
     render();
     if(late)toast(late);
