@@ -557,6 +557,16 @@ input[type=search]{appearance:none}
 .tplegs li{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line-soft);padding:7px 0}
 .tplegs .tpn{flex:1;min-width:220px}
 .tpalt{margin-top:8px}.tprules{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.calhd{display:flex;align-items:center;gap:8px;margin:12px 0 6px}.calhd b{min-width:150px;text-align:center}
+.calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.calwd{font:800 12px var(--f-body);color:var(--muted);text-align:center;padding:2px 0}
+.calday{appearance:none;border:1px solid var(--line-soft);background:var(--panel);border-radius:8px;min-height:64px;padding:4px 6px;text-align:left;display:flex;flex-direction:column;gap:2px;cursor:pointer;font:inherit;color:inherit;overflow:hidden}
+.calday span{font-weight:700;font-size:13px}.calday i{font-style:normal;font-size:11.5px;line-height:1.2;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.calday.trip{background:var(--accent-soft)}.calday.today{outline:2px solid var(--gold);outline-offset:-2px}.calday.sel{border-color:var(--accent)}
+.calsel{margin-top:10px;border-top:1px solid var(--line-soft);padding-top:8px}
+.calev{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}.calev li{display:flex;justify-content:space-between;gap:10px;align-items:center;border-top:1px solid var(--line-soft);padding:6px 0}
+.tplog{list-style:none;margin:8px 0;padding:0;display:flex;flex-direction:column}.tplog li{border-top:1px solid var(--line-soft);padding:7px 0;font-size:14px;display:flex;flex-direction:column;gap:2px}
+.tpenc{color:var(--bad);font-weight:600}.tdcal{cursor:pointer;font:inherit;color:inherit}
 .clrleg{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:13px;margin-top:6px}
 .clrleg span{display:inline-flex;align-items:center;gap:6px}
 .clrleg .ln{display:inline-block;width:22px;height:4px;border-radius:2px}
@@ -1157,6 +1167,7 @@ main{padding:18px 22px 0}
 .nv[data-tab=overview]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 11l9-8 9 8M5 10v10h14V10'/%3E%3C/svg%3E")}
 .nv[data-tab=journal],.nv[data-tab=leads]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3zM9 8h6M9 12h6'/%3E%3C/svg%3E")}
 .nv[data-tab=timeline]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v18M12 7h6M12 12H6M12 17h6'/%3E%3C/svg%3E")}
+.nv[data-tab=cal]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='5' width='17' height='15' rx='2'/%3E%3Cpath d='M3.5 10h17M8 3v4M16 3v4'/%3E%3C/svg%3E")}
 .nv[data-tab=people],.nv[data-tab=account]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='8' r='3.5'/%3E%3Cpath d='M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 5.2a3.5 3.5 0 010 5.6M18 14.8c2 .6 3.2 2.2 3.5 4.7'/%3E%3C/svg%3E")}
 .nv[data-tab=map]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s7-6.2 7-11.5A7 7 0 005 9.5C5 14.8 12 21 12 21z'/%3E%3Ccircle cx='12' cy='9.5' r='2.5'/%3E%3C/svg%3E")}
 .nv[data-tab=trainer],.nv[data-tab=npc]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='7' r='3.5'/%3E%3Cpath d='M5 21c0-4 3-6.5 7-6.5s7 2.5 7 6.5z'/%3E%3C/svg%3E")}
@@ -1245,6 +1256,7 @@ input,select,textarea{border-radius:9px}
 .at[data-tab=overview]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 11l9-8 9 8M5 10v10h14V10'/%3E%3C/svg%3E")}
 .at[data-tab=journal],.at[data-tab=leads]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3zM9 8h6M9 12h6'/%3E%3C/svg%3E")}
 .at[data-tab=timeline]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v18M12 7h6M12 12H6M12 17h6'/%3E%3C/svg%3E")}
+.at[data-tab=cal]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='5' width='17' height='15' rx='2'/%3E%3Cpath d='M3.5 10h17M8 3v4M16 3v4'/%3E%3C/svg%3E")}
 .at[data-tab=people],.at[data-tab=account]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='8' r='3.5'/%3E%3Cpath d='M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 5.2a3.5 3.5 0 010 5.6M18 14.8c2 .6 3.2 2.2 3.5 4.7'/%3E%3C/svg%3E")}
 .at[data-tab=map]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s7-6.2 7-11.5A7 7 0 005 9.5C5 14.8 12 21 12 21z'/%3E%3Ccircle cx='12' cy='9.5' r='2.5'/%3E%3C/svg%3E")}
 .at[data-tab=trainer],.at[data-tab=npc]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='7' r='3.5'/%3E%3Cpath d='M5 21c0-4 3-6.5 7-6.5s7 2.5 7 6.5z'/%3E%3C/svg%3E")}
@@ -1319,5 +1331,5 @@ input,select,textarea{border-radius:9px}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-10-31-travel"></script>
+<script src="app.js?v=2026-10-31-calendar"></script>
 </body></html>

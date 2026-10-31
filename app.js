@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-30 · Travel planner';
+const BUILD='2026-10-31 · Calendar and daily travel';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -64,12 +64,12 @@ const LEAD_STATES=[['open','Open'],['chasing','Chasing'],['resolved','Resolved']
 const LOY_WORDS=['Defiant','Distrustful','Obedient','Trusting','Devoted','Bonded'];
 const DEF_META={campaign:'Sinnoh Trainer Log',subtitle:'Post-game Sinnoh · ten years after Team Galactic',gm:'',session:1,pinned:'',ribbonNeed:5,hpx:2};
 const NAV=[
-  ['Narrative',[['overview','Overview'],['journal','Journal'],['timeline','Timeline']]],
+  ['Narrative',[['overview','Overview'],['journal','Journal'],['timeline','Timeline'],['cal','Calendar']]],
   ['World',[['people','People'],['leads','Leads'],['map','Map']]],
   ['Table',[['trainer','Trainer'],['pokemon','Pokémon'],['dex','Pokédex'],['battle','Battle'],['contest','Contests'],['shop','Shop']]]
 ];
 const GM_NAV=['Game Master',[['gm','GM Desk'],['npc','NPC Trainers']]];
-const PAGE_LABEL={overview:'Overview',journal:'Journal',timeline:'Timeline',people:'People',leads:'Leads',map:'Map',place:'Place',trainer:'Trainer sheet',pokemon:'Pokémon',dex:'Pokédex',battle:'Battle',contest:'Contests',shop:'Shop',gm:'GM Desk',npc:'NPC Trainers',account:'Account'};
+const PAGE_LABEL={cal:'Calendar',overview:'Overview',journal:'Journal',timeline:'Timeline',people:'People',leads:'Leads',map:'Map',place:'Place',trainer:'Trainer sheet',pokemon:'Pokémon',dex:'Pokédex',battle:'Battle',contest:'Contests',shop:'Shop',gm:'GM Desk',npc:'NPC Trainers',account:'Account'};
 const PIN_KINDS=[['place','Place'],['party','Party'],['danger','Danger'],['lead','Lead']];
 const AWARD_TYPES=['Gym Badge','Trial Medal','Frontier Symbol','Contest Ribbon','Certificate','Emblem of Recognition','Loyal Partner','Moment of Destiny','Other'];
 
@@ -4277,6 +4277,7 @@ const CDI={
   moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
   tide:'<path d="M3 9c3 0 3 2 6 2s3-2 6-2 3 2 6 2M3 15c3 0 3 2 6 2s3-2 6-2 3 2 6 2"/>',
   festival:'<path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.4 6.6 19.5l1.2-6-4.5-4.2 6.1-.7z"/>',
+  cal:'<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
   fx:'<path d="M5 15a4 4 0 0 1-.4-8A6 6 0 0 1 16 8a3.6 3.6 0 0 1 .4 7.2M9 18l-.8 2.5M13 18l-.8 2.5"/>'
 };
 const cdIcon=k=>raw('<svg class="cdi" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+(CDI[k]||'')+'</svg>');
@@ -4292,7 +4293,7 @@ function todayHtml(){
   return h`<section class="today" aria-label="Today in Sinnoh">
     <div class="td-row">
       <div class="td-chips" role="status" aria-live="polite" aria-label="Conditions now: ${cdText()}">
-        ${cdChip('t',CD_LAB[c.t],c.t)}${cdChip('x',CD_LAB[c.x],c.x)}${cdChip('s',CD_LAB[c.s],c.s)}${c.t==='night'?cdChip('m',CD_LAB[c.m],'moon'):''}${c.d==='low'?cdChip('d','Low tide','tide'):''}${c.f?cdChip('f','Festival week','festival'):''}
+        ${clToday()?h`<button class="td-chip tdcal" data-act="tab" data-tab="cal" title="Open the calendar">${cdIcon('cal')}<b>${clNice(clToday())}</b></button>`:''}${cdChip('t',CD_LAB[c.t],c.t)}${cdChip('x',CD_LAB[c.x],c.x)}${cdChip('s',CD_LAB[c.s],c.s)}${c.t==='night'?cdChip('m',CD_LAB[c.m],'moon'):''}${c.d==='low'?cdChip('d','Low tide','tide'):''}${c.f?cdChip('f','Festival week','festival'):''}
       </div>
       <div class="td-acts">
         <button class="btn sm ghost" data-act="cd_fx" aria-pressed="${String(fxOn)}" title="Show weather and light effects on the screen">${cdIcon('fx')} Effects: ${fxOn?'on':'off'}</button>
@@ -4301,7 +4302,7 @@ function todayHtml(){
     </div>
     ${open?h`<div class="td-edit">
       ${cdSeg('Time of day','t',CD_T,c.t)}${cdSeg('Weather','x',CD_X,c.x)}${cdSeg('Season','s',CD_S,c.s)}${cdSeg('Moon','m',CD_M,c.m)}${cdSeg('Tide','d',CD_D,c.d)}
-      <div class="td-grp"><span class="fl">Quick</span><div class="row"><button class="btn sm" data-act="cd_adv">Next time of day</button><button class="btn sm" data-act="cd_roll">Roll the weather</button><button class="btn sm" data-act="cd_fest" aria-pressed="${String(c.f)}">Festival week: ${c.f?'on':'off'}</button></div></div>
+      <div class="td-grp"><span class="fl">Quick</span><div class="row">${clToday()?h`<button class="btn sm" data-act="cl_next">Next day</button>`:''}<button class="btn sm" data-act="cd_adv">Next time of day</button><button class="btn sm" data-act="cd_roll">Roll the weather</button><button class="btn sm" data-act="cd_fest" aria-pressed="${String(c.f)}">Festival week: ${c.f?'on':'off'}</button></div></div>
       <p class="sub">Everyone sees this strip and the weather on their screen. Your wild encounter tables use it too, so a rainy night gives different odds than a clear morning.</p>
     </div>`:''}
   </section>`;
@@ -9299,7 +9300,9 @@ function trLegStatus(l,cl){
   const r=trReq(l);
   if(!r)return {cls:'open',txt:'Open',block:false,seasonal:false};
   const st=clrStatus(cl,r[2],r[3],r[4]);
-  return {cls:st[0],txt:st[1],block:st[0]==='warn'&&!TR_SEASONAL.has(l[0]),seasonal:TR_SEASONAL.has(l[0])};
+  const seas=TR_SEASONAL.has(l[0]);
+  if(seas&&!clSeasonalOn(l[0]))return {cls:'open',txt:'Open (seasonal limit not in effect)',block:false,seasonal:false};
+  return {cls:st[0],txt:st[1],block:st[0]==='warn',seasonal:seas};
 }
 function trPath(from,to,pace,cl,avoid){
   const m=TR_PACE[pace][0],dist={},prev={},done=new Set();
@@ -9376,7 +9379,7 @@ function trPanel(){
             ${s?h`<span class="pill ${s.cls}">${s.seasonal&&s.cls==='warn'?'Seasonal: '+s.txt.toLowerCase():s.txt}</span>`:''}</li>`;})}
       </ol>
       ${altSum?h`<p class="sub tpalt">Avoiding restricted routes: ${timeTxt(altSum)}, ${altSum.mi} miles. <button class="lnk" data-act="tpAvoid">Use that way</button></p>`:''}
-      <div class="row"><button class="btn sm" data-act="tpShow" aria-pressed="${String(!!u.show)}">${u.show?'Hide on map':'Show on map'}</button></div>`}
+      <div class="row"><button class="btn sm" data-act="tpShow" aria-pressed="${String(!!u.show)}">${u.show?'Hide on map':'Show on map'}</button>${S.me.admin?h`<button class="btn sm primary" data-act="cl_start">${clTrip()&&!clTrip().done?'Start this trip instead':'Start this trip'}</button>`:''}</div>`}
     <details class="clrd"><summary>Travel rules</summary>
       <ul class="tprules">
         <li><b>Distances.</b> Sinnoh is bigger than the old notes said: every land travel time is doubled. Ferries keep their times.</li>
@@ -9403,6 +9406,238 @@ function trOverlay(){
   ids.forEach(id=>{const f=PD_BY[id];if(!f)return;const d=f.segs.map(g=>'M'+g.map(q=>q[0]+' '+q[1]).join('L')).join('');s+='<path class="tpb" d="'+d+'"/><path class="tpr" d="'+d+'"/>';});
   [u.from,u.to].forEach(id=>{const f=PD_BY[id];if(f&&f.t==='p')s+='<circle class="tpb" cx="'+f.x+'" cy="'+f.y+'" r="26"/><circle class="tpr" cx="'+f.x+'" cy="'+f.y+'" r="26"/>';});
   return '<svg class="clrov tpov" viewBox="0 0 '+MAP_W+' '+MAP_H+'" preserveAspectRatio="none" aria-hidden="true" focusable="false">'+s+'</svg>';
+}
+
+/* ---------- Calendar and the daily travel roll ----------
+   The in-game date lives with the shared conditions (meta/conditions: "date", "start", "ev" for events, "trip" for the journey
+   under way), which every member reads and only the GM writes. When the GM sets the date or moves to the next day, the season
+   and the moon follow it, so the Today strip, the wild encounter odds and the seasonal route limits all follow the calendar.
+   A trip is a planned way from the travel planner. Each "Roll the day" moves the party one day along it: it rolls the weather
+   for the season, checks for a wild encounter on the route (using the GM's encounter table when the route has one) and rolls
+   a road event. Everything rolled goes into the trip's log, which the GM can copy into the journal. */
+S.ui.cl=Object.assign({view:'',sel:'',date:'',en:'',ed:'',ey:false,ep:''},S.ui.cl||{});
+const CL_MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const CL_WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const clParse=s=>{const m=/^(\d{1,5})-(\d{2})-(\d{2})$/.exec(String(s||''));if(!m)return null;const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));return isNaN(d)?null:d;};
+const clFmt=d=>d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+const clAdd=(s,n)=>{const d=clParse(s);if(!d)return '';d.setUTCDate(d.getUTCDate()+n);return clFmt(d);};
+const clDiff=(a,b)=>{const x=clParse(a),y=clParse(b);return x&&y?Math.round((y-x)/864e5):0;};
+const clNice=(s,o)=>{const d=clParse(s);if(!d)return '';return (o&&o.wd===false?'':CL_WD[d.getUTCDay()]+' ')+d.getUTCDate()+' '+CL_MON[d.getUTCMonth()]+(o&&o.y?' '+d.getUTCFullYear():'');};
+function clSeason(s){const d=clParse(s);if(!d)return '';const m=d.getUTCMonth();return m<2||m===11?'winter':m<5?'spring':m<8?'summer':'autumn';}
+function clMoon(s){
+  const d=clParse(s);if(!d)return '';
+  const age=(((d-Date.UTC(2000,0,6))/864e5)%29.530588+29.530588)%29.530588;
+  return age<1.8||age>27.7?'new':age<12.9?'waxing':age<16.6?'full':'waning';
+}
+const clToday=()=>{const c=S.cond||{};return clParse(c.date)?c.date:'';};
+const clStart=()=>{const c=S.cond||{};return clParse(c.start)?c.start:clToday();};
+const clDayNo=s=>s&&clStart()?clDiff(clStart(),s)+1:0;
+const clEvents=()=>{const c=S.cond||{};return Array.isArray(c.ev)?c.ev.filter(e=>e&&e.n&&clParse(e.d)):[];};
+function clEventsOn(s){
+  const d=clParse(s);if(!d)return [];
+  return clEvents().filter(e=>{
+    const x=clParse(e.d),end=e.to&&clParse(e.to)?clParse(e.to):x;
+    if(e.y){const md=v=>v.getUTCMonth()*40+v.getUTCDate(),k=md(d);return md(x)<=md(end)?k>=md(x)&&k<=md(end):k>=md(x)||k<=md(end);}
+    return d>=x&&d<=end;
+  });
+}
+/* ferries by the calendar: which sail on a given date */
+const CL_SAIL={
+  'the Ironwright: Mon, Wed and Fri at dawn':d=>[1,3,5].indexOf(d.getUTCDay())>=0,
+  'the Badge Ferry, alternate days':d=>Math.floor(d/864e5)%2===0,
+  'the freighter Gannet, three times a week':d=>[2,4,6].indexOf(d.getUTCDay())>=0,
+  'the Valerian, Conference season only':d=>clEventsOn(clFmt(d)).some(e=>/conference/i.test(e.n)),
+  'seasonal ferry':d=>clSeason(clFmt(d))==='summer'
+};
+const clSails=(sea,s)=>{const d=clParse(s);if(!d)return true;const f=CL_SAIL[sea[3]];return f?f(d):true;};
+function clSailingsOn(s){return TR_SEA.filter(x=>CL_SAIL[x[3]]&&clSails(x,s)).map(x=>x[3].split(':')[0].replace(/^the /,'The ')+' ('+trName(x[0])+' and '+trName(x[1])+')');}
+/* the seasonal route limits follow the conditions */
+function clSeasonalOn(route){
+  const c=cdGet();
+  if(route==='route-228')return c.x==='blizzard';
+  if(route==='route-229')return c.s==='winter';
+  if(route==='route-239')return c.s==='spring';
+  return true;
+}
+/* set the date: season and moon follow */
+function clSetDate(s,o){
+  if(!S.me.admin||!clParse(s))return;
+  edit('cd','conditions','date',s);
+  if(!clParse((S.cond||{}).start))edit('cd','conditions','start',s);
+  edit('cd','conditions','s',clSeason(s));
+  edit('cd','conditions','m',clMoon(s));
+  let x=cdGet().x;
+  if(o&&o.dawn){x=cdWeatherRoll(clSeason(s));edit('cd','conditions','t','dawn');edit('cd','conditions','x',x);edit('cd','conditions','d',Math.random()<0.5?'high':'low');}
+  cdChanged();
+  return x;
+}
+
+/* ----- road events: d20, read with the route's danger ----- */
+const CL_EVENTS=[
+  [1,'A washed-out stretch or a fallen tree. The detour costs half a day.',0.5],
+  [2,'A Ranger patrol stops the party, checks licenses and shares the road conditions ahead.'],
+  [3,'Another trainer on the road asks for a battle.'],
+  [4,'A traveling merchant: roll a few items from the nearest town\'s shop at +10%.'],
+  [5,'A lost or injured wild Pokémon by the path. Helping it takes an hour or two.'],
+  [6,'An abandoned camp: a little food, a used Potion, and tracks leading off the trail.'],
+  [7,'Good ground and a tailwind. The party makes up half a day.',-0.5],
+  [8,'A courier, a cart or a coach passes. Someone has news from the next town.'],
+  [9,'A sighting: something rare at a distance. A Nature check tells what it was.'],
+  [10,'Rival tracks: somebody passed this way a day ahead.'],
+  [11,'A territorial wild Pokémon blocks the path and must be calmed, driven off or avoided.'],
+  [12,'Supplies spoil or go missing overnight. The next town looks very good.'],
+  [13,'A Route House or campsite with good company: a story, a rumor or a lead.']
+];
+function clRoadEvent(danger){
+  const r=encRand(1,20);
+  if(r<=7)return {r,txt:'',d:0};
+  const pool=CL_EVENTS.filter(e=>danger>=3||e[0]!==11);
+  const e=pool[(r+danger*3)%pool.length];
+  return {r,txt:e[1],d:e[2]||0};
+}
+
+/* ----- the trip ----- */
+const clTrip=()=>{const t=(S.cond||{}).trip;return t&&Array.isArray(t.steps)&&t.steps.length?t:null;};
+function clTripFromPlan(){
+  const u=S.ui.tp,who=trWho(),cl=who?clrOf(S.trainers[who]):null;
+  const path=trPath(u.from,u.to,u.pace,cl,u.avoid);
+  if(!path)return null;
+  const m=TR_PACE[u.pace][0];
+  const steps=path.map(e=>{
+    if(e.sea)return {sea:1,a:e.a,b:e.b,h:e.sea[2],boat:e.sea[3],days:Math.max(1,Math.ceil(e.sea[2]/24))};
+    const l=e.leg;
+    return {r:l[0],a:e.a,b:e.b,n:l[6]||'',t:l[5],days:Math.max(0.5,Math.round(trMid(l)*TRAVEL_SCALE*m*2)/2)};
+  });
+  return {from:u.from,to:u.to,pace:u.pace,who,steps,pos:0,into:0,day:0,start:clToday(),log:[],done:false};
+}
+function clRollDay(){
+  const T=clTrip();if(!T||T.done||!S.me.admin)return;
+  const t=JSON.parse(JSON.stringify(T));
+  let date=clToday(),x;
+  if(date&&t.day>0){date=clAdd(date,1);x=clSetDate(date,{dawn:true});}
+  else if(date)x=cdGet().x;
+  else{x=cdWeatherRoll(cdGet().s);edit('cd','conditions','x',x);edit('cd','conditions','t','dawn');cdChanged();}
+  t.day+=1;
+  const st=t.steps[t.pos];
+  const entry={n:t.day,date:date||'',wx:CD_LAB[x]||'',at:'',prog:'',enc:'',sp:[],ev:'',push:t.pace==='push'};
+  if(st.sea){
+    const ok=!date||clSails({3:st.boat},date)||t.into>0;
+    entry.at='At sea: '+trName(st.a)+' to '+trName(st.b);
+    if(!ok){entry.at='Waiting in '+trName(st.a)+' for '+st.boat.split(':')[0];entry.prog='No sailing today.';}
+    else{t.into+=1;entry.prog=st.h+' hours aboard '+st.boat.split(':')[0]+'.';if(t.into>=st.days){t.pos+=1;t.into=0;}}
+  }else{
+    const f=PD_BY[st.r],dg=f?((String(plFact(f,'Danger')).match(/★+/)||[''])[0]).length:1;
+    let move=1;
+    if(x==='blizzard'&&st.t>=2){move=0;entry.prog='The blizzard pins the party down: no progress today.';}
+    else if(x==='storm'&&st.t>=3){move=0.5;entry.prog='The storm halves the day\'s progress.';}
+    const ev=clRoadEvent(dg);
+    if(ev.txt){entry.ev=ev.txt;move=Math.max(0,move-ev.d);}
+    entry.at=(f?f.name:st.r)+(st.n?' ('+st.n+')':'')+' toward '+trName(st.b);
+    const chance=Math.min(0.7,(0.1+0.08*dg)*(t.pace==='careful'?0.75:t.pace==='push'?1.15:1));
+    if(Math.random()<chance){
+      const tabs=encTabs(st.r),T0=tabs[0]&&tabs[0].T;
+      if(T0&&encRows(T0).filter(encOk).length){
+        const r=encRollRef(st.r,0,'enc');
+        if(r.none)entry.enc='Something stirred, but: '+r.why;
+        else{entry.enc='Wild encounter';entry.sp=r.lines.map(L=>(L.n>1?L.n+'× ':'')+L.sp+(L.a?' (alpha)':''));}
+      }else entry.enc='Wild encounter (this route has no encounter table yet)';
+    }
+    t.into+=move;
+    const left=st.days-t.into;
+    if(left<=0){
+      entry.prog=(entry.prog?entry.prog+' ':'')+'Reached '+trName(st.b)+'.';
+      const carry=-left;t.pos+=1;t.into=0;
+      if(carry>0&&t.steps[t.pos]&&!t.steps[t.pos].sea)t.into=carry;
+    }else if(!entry.prog||move>0)entry.prog=(entry.prog?entry.prog+' ':'')+'About '+(Math.round(left*2)/2)+(left===1?' day':' days')+' left on this stretch.';
+  }
+  if(t.pos>=t.steps.length){t.done=true;entry.prog=entry.prog.replace('Reached '+trName(t.to)+'.','').trim();entry.prog=(entry.prog?entry.prog+' ':'')+'Arrived at '+trName(t.to)+'.';}
+  t.log=t.log.concat([entry]).slice(-120);
+  edit('cd','conditions','trip',t);
+  render();
+}
+function clTripText(t){
+  return t.log.map(e=>'Day '+e.n+(e.date?' ('+clNice(e.date)+')':'')+': '+e.at+'. '+e.wx+'. '+e.prog+(e.enc?' '+e.enc+(e.sp.length?': '+e.sp.join(', '):'')+'.':'')+(e.ev?' '+e.ev:'')+(e.push?' Pushed: Constitution check.':'')).join('\n');
+}
+function clTripPanel(){
+  const t=clTrip();if(!t)return '';
+  const gm=!!S.me.admin,last=t.log.slice(-8).reverse();
+  const total=t.steps.reduce((a,s)=>a+s.days,0);
+  const doneDays=t.steps.slice(0,t.pos).reduce((a,s)=>a+s.days,0)+t.into;
+  return h`<section class="panel"><div class="ph"><h2>On the road</h2><span class="sub">${trName(t.from)} to ${trName(t.to)} · ${TR_PACE[t.pace][1]} pace · day ${t.day}</span></div>
+    <div class="rbar" role="img" aria-label="${Math.round(100*doneDays/Math.max(total,1))}% of the way"><i ${raw('style="width:'+Math.min(100,Math.round(100*doneDays/Math.max(total,1)))+'%"')}></i></div>
+    ${t.done?h`<p><b>Arrived at ${trName(t.to)}</b> after ${t.day} ${t.day===1?'day':'days'}.</p>`:''}
+    ${last.length?h`<ol class="tplog">${last.map(e=>h`<li><b>Day ${e.n}${e.date?h` · ${clNice(e.date)}`:''}</b> <span class="sub">${e.wx}</span><div>${e.at}. ${e.prog}</div>
+      ${e.enc?h`<div class="tpenc">${e.enc}${gm&&e.sp.length?': '+e.sp.join(', '):''}</div>`:''}${e.ev?h`<div>${e.ev}</div>`:''}${e.push?h`<div class="sub">Pushed: every trainer makes a Constitution check tonight.</div>`:''}</li>`)}</ol>`
+      :h`<p class="sub">${gm?'Roll the first day when the party sets out.':'The party is about to set out.'}</p>`}
+    ${gm?h`<div class="row">${t.done?'':h`<button class="btn primary sm" data-act="cl_roll">Roll the day</button>`}<button class="btn sm" data-act="cl_journal" ${t.log.length?'':raw('disabled')}>Copy the log to the journal</button><button class="btn sm ghost" data-act="cl_end">${t.done?'Clear the trip':'Abandon the trip'}</button></div>
+      <p class="sub">Each roll moves the party one day: weather for the season, a wild encounter check from the route's danger (and its table), and a road event. Wild Pokémon names show only to you.</p>`:''}
+  </section>`;
+}
+
+/* ----- the Calendar page ----- */
+function calTab(){
+  const today=clToday(),u=S.ui.cl,gm=!!S.me.admin;
+  const view=u.view&&clParse(u.view+'-01')?u.view:(today||clFmt(new Date())).slice(0,7);
+  const first=clParse(view+'-01'),y=first.getUTCFullYear(),mo=first.getUTCMonth();
+  const lead=(first.getUTCDay()+6)%7,len=new Date(Date.UTC(y,mo+1,0)).getUTCDate();
+  const cells=[];for(let i=0;i<lead;i++)cells.push(null);for(let d=1;d<=len;d++)cells.push(clFmt(new Date(Date.UTC(y,mo,d))));
+  const t=clTrip(),tripDays=new Set(t?t.log.map(e=>e.date).filter(Boolean):[]);
+  const sel=u.sel&&clParse(u.sel)?u.sel:today;
+  const prevM=clFmt(new Date(Date.UTC(y,mo-1,1))).slice(0,7),nextM=clFmt(new Date(Date.UTC(y,mo+1,1))).slice(0,7);
+  const selEv=sel?clEventsOn(sel):[],selSail=sel?clSailingsOn(sel):[],selLog=t&&sel?t.log.filter(e=>e.date===sel):[];
+  return h`<section class="panel"><div class="ph"><h2>Calendar</h2>${today?h`<span class="sub">Today: ${clNice(today,{y:1})} · day ${clDayNo(today)} of the journey</span>`:h`<span class="sub">The GM has not set the date yet.</span>`}</div>
+    ${gm?h`<div class="row"><label class="fld"><span class="fl">${today?'Change the date':'Set the date'}</span><input type="date" data-u="cl.date" value="${u.date||today}" data-nr></label>
+      <button class="btn sm" data-act="cl_set">Set</button>${today?h`<button class="btn sm primary" data-act="cl_next">Next day</button>`:''}</div>
+      <p class="sub">Season and moon follow the date. Next day also rolls the weather and starts the day at dawn.</p>`:''}
+    <div class="calhd"><button class="btn sm ghost" data-act="cl_view" data-v="${prevM}" aria-label="Previous month">‹</button><b>${CL_MON[mo]} ${y}</b><button class="btn sm ghost" data-act="cl_view" data-v="${nextM}" aria-label="Next month">›</button>${today?h`<button class="btn sm ghost" data-act="cl_view" data-v="${today.slice(0,7)}">Today</button>`:''}</div>
+    <div class="calgrid" role="grid">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(w=>h`<span class="calwd">${w}</span>`)}
+      ${cells.map(s=>s?h`<button class="calday ${s===today?'today':''} ${s===sel?'sel':''} ${tripDays.has(s)?'trip':''}" data-act="cl_sel" data-v="${s}" aria-label="${clNice(s,{y:1})}"><span>${+s.slice(8)}</span>${clEventsOn(s).slice(0,2).map(e=>h`<i>${e.n}</i>`)}</button>`:h`<span></span>`)}</div>
+    ${sel?h`<div class="calsel"><b>${clNice(sel,{y:1})}</b>${clDayNo(sel)>0?h` <span class="sub">· day ${clDayNo(sel)}</span>`:''} <span class="sub">· ${CD_LAB[clSeason(sel)]} · ${CD_LAB[clMoon(sel)]}</span>
+      ${selEv.length?h`<ul class="mini-list">${selEv.map(e=>h`<li>${e.n}${e.pl&&PD_BY[e.pl]?h` <span class="sub">· ${PD_BY[e.pl].name}</span>`:''}</li>`)}</ul>`:''}
+      ${selSail.length?h`<p class="sub">Sailing: ${selSail.join('; ')}.</p>`:''}
+      ${selLog.map(e=>h`<p class="sub">Day ${e.n} on the road: ${e.at}. ${e.wx}.</p>`)}</div>`:''}
+  </section>
+  ${clTripPanel()}
+  <section class="panel"><div class="ph"><h2>Events</h2><span class="sub">${clEvents().length}</span></div>
+    ${clEvents().length?h`<ul class="calev">${clEvents().slice().sort((a,b)=>a.d.slice(5).localeCompare(b.d.slice(5))).map((e,i)=>h`<li><span><b>${e.n}</b> <span class="sub">${clNice(e.d,{wd:false,y:!e.y})}${e.to?' to '+clNice(e.to,{wd:false,y:!e.y}):''}${e.y?' · every year':''}${e.pl&&PD_BY[e.pl]?' · '+PD_BY[e.pl].name:''}</span></span>${gm?h`<button class="btn sm ghost" data-act="cl_evdel" data-v="${e.k}">Remove</button>`:''}</li>`)}</ul>`
+      :h`<p class="sub">${gm?'Add the dates that matter: the Grand Festival, the Conference, festivals and deadlines.':'No events yet.'}</p>`}
+    ${gm?h`<div class="mgd"><b>Add an event</b><div class="fgrid">
+      <label class="fld"><span class="fl">Name</span><input type="text" data-u="cl.en" value="${u.en}" placeholder="Lily of the Valley Conference" data-nr></label>
+      <label class="fld"><span class="fl">Starts</span><input type="date" data-u="cl.ed" value="${u.ed}" data-nr></label>
+      <label class="fld"><span class="fl">Ends (optional)</span><input type="date" data-u="cl.ee" value="${u.ee||''}" data-nr></label>
+      <label class="fld"><span class="fl">Where (optional)</span><select data-u="cl.ep" data-nr><option value="">Nowhere in particular</option>${PD.slice().sort(natural).map(f=>h`<option value="${f.id}" ${f.id===u.ep?raw('selected'):''}>${f.name}</option>`)}</select></label></div>
+      <div class="row"><label class="row"><input type="checkbox" data-u="cl.ey" ${u.ey?raw('checked'):''} data-nr><span>Every year</span></label><button class="btn sm" data-act="cl_evadd">Add the event</button></div>
+      <p class="sub">An event named with "Conference" runs the Valerian ferry from Sunyshore while it lasts.</p></div>`:''}
+  </section>`;
+}
+function clAct(b){
+  const d=b.dataset,u=S.ui.cl,gm=!!S.me.admin;
+  switch(d.act){
+    case 'cl_view':u.view=d.v;render();break;
+    case 'cl_sel':u.sel=d.v;render();break;
+    case 'cl_set':if(gm&&clParse(u.date)){clSetDate(u.date);u.view=u.date.slice(0,7);u.sel=u.date;render();}else toast('Pick a date first.');break;
+    case 'cl_next':if(gm&&clToday()){const n=clAdd(clToday(),1);clSetDate(n,{dawn:true});u.sel=n;u.view=n.slice(0,7);render();}break;
+    case 'cl_evadd':{
+      if(!gm)break;
+      const n=String(u.en||'').trim();
+      if(!n||!clParse(u.ed)){toast('Give the event a name and a start date.');break;}
+      const ev=clEvents().concat([{k:Math.random().toString(36).slice(2,9),n,d:u.ed,to:clParse(u.ee)?u.ee:'',y:!!u.ey,pl:u.ep||''}]);
+      edit('cd','conditions','ev',ev);u.en='';u.ed='';u.ee='';u.ey=false;u.ep='';render();break;}
+    case 'cl_evdel':if(gm){edit('cd','conditions','ev',clEvents().filter(e=>e.k!==d.v));render();}break;
+    case 'cl_start':{
+      if(!gm)break;
+      const t=clTripFromPlan();
+      if(!t){toast('Plan a way first.');break;}
+      edit('cd','conditions','trip',t);toast('Trip started. Roll each day as the party travels.',true);render();break;}
+    case 'cl_roll':clRollDay();break;
+    case 'cl_end':if(gm){edit('cd','conditions','trip',null);render();}break;
+    case 'cl_journal':{
+      const t=clTrip();if(!gm||!t||!t.log.length)break;
+      const id=S.db.collection('journal').doc().id;
+      newDoc('j',id,{session:num(S.meta.session)||1,title:'On the road: '+trName(t.from)+' to '+trName(t.to),body:clTripText(t),place:PD_BY[t.to]?PD_BY[t.to].name:'',addedBy:S.me.id,createdAt:Date.now()});
+      toast('The trip log is in the journal.',true);break;}
+    default:break;
+  }
 }
 
 /* rings round towns keep a steady on-screen size whatever the zoom */
@@ -9602,6 +9837,7 @@ function mapTab(){
             ${pins.length?h`<ul class="pinlist">${pins.map(pinRow)}</ul>`:h`<p class="sub">No pins yet. Mark the places your party has been or wants to go.</p>`}`}
       </aside>
     </div>
+    ${clTripPanel()}
     ${trPanel()}`;
 }
 
@@ -9729,7 +9965,7 @@ function footer(){
 function mainHtml(){
   if(S.noDb)return emptyState('This tracker needs a signed-in view','Open it from your claude.ai link while signed in. The shared table is stored with the page, so it cannot load anywhere else.');
   if(!S.ready)return h`<p class="loading">OPENING THE TABLE…</p>`;
-  const views={overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,dex:dexTab,battle:battleTab,contest:ctTab,shop:shopTab,gm:gmTab,npc:npcTab,account:accountTab};
+  const views={cal:calTab,overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,dex:dexTab,battle:battleTab,contest:ctTab,shop:shopTab,gm:gmTab,npc:npcTab,account:accountTab};
   let tab=S.tab;
   if((tab==='gm'||tab==='npc')&&!S.me.admin)tab='overview';
   if(tab==='account'&&!CFG)tab='overview';
@@ -9949,6 +10185,7 @@ function act(b,e){
   if(d.act&&d.act.indexOf('cc_')===0){ccAct(b);return;}
   if(d.act&&d.act.indexOf('hpx_')===0){hpxAct(b);return;}
   if(d.act&&d.act.indexOf('cd_')===0){cdAct(b);return;}
+  if(d.act&&d.act.indexOf('cl_')===0){clAct(b);return;}
   if(d.act&&d.act.indexOf('sp_')===0){shAct(b);return;}
   if(d.act&&d.act.indexOf('rb_')===0){ribAct(b);return;}
   if(d.act&&d.act.indexOf('nt_')===0){ntAct(b,e);return;}
