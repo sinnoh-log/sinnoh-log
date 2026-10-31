@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-31 · Wild zones';
+const BUILD='2026-10-31 · Event categories';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -9458,7 +9458,8 @@ function trOverlay(){
    A trip is a planned way from the travel planner. Each "Roll the day" moves the party one day along it: it rolls the weather
    for the season, checks for a wild encounter on the route (using the GM's encounter table when the route has one) and rolls
    a road event. Everything rolled goes into the trip's log, which the GM can copy into the journal. */
-S.ui.cl=Object.assign({view:'',sel:'',date:'',en:'',ed:'',ey:false,ep:''},S.ui.cl||{});
+S.ui.cl=Object.assign({view:'',sel:'',date:'',start:'',en:'',ed:'',ey:false,ep:''},S.ui.cl||{});
+const CL_YEAR='3000';
 const CL_MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const CL_WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const clParse=s=>{const m=/^(\d{1,5})-(\d{2})-(\d{2})$/.exec(String(s||''));if(!m)return null;const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));return isNaN(d)?null:d;};
@@ -9639,6 +9640,41 @@ function clTripPanel(){
   </section>`;
 }
 
+/* ----- event categories, filters and sorting ----- */
+const CL_CATS=[['league','League'],['contest','Contests'],['festival','Festivals'],['season','Seasons and nature'],['other','Other']];
+function clCatOf(e){
+  if(e.c&&CL_CATS.some(c=>c[0]===e.c))return e.c;
+  const n=String(e.n||'');
+  if(e.mr||/contest|cup\b|qualifier|grand festival|appeal/i.test(n))return 'contest';
+  if(/conference|gym|registration|ladder finals|cohort|trainer school|route \d|marker poles/i.test(n))return 'league';
+  if(e.bg||/gracidea bloom|ski season|spring launch|hoppip/i.test(n))return 'season';
+  if(e.y&&/festival|fair|night|walk|rumble|burned|equinox|harvest|vigil/i.test(n))return 'festival';
+  return 'other';
+}
+S.ui.clf=Object.assign({cats:{},q:'',sort:'date'},S.ui.clf||{});
+const clCatOn=e=>{const on=S.ui.clf.cats;return !Object.keys(on).some(k=>on[k])||!!on[clCatOf(e)];};
+function clFilterBar(){
+  const f=S.ui.clf,ev=clEvents(),cnt=k=>ev.filter(e=>clCatOf(e)===k).length;
+  return h`<div class="calfilt">
+    <div class="row evchips" role="group" aria-label="Show categories">${CL_CATS.filter(c=>cnt(c[0])).map(([k,l])=>h`<button class="chip enchip" data-act="cl_cat" data-v="${k}" aria-pressed="${String(!!f.cats[k])}">${l} <span class="mono">${cnt(k)}</span></button>`)}${Object.keys(f.cats).some(k=>f.cats[k])?h`<button class="lnk" data-act="cl_catall">Show all</button>`:''}</div>
+    <div class="fgrid"><label class="fld"><span class="fl">Search</span><input type="search" data-u="clf.q" value="${f.q}" placeholder="Name or place" data-nr></label>
+      <label class="fld"><span class="fl">Sort by</span><select data-u="clf.sort">${[['date','Date in the year'],['cat','Category'],['name','Name'],['place','Place']].map(([v,l])=>h`<option value="${v}" ${v===f.sort?raw('selected'):''}>${l}</option>`)}</select></label></div>
+    <p class="sub">The categories you pick also filter the calendar above.</p></div>`;
+}
+function clListHtml(){
+  const f=S.ui.clf,gm=!!S.me.admin,q=String(f.q||'').trim().toLowerCase();
+  const plN=e=>e.pl&&PD_BY[e.pl]?PD_BY[e.pl].name:'';
+  let list=clEvents().filter(clCatOn).filter(e=>!q||(e.n+' '+plN(e)).toLowerCase().indexOf(q)>=0);
+  const byDate=(a,b)=>(a.mr?1:0)-(b.mr?1:0)||a.d.slice(5).localeCompare(b.d.slice(5));
+  const sorters={date:byDate,name:(a,b)=>a.n.localeCompare(b.n),place:(a,b)=>(plN(a)||'~').localeCompare(plN(b)||'~')||byDate(a,b),cat:(a,b)=>CL_CATS.findIndex(c=>c[0]===clCatOf(a))-CL_CATS.findIndex(c=>c[0]===clCatOf(b))||byDate(a,b)};
+  list=list.slice().sort(sorters[f.sort]||byDate);
+  if(!list.length)return h`<p class="sub">No events match.</p>`;
+  const row=e=>h`<li><span><b>${e.n}</b> <span class="sub">${e.mr?(e.sched||'every month'):h`${clNice(e.d,{wd:false,y:!e.y})}${e.to?' to '+clNice(e.to,{wd:false,y:!e.y}):''}${e.y?' · every year':''}`}${e.bg?' · season':''}${plN(e)?' · '+plN(e):''}</span></span>
+    <span class="row">${f.sort==='cat'?'':h`<span class="pill">${(CL_CATS.find(c=>c[0]===clCatOf(e))||[0,''])[1]}</span>`}${gm?h`<select class="clcatsel" data-clcat="${e.k}" aria-label="Category for ${e.n}">${CL_CATS.map(([k,l])=>h`<option value="${k}" ${k===clCatOf(e)?raw('selected'):''}>${l}</option>`)}</select><button class="btn sm ghost" data-act="cl_evdel" data-v="${e.k}">Remove</button>`:''}</span></li>`;
+  if(f.sort==='cat')return h`${CL_CATS.filter(c=>list.some(e=>clCatOf(e)===c[0])).map(([k,l])=>h`<h3 class="calcat">${l}</h3><ul class="calev">${list.filter(e=>clCatOf(e)===k).map(row)}</ul>`)}`;
+  return h`<ul class="calev">${list.map(row)}</ul>`;
+}
+function clListRefresh(){const el=document.getElementById('callist');if(el)el.innerHTML=clListHtml().s;}
 /* ----- the Calendar page ----- */
 /* Sinnoh's yearly calendar: [name, start MM-DD, end MM-DD, place id, long season (shown on the day, not in the grid)] */
 const CL_PRESET=[
@@ -9689,7 +9725,7 @@ const CL_CONTESTS=[['Jubilife contest (Cool)','jubilife'],['Floaroma contest (Cu
 const clAllPresetNames=()=>CL_PRESET.map(p=>p[0]).concat(CL_CONTESTS.map(c=>c[0]));
 function calTab(){
   const today=clToday(),u=S.ui.cl,gm=!!S.me.admin;
-  const view=u.view&&clParse(u.view+'-01')?u.view:(today||clFmt(new Date())).slice(0,7);
+  const view=u.view&&clParse(u.view+'-01')?u.view:(today||clStart()||CL_YEAR+'-07-01').slice(0,7);
   const first=clParse(view+'-01'),y=first.getUTCFullYear(),mo=first.getUTCMonth();
   const lead=(first.getUTCDay()+6)%7,len=new Date(Date.UTC(y,mo+1,0)).getUTCDate();
   const cells=[];for(let i=0;i<lead;i++)cells.push(null);for(let d=1;d<=len;d++)cells.push(clFmt(new Date(Date.UTC(y,mo,d))));
@@ -9697,13 +9733,15 @@ function calTab(){
   const sel=u.sel&&clParse(u.sel)?u.sel:today;
   const prevM=clFmt(new Date(Date.UTC(y,mo-1,1))).slice(0,7),nextM=clFmt(new Date(Date.UTC(y,mo+1,1))).slice(0,7);
   const selEv=sel?clEventsOn(sel):[],selSail=sel?clSailingsOn(sel):[],selLog=t&&sel?t.log.filter(e=>e.date===sel):[];
-  return h`<section class="panel"><div class="ph"><h2>Calendar</h2>${today?h`<span class="sub">Today: ${clNice(today,{y:1})} · day ${clDayNo(today)} of the journey${clNextEvent(clIsConf)?' · '+clDiff(today,clNextEvent(clIsConf))+' days to the Conference':''}${clNextEvent(clIsFest)?' · '+clDiff(today,clNextEvent(clIsFest))+' to the Grand Festival':''}</span>`:h`<span class="sub">The GM has not set the date yet.</span>`}</div>
-    ${gm?h`<div class="row"><label class="fld"><span class="fl">${today?'Change the date':'Set the date'}</span><input type="date" data-u="cl.date" value="${u.date||today}" data-nr></label>
+  return h`<section class="panel"><div class="ph"><h2>Calendar</h2>${today?h`<span class="sub">Today: ${clNice(today,{y:1})}${clDayNo(today)>0?' · day '+clDayNo(today)+' of the journey':''}</span>`:h`<span class="sub">The GM has not set the date yet.</span>`}</div>
+    ${gm?h`<div class="row"><label class="fld"><span class="fl">${today?'Change the date':'Set the date'}</span><input type="date" data-u="cl.date" value="${u.date||today||CL_YEAR+'-07-12'}" min="0001-01-01" max="9999-12-31" data-nr></label>
       <button class="btn sm" data-act="cl_set">Set</button>${today?h`<button class="btn sm primary" data-act="cl_next">Next day</button>`:''}</div>
-      <p class="sub">Season and moon follow the date. Next day also rolls the weather and starts the day at dawn.</p>`:''}
+      <div class="row"><label class="fld"><span class="fl">The journey began on</span><input type="date" data-u="cl.start" value="${u.start||clStart()||CL_YEAR+'-07-12'}" min="0001-01-01" max="9999-12-31" data-nr></label>
+        <button class="btn sm" data-act="cl_setstart">Set</button><span class="sub">${clStart()?'Day 1 is '+clNice(clStart(),{y:1})+'.':'Day 1 starts on the first date you set.'}</span></div>
+      <p class="sub">Season and moon follow the date. Next day also rolls the weather and starts the day at dawn. The journey's start only sets the day count.</p>`:''}
     <div class="calhd"><button class="btn sm ghost" data-act="cl_view" data-v="${prevM}" aria-label="Previous month">‹</button><b>${CL_MON[mo]} ${y}</b><button class="btn sm ghost" data-act="cl_view" data-v="${nextM}" aria-label="Next month">›</button>${today?h`<button class="btn sm ghost" data-act="cl_view" data-v="${today.slice(0,7)}">Today</button>`:''}</div>
     <div class="calgrid" role="grid">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(w=>h`<span class="calwd">${w}</span>`)}
-      ${cells.map(s=>s?h`<button class="calday ${s===today?'today':''} ${s===sel?'sel':''} ${tripDays.has(s)?'trip':''}" data-act="cl_sel" data-v="${s}" aria-label="${clNice(s,{y:1})}"><span>${+s.slice(8)}</span>${clEventsOn(s).filter(e=>!e.bg).slice(0,2).map(e=>h`<i>${e.n}</i>`)}${clEventsOn(s).filter(e=>!e.bg).length>2?h`<i class="calmore">+${clEventsOn(s).filter(e=>!e.bg).length-2} more</i>`:''}${clEventsOn(s).some(e=>e.bg)?h`<b class="calbg" title="${clEventsOn(s).filter(e=>e.bg).map(e=>e.n).join(', ')}"></b>`:''}</button>`:h`<span></span>`)}</div>
+      ${cells.map(s=>s?h`<button class="calday ${s===today?'today':''} ${s===sel?'sel':''} ${tripDays.has(s)?'trip':''}" data-act="cl_sel" data-v="${s}" aria-label="${clNice(s,{y:1})}"><span>${+s.slice(8)}</span>${clEventsOn(s).filter(e=>!e.bg&&clCatOn(e)).slice(0,2).map(e=>h`<i>${e.n}</i>`)}${clEventsOn(s).filter(e=>!e.bg&&clCatOn(e)).length>2?h`<i class="calmore">+${clEventsOn(s).filter(e=>!e.bg&&clCatOn(e)).length-2} more</i>`:''}${clEventsOn(s).some(e=>e.bg&&clCatOn(e))?h`<b class="calbg" title="${clEventsOn(s).filter(e=>e.bg).map(e=>e.n).join(', ')}"></b>`:''}</button>`:h`<span></span>`)}</div>
     ${sel?h`<div class="calsel"><b>${clNice(sel,{y:1})}</b>${clDayNo(sel)>0?h` <span class="sub">· day ${clDayNo(sel)}</span>`:''} <span class="sub">· ${CD_LAB[clSeason(sel)]} · ${CD_LAB[clMoon(sel)]}</span>
       ${selEv.length?h`<ul class="mini-list">${selEv.map(e=>h`<li>${e.n}${e.pl&&PD_BY[e.pl]?h` <span class="sub">· ${PD_BY[e.pl].name}</span>`:''}</li>`)}</ul>`:''}
       ${selSail.length?h`<p class="sub">Sailing: ${selSail.join('; ')}.</p>`:''}
@@ -9711,12 +9749,14 @@ function calTab(){
   </section>
   ${clTripPanel()}
   <section class="panel"><div class="ph"><h2>Events</h2><span class="sub">${clEvents().length}</span></div>
-    ${clEvents().length?h`<ul class="calev">${clEvents().slice().sort((a,b)=>(a.mr?1:0)-(b.mr?1:0)||a.d.slice(5).localeCompare(b.d.slice(5))).map((e,i)=>h`<li><span><b>${e.n}</b> <span class="sub">${e.mr?(e.sched||'every month'):h`${clNice(e.d,{wd:false,y:!e.y})}${e.to?' to '+clNice(e.to,{wd:false,y:!e.y}):''}${e.y?' · every year':''}`}${e.bg?' · season':''}${e.pl&&PD_BY[e.pl]?' · '+PD_BY[e.pl].name:''}</span></span>${gm?h`<button class="btn sm ghost" data-act="cl_evdel" data-v="${e.k}">Remove</button>`:''}</li>`)}</ul>`
+    ${clEvents().length?clFilterBar():''}
+    ${clEvents().length?h`<div id="callist">${clListHtml()}</div>`
       :h`<p class="sub">${gm?'Add the dates that matter: the Grand Festival, the Conference, festivals and deadlines.':'No events yet.'}</p>`}
     ${gm?h`<div class="mgd"><b>Add an event</b><div class="fgrid">
       <label class="fld"><span class="fl">Name</span><input type="text" data-u="cl.en" value="${u.en}" placeholder="Lily of the Valley Conference" data-nr></label>
       <label class="fld"><span class="fl">Starts</span><input type="date" data-u="cl.ed" value="${u.ed}" data-nr></label>
       <label class="fld"><span class="fl">Ends (optional)</span><input type="date" data-u="cl.ee" value="${u.ee||''}" data-nr></label>
+      <label class="fld"><span class="fl">Category</span><select data-u="cl.ec" data-nr>${CL_CATS.map(([k,l])=>h`<option value="${k}" ${k===(u.ec||'other')?raw('selected'):''}>${l}</option>`)}</select></label>
       <label class="fld"><span class="fl">Where (optional)</span><select data-u="cl.ep" data-nr><option value="">Nowhere in particular</option>${PD.slice().sort(natural).map(f=>h`<option value="${f.id}" ${f.id===u.ep?raw('selected'):''}>${f.name}</option>`)}</select></label></div>
       <div class="row"><label class="row"><input type="checkbox" data-u="cl.ey" ${u.ey?raw('checked'):''} data-nr><span>Every year</span></label><button class="btn sm" data-act="cl_evadd">Add the event</button></div>
       <p class="sub">An event named with "Conference" runs the Valerian ferry from Sunyshore while it lasts.</p>
@@ -9725,20 +9765,30 @@ function calTab(){
 }
 function clAct(b){
   const d=b.dataset,u=S.ui.cl,gm=!!S.me.admin;
+  const fromBox=k=>{const el=document.querySelector('[data-u="cl.'+k+'"]');if(el&&el.value&&!u[k])u[k]=el.value;};
+  if(d.act==='cl_set')fromBox('date');if(d.act==='cl_setstart')fromBox('start');
   switch(d.act){
     case 'cl_view':u.view=d.v;render();break;
     case 'cl_sel':u.sel=d.v;render();break;
     case 'cl_set':if(gm&&clParse(u.date)){clSetDate(u.date);u.view=u.date.slice(0,7);u.sel=u.date;render();}else toast('Pick a date first.');break;
+    case 'cl_setstart':
+      if(!gm)break;
+      if(!clParse(u.start)){toast('Pick the start date first.');break;}
+      edit('cd','conditions','start',u.start);
+      if(!clToday())clSetDate(u.start);
+      toast('The journey began on '+clNice(u.start,{y:1})+'.',true);u.start='';render();break;
     case 'cl_next':if(gm&&clToday()){const n=clAdd(clToday(),1);clSetDate(n,{dawn:true});u.sel=n;u.view=n.slice(0,7);render();}break;
     case 'cl_evadd':{
       if(!gm)break;
       const n=String(u.en||'').trim();
       if(!n||!clParse(u.ed)){toast('Give the event a name and a start date.');break;}
-      const ev=clEvents().concat([{k:Math.random().toString(36).slice(2,9),n,d:u.ed,to:clParse(u.ee)?u.ee:'',y:!!u.ey,pl:u.ep||''}]);
+      const ev=clEvents().concat([{k:Math.random().toString(36).slice(2,9),n,d:u.ed,to:clParse(u.ee)?u.ee:'',y:!!u.ey,pl:u.ep||'',c:u.ec||'other'}]);
       edit('cd','conditions','ev',ev);u.en='';u.ed='';u.ee='';u.ey=false;u.ep='';render();break;}
+    case 'cl_cat':S.ui.clf.cats[d.v]=!S.ui.clf.cats[d.v];render();break;
+    case 'cl_catall':S.ui.clf.cats={};render();break;
     case 'cl_preset':{
       if(!gm)break;
-      const y=(clToday()||clFmt(new Date())).slice(0,4),ev=clEvents().slice();
+      const y=(clToday()||clStart()||CL_YEAR+'-01-01').slice(0,4),ev=clEvents().slice();
       const have=n=>ev.some(e=>e.n.toLowerCase()===n.toLowerCase())||(n==='Lily of the Valley Conference'&&ev.some(clIsConf))||(n==='Grand Festival (Festival Week)'&&ev.some(clIsFest));
       let n=0;
       CL_PRESET.forEach(([name,a,b,pl,bg])=>{if(have(name))return;ev.push({k:Math.random().toString(36).slice(2,9),n:name,d:y+'-'+a,to:b?y+'-'+b:'',y:true,pl:PD_BY[pl]?pl:'',bg:!!bg});n++;});
@@ -10744,6 +10794,7 @@ document.addEventListener('input',e=>{
     if(k[0]==='dx'){S.ui.dx.page=1;if(k[1]==='q'){dxRefresh();return;}}
     if(k[0]==='ct'&&ctInput(k[1],t))return;
     if(k[0]==='shop'&&k[1]==='q'){shRefresh();return;}
+    if(k[0]==='clf'&&k[1]==='q'){clListRefresh();return;}
     if(k[0]==='cc'&&('nr' in t.dataset)){S.ui.cc.res=null;document.querySelectorAll('.ccres').forEach(el=>{el.innerHTML=ccResult();});return;}
     if(!('nr' in t.dataset))render();
   }
@@ -10757,6 +10808,7 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('change',async e=>{
   const t=e.target;
+  if(t&&t.dataset&&t.dataset.clcat&&S.me.admin){edit('cd','conditions','ev',clEvents().map(x=>x.k===t.dataset.clcat?Object.assign({},x,{c:t.value}):x));render();return;}
   if(t&&t.dataset&&t.dataset.b&&onSpeciesChange(t))return;
   if(t&&t.dataset&&t.dataset.evot!=null){evoTarget(t.dataset.pid,t.value);return;}
   if(t&&t.classList&&t.classList.contains('ptz')){ntFrameZoom(t,true);return;}
