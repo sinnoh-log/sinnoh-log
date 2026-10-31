@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-31 · Contest halls and monthly contests';
+const BUILD='2026-10-31 · Wild zones';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -5126,6 +5126,9 @@ function encDesk(){
     <p class="sub">${mode==='replace'?'Every place in the file gets the new table. Tables you wrote yourself are overwritten. Your GM notes on each place are kept.':mode==='wish'?'Use this after an update that changes a wish list. A place with a table gets the wished Pokémon it lacks, and its wish marks and reasons are brought in line with the file (a wish the file no longer has is removed); the chances, notes and conditions you set are left alone. Places without a table get the whole table. Your GM notes are always kept.':'Places where you already wrote a table keep it. Your GM notes are always kept.'}</p>
     ${im.busy?h`<progress class="ptaprog" max="${num(im.total)}" value="${num(im.done)}" aria-label="Import progress"></progress>`:''}
     ${im.msg?h`<p class="sub ${im.bad?'bad':''}" role="status">${im.msg}</p>`:''}
+    <div class="mgd"><b>Semi-route and off-route tables</b>
+      <p class="sub">Each wild route gets a "Semi-route" and, where the land is still wild, an "Off-route" table beside its main one: stronger, warier Pokémon drawn from the route's terrain (forest, coast, marsh, mountain, cave, snow and so on). Your main tables are not touched. Roll them from the route's page like any other table.</p>
+      <div class="row">${znMissing()?h`<button class="btn sm" data-act="zn_load">Add ${znMissing()} zone tables</button>`:h`<span class="sub">Every route has its zone tables.</span>`}</div></div>
     ${wishes.length?h`<div class="encwishes"><h3>Wished Pokémon</h3><p class="sub">Where each Pokémon a player wants turns up, with its usual chance there.</p>
       ${wishes.map(x=>h`<div class="fld"><button class="btn sm ${wo[x.i]?'primary':''}" data-act="en_wo" data-i="${x.i}" aria-expanded="${String(!!wo[x.i])}">${x.name||ENC_WISH[x.i].d} · ${x.list.length} Pokémon</button>${wo[x.i]?encWishList(x):''}</div>`)}</div>`:''}
   </section>`;
@@ -8509,9 +8512,9 @@ const CLR_REQ=[
   ['route-229','once the snow closes in',1,0,null],
   ['route-239','during spring melt',1,0,null],
   ['mt-coronet-and-spear-pillar','tunnels',1,0,null],
-  ['mt-coronet-and-spear-pillar','off the marked routes (a permit needs a Ranger escort)',2,null,1],
-  ['eterna-forest','off the road or after dark',1,0,0],
-  ['grand-marsh','off the boardwalks',1,0,0],
+  ['mt-coronet-and-spear-pillar','off the marked routes (a permit needs a Ranger escort)',2,null,1,1],
+  ['eterna-forest','off the road or after dark',1,0,0,1],
+  ['grand-marsh','off the boardwalks',1,0,0,1],
   ['battle-resort-route-226','',1,0,null],
   ['battle-resort-route-228','',1,0,null],
   ['battle-resort-route-227','',3,2,2],
@@ -8547,7 +8550,7 @@ function clrPanel(uid,t,ro){
       next?'Next tier: '+next[0]+' at '+nextAt+' badges or ribbons.':'The highest tier: every restricted area is open.'}
       ${cl.permit?' Holds a research permit.':''}${cl.guide?' Travelling with a hired guide.':''}</p>
     <details class="clrd"><summary>Restricted areas</summary>
-      <div class="clrl">${CLR_REQ.filter(r=>PD_BY[r[0]]).map(([id,part,need,g,pm])=>{const st=clrStatus(cl,need,g,pm);return h`<div class="clrr"><span><button class="plink" data-act="place" data-id="${id}">${PD_BY[id].name}</button>${part?h` <span class="sub">${part}</span>`:''}</span><span class="pill ${st[0]}">${st[1]}</span></div>`;})}</div>
+      <div class="clrl">${CLR_REQ.filter(r=>PD_BY[r[0]]).map(([id,part,need,g,pm,adv])=>{let st=clrStatus(cl,need,g,pm);if(adv&&st[0]==='warn'&&!cl.sus)st=['warn',st[1].replace(/^Needs/,'Not advised without')];return h`<div class="clrr"><span><button class="plink" data-act="place" data-id="${id}">${PD_BY[id].name}</button>${part?h` <span class="sub">${part}</span>`:''}</span><span class="pill ${st[0]}">${st[1]}</span></div>`;})}</div>
     </details>
     ${gm?h`<div class="fgrid">${fSel('Tier','t',uid,'clr.tier',t,[['','Automatic ('+CLR_TIERS[cl.auto][0]+')']].concat(CLR_TIERS.map((x,i)=>[String(i),x[0]+' (set by GM)'])).concat([['x','Suspended']]),{ro:lock})}
       <div class="fld"><span class="fl">Credentials</span>${fCheck('Research permit','t',uid,'clr.permit',t,lock)}${fCheck('Hired guide with the party','t',uid,'clr.guide',t,lock)}</div></div>`:''}`;
@@ -9425,6 +9428,7 @@ function trPanel(){
         <li><b>Daily distance.</b> A party walking with Pokémon covers, at a steady pace: ${TR_MPD.slice(1).map((d,i)=>TR_TERRAIN[i+1]+' ground '+d+' miles').join(', ')}. The terrain is the route's travel rating.</li>
         <li><b>Careful</b> (half again as long): +2 on Nature and Perception checks on the road, and the party is never caught by surprise.</li>
         <li><b>Steady:</b> the listed time.</li>
+        <li><b>Off the road.</b> The semi-route moves at half speed and the off-route at a third. Both are advised against below Pathfinder and Warden but never stopped; file a route plan at a Ranger station for rescue cover.</li>
         <li><b>Push</b> (three quarters of the time): at the end of each pushed day, every trainer makes a Constitution check (the GM sets the difficulty). On a failure they are worn out: −2 on all skill checks until they spend a night at a Route House, an inn or a Pokémon Center.</li>
       </ul>
     </details>
@@ -9582,20 +9586,25 @@ function clRollDay(){
     else{t.into+=1;entry.prog=st.h+' hours aboard '+st.boat.split(':')[0]+'.';if(t.into>=st.days){t.pos+=1;t.into=0;}}
   }else{
     const f=PD_BY[st.r],dg=f?((String(plFact(f,'Danger')).match(/★+/)||[''])[0]).length:1;
-    let move=1;
+    const zr=ZN_ROUTES[st.r];
+    let zn=t.zone==='semi'||t.zone==='off'?t.zone:'road';
+    if(zn!=='road'&&!zr)zn='road';
+    if(zn==='off'&&zr&&!zr[2]){zn='semi';entry.prog='No off-route left here: the party keeps to the semi-route.';}
+    let move=zn==='semi'?0.5:zn==='off'?1/3:1;
     if(x==='blizzard'&&st.t>=2){move=0;entry.prog='The blizzard pins the party down: no progress today.';}
-    else if(x==='storm'&&st.t>=3){move=0.5;entry.prog='The storm halves the day\'s progress.';}
+    else if(x==='storm'&&st.t>=3){move=move*0.5;entry.prog='The storm halves the day\'s progress.';}
     const ev=clRoadEvent(dg);
     if(ev.txt){entry.ev=ev.txt;move=Math.max(0,move-ev.d);}
     entry.at=(f?f.name:st.r)+(st.n?' ('+st.n+')':'')+' toward '+trName(st.b);
-    const chance=Math.min(0.7,(0.1+0.08*dg)*(t.pace==='careful'?0.75:t.pace==='push'?1.15:1));
+    const chance=Math.min(0.7,(0.1+0.08*dg)*(t.pace==='careful'?0.75:t.pace==='push'?1.15:1)*(zn==='semi'?0.85:zn==='off'?0.7:1));
+    if(zn!=='road')entry.zone=zn;
     if(Math.random()<chance){
-      const tabs=encTabs(st.r),T0=tabs[0]&&tabs[0].T;
+      const tabs=encTabs(st.r),want=zn==='semi'?'Semi-route':zn==='off'?'Off-route':'',tab=want?tabs.find(x=>x.nm===want):tabs[0],T0=tab&&tab.T;
       if(T0&&encRows(T0).filter(encOk).length){
-        const r=encRollRef(st.r,0,'enc');
+        const r=encRollRef(st.r,tab.k,'enc');
         if(r.none)entry.enc='Something stirred, but: '+r.why;
         else{entry.enc='Wild encounter';entry.sp=r.lines.map(L=>(L.n>1?L.n+'× ':'')+L.sp+(L.a?' (alpha)':''));}
-      }else entry.enc='Wild encounter (this route has no encounter table yet)';
+      }else entry.enc='Wild encounter (this route has no '+(want?want.toLowerCase()+' ':'')+'encounter table yet)';
     }
     t.into+=move;
     const left=st.days-t.into;
@@ -9611,7 +9620,7 @@ function clRollDay(){
   render();
 }
 function clTripText(t){
-  return t.log.map(e=>'Day '+e.n+(e.date?' ('+clNice(e.date)+')':'')+': '+e.at+'. '+e.wx+'. '+e.prog+(e.enc?' '+e.enc+(e.sp.length?': '+e.sp.join(', '):'')+'.':'')+(e.ev?' '+e.ev:'')+(e.push?' Pushed: Constitution check.':'')).join('\n');
+  return t.log.map(e=>'Day '+e.n+(e.date?' ('+clNice(e.date)+')':'')+': '+e.at+'. '+e.wx+'. '+e.prog+(e.enc?' '+e.enc+(e.sp.length?': '+e.sp.join(', '):'')+'.':'')+(e.ev?' '+e.ev:'')+(e.push?' Pushed: Constitution check.':'')+(e.zone?' ('+(e.zone==='semi'?'semi-route':'off-route')+')':'')).join('\n');
 }
 function clTripPanel(){
   const t=clTrip();if(!t)return '';
@@ -9622,8 +9631,9 @@ function clTripPanel(){
     <div class="rbar" role="img" aria-label="${Math.round(100*doneDays/Math.max(total,1))}% of the way"><i ${raw('style="width:'+Math.min(100,Math.round(100*doneDays/Math.max(total,1)))+'%"')}></i></div>
     ${t.done?h`<p><b>Arrived at ${trName(t.to)}</b> after ${t.day} ${t.day===1?'day':'days'}.</p>`:''}
     ${last.length?h`<ol class="tplog">${last.map(e=>h`<li><b>Day ${e.n}${e.date?h` · ${clNice(e.date)}`:''}</b> <span class="sub">${e.wx}</span><div>${e.at}. ${e.prog}</div>
-      ${e.enc?h`<div class="tpenc">${e.enc}${gm&&e.sp.length?': '+e.sp.join(', '):''}</div>`:''}${e.ev?h`<div>${e.ev}</div>`:''}${e.push?h`<div class="sub">Pushed: every trainer makes a Constitution check tonight.</div>`:''}</li>`)}</ol>`
+      ${e.enc?h`<div class="tpenc">${e.enc}${gm&&e.sp.length?': '+e.sp.join(', '):''}</div>`:''}${e.ev?h`<div>${e.ev}</div>`:''}${e.push?h`<div class="sub">Pushed: every trainer makes a Constitution check tonight.</div>`:''}${e.zone==='semi'?h`<div class="sub">Semi-route: Nature 12 to keep the heading; Perception 13 before any encounter.</div>`:e.zone==='off'?h`<div class="sub">Off-route: Nature 16 twice today; Perception 16 on watch; Insight or Pokémon Handling 17 before any fight; Constitution 14 tonight without a proper camp.</div>`:''}</li>`)}</ol>`
       :h`<p class="sub">${gm?'Roll the first day when the party sets out.':'The party is about to set out.'}</p>`}
+    ${gm&&!t.done?h`<div class="row"><span class="fl">Where the party travels</span><span class="seg" role="group" aria-label="Zone">${[['road','On the road'],['semi','Semi-route'],['off','Off-route']].map(([v,l])=>h`<button data-act="zn_zone" data-v="${v}" aria-pressed="${String((t.zone||'road')===v)}">${l}</button>`)}</span></div>`:''}
     ${gm?h`<div class="row">${t.done?'':h`<button class="btn primary sm" data-act="cl_roll">Roll the day</button>`}<button class="btn sm" data-act="cl_journal" ${t.log.length?'':raw('disabled')}>Copy the log to the journal</button><button class="btn sm ghost" data-act="cl_end">${t.done?'Clear the trip':'Abandon the trip'}</button></div>
       <p class="sub">Each roll moves the party one day: weather for the season, a wild encounter check from the route's danger (and its table), and a road event. Wild Pokémon names show only to you.</p>`:''}
   </section>`;
@@ -9750,6 +9760,117 @@ function clAct(b){
     default:break;
   }
 }
+
+/* ---------- Wild zones: semi-route and off-route encounter tables ----------
+   Every wild route has up to three zones: the road (primary route), the semi-route just off it, and the off-route beyond
+   the markers. Going off the road is advised against below a badge tier but never stopped. The primary table is the route's
+   existing table; the GM loads a "Semi-route" and an "Off-route" table onto each route from these pools (they become extra
+   tables on the route's GM page, kept in gm/place_<id> like the rest). Each pool row: [species, weight, group low, group high,
+   rarity C/U/R, alpha %]. A route draws from one to three biomes; the first counts most. */
+const ZN_POOL={
+  forest:{
+    semi:[['Kricketune',12,1,2,'C'],['Staravia',10,2,4,'C'],['Roselia',8,1,2,'U'],['Murkrow',7,1,3,'U'],['Pachirisu',6,1,2,'C'],['Beautifly',5,1,1,'U'],['Dustox',5,1,1,'U'],['Teddiursa',5,1,2,'U'],['Noctowl',5,1,1,'U'],['Cherrim',4,1,2,'U'],['Ursaring',3,1,1,'R',8],['Breloom',3,1,1,'R']],
+    off:[['Ursaring',10,1,2,'U',10],['Staraptor',8,1,2,'U',6],['Vespiquen',7,1,1,'U',10],['Breloom',6,1,1,'U'],['Noctowl',7,1,1,'U'],['Roserade',5,1,1,'R'],['Ariados',6,1,2,'U'],['Honchkrow',4,1,1,'R',12],['Heracross',4,1,1,'R'],['Pinsir',3,1,1,'R'],['Yanmega',3,1,1,'R'],['Tangrowth',2,1,1,'R']]
+  },
+  grass:{
+    semi:[['Staravia',10,2,4,'C'],['Bibarel',10,1,3,'C'],['Kricketune',8,1,2,'C'],['Luxio',7,2,3,'U'],['Ponyta',7,2,4,'U'],['Buneary',6,1,2,'C'],['Glameow',6,1,2,'C'],['Tauros',5,3,6,'U'],['Miltank',4,1,3,'U'],['Girafarig',3,1,1,'R'],['Lopunny',2,1,1,'R']],
+    off:[['Luxray',10,1,3,'U',10],['Staraptor',9,1,2,'U',6],['Tauros',8,4,8,'U',8],['Rapidash',6,2,4,'U',6],['Purugly',5,1,1,'U'],['Miltank',5,2,4,'U'],['Lopunny',4,1,1,'R'],['Girafarig',4,1,1,'R'],['Arcanine',2,1,1,'R',10]]
+  },
+  flower:{
+    semi:[['Combee',10,3,6,'C'],['Cherubi',9,1,3,'C'],['Roselia',8,1,2,'U'],['Burmy',7,1,2,'C'],['Mothim',5,1,1,'U'],['Wormadam',4,1,1,'U'],['Pachirisu',5,1,2,'C'],['Gloom',5,1,2,'U'],['Cherrim',4,1,2,'U']],
+    off:[['Vespiquen',9,1,1,'U',12],['Roserade',7,1,1,'U'],['Cherrim',7,2,4,'U'],['Vileplume',5,1,1,'U'],['Bellossom',4,1,2,'U'],['Heracross',4,1,1,'R'],['Tropius',2,1,1,'R',8]]
+  },
+  coast:{
+    semi:[['Wingull',10,2,5,'C'],['Pelipper',9,1,2,'C'],['Shellos',9,2,4,'C'],['Buizel',8,1,2,'C'],['Tentacool',8,2,4,'C'],['Finneon',6,1,3,'U'],['Chatot',5,1,2,'U'],['Remoraid',5,2,4,'U'],['Mantyke',3,1,1,'R']],
+    off:[['Gastrodon',10,1,2,'U'],['Tentacruel',8,1,3,'U',8],['Floatzel',8,1,2,'U'],['Lumineon',6,1,2,'U'],['Pelipper',6,1,3,'C'],['Octillery',4,1,1,'U'],['Sharpedo',4,2,4,'R',10],['Mantine',3,1,1,'R'],['Gyarados',3,1,1,'R',12],['Lapras',1,1,1,'R']]
+  },
+  marsh:{
+    semi:[['Croagunk',10,1,2,'C'],['Skorupi',9,1,2,'C'],['Quagsire',8,1,2,'C'],['Stunky',6,1,2,'C'],['Carnivine',6,1,1,'U'],['Yanma',6,1,2,'U'],['Bibarel',5,1,2,'C'],['Marill',5,1,2,'C'],['Gastrodon',4,1,1,'U'],['Tangela',4,1,1,'U']],
+    off:[['Toxicroak',10,1,2,'U',10],['Drapion',8,1,1,'U',10],['Carnivine',8,1,2,'U'],['Skuntank',5,1,2,'U'],['Quagsire',6,1,3,'C'],['Yanmega',5,1,1,'R'],['Gastrodon',5,1,2,'U'],['Azumarill',4,1,2,'U'],['Arbok',4,1,1,'U'],['Tangrowth',3,1,1,'R'],['Kecleon',2,1,1,'R']]
+  },
+  mountain:{
+    semi:[['Geodude',10,2,4,'C'],['Graveler',8,1,2,'C'],['Machoke',7,1,2,'U'],['Ponyta',6,1,3,'U'],['Meditite',6,1,1,'U'],['Bronzor',5,1,2,'U'],['Hippopotas',5,1,2,'U'],['Chingling',4,1,1,'U'],['Nosepass',4,1,1,'U'],['Bonsly',4,1,1,'U'],['Gible',2,1,1,'R'],['Riolu',2,1,1,'R'],['Absol',2,1,1,'R']],
+    off:[['Golem',7,1,2,'U',8],['Machamp',6,1,2,'U',8],['Medicham',5,1,1,'U'],['Bronzong',5,1,1,'U'],['Sudowoodo',5,1,1,'U'],['Hippowdon',4,1,2,'U',8],['Rhydon',4,1,1,'U',8],['Absol',4,1,1,'R'],['Gabite',3,1,1,'R',8],['Probopass',3,1,1,'R'],['Steelix',3,1,1,'R',10],['Lucario',2,1,1,'R'],['Garchomp',1,1,1,'R',15]]
+  },
+  cave:{
+    semi:[['Golbat',12,2,5,'C'],['Geodude',10,2,4,'C'],['Graveler',8,1,2,'C'],['Onix',6,1,1,'U'],['Bronzor',5,1,2,'U'],['Machop',5,1,2,'C'],['Clefairy',4,1,3,'U'],['Chingling',4,1,1,'U'],['Nosepass',4,1,1,'U'],['Gible',3,1,1,'R'],['Sableye',2,1,1,'R']],
+    off:[['Crobat',7,1,3,'U',8],['Golem',6,1,2,'U',8],['Steelix',5,1,1,'R',10],['Rhydon',4,1,1,'U'],['Gabite',4,1,1,'R',8],['Probopass',3,1,1,'R'],['Sableye',3,1,1,'R'],['Clefable',2,1,1,'R'],['Garchomp',1,1,1,'R',15]]
+  },
+  snow:{
+    semi:[['Snover',12,2,3,'C'],['Swinub',9,2,4,'C'],['Snorunt',9,1,2,'C'],['Sneasel',7,1,3,'U'],['Piloswine',5,1,2,'U'],['Delibird',5,1,2,'U'],['Machoke',4,1,1,'U'],['Noctowl',4,1,1,'U'],['Glalie',3,1,1,'R'],['Froslass',3,1,1,'R']],
+    off:[['Abomasnow',9,1,2,'U',12],['Weavile',7,2,4,'U',10],['Mamoswine',6,1,3,'R',12],['Piloswine',6,2,4,'U'],['Glalie',5,1,1,'U'],['Froslass',5,1,1,'R'],['Sneasel',5,2,3,'U'],['Absol',3,1,1,'R'],['Glaceon',1,1,1,'R']]
+  },
+  volcanic:{
+    semi:[['Slugma',10,1,3,'C'],['Numel',8,2,4,'C'],['Ponyta',8,1,3,'C'],['Houndour',8,2,3,'U'],['Geodude',8,2,3,'C'],['Graveler',6,1,2,'C'],['Torkoal',4,1,1,'U'],['Magby',4,1,1,'U']],
+    off:[['Houndoom',8,2,3,'U',10],['Magcargo',8,1,2,'U'],['Camerupt',6,1,2,'U',8],['Golem',6,1,2,'U'],['Rapidash',5,1,3,'U'],['Torkoal',4,1,1,'U'],['Magmar',4,1,1,'R'],['Magmortar',2,1,1,'R',10]]
+  },
+  lake:{
+    semi:[['Psyduck',10,1,3,'C'],['Buizel',10,1,2,'C'],['Bibarel',8,1,3,'C'],['Marill',6,1,2,'C'],['Goldeen',6,1,3,'C'],['Barboach',6,1,2,'U'],['Wooper',5,1,2,'C'],['Shellos',5,1,3,'C'],['Golduck',4,1,1,'U']],
+    off:[['Floatzel',8,1,2,'U'],['Golduck',8,1,2,'U'],['Whiscash',6,1,1,'U',10],['Seaking',6,1,2,'U'],['Quagsire',6,1,2,'C'],['Azumarill',5,1,2,'U'],['Gyarados',5,1,1,'R',12],['Lapras',1,1,1,'R'],['Milotic',1,1,1,'R']]
+  },
+  ghost:{
+    semi:[['Murkrow',8,2,4,'C'],['Gastly',8,1,2,'C'],['Duskull',8,1,1,'C'],['Haunter',6,1,1,'U'],['Misdreavus',6,1,1,'U'],['Drifloon',6,1,2,'U'],['Stunky',5,1,2,'C']],
+    off:[['Dusclops',7,1,1,'U'],['Drifblim',6,1,2,'U'],['Honchkrow',6,1,1,'R',12],['Gengar',5,1,1,'R',10],['Mismagius',4,1,1,'R'],['Haunter',5,1,2,'U'],['Spiritomb',1,1,1,'R']]
+  },
+  moor:{
+    semi:[['Ponyta',10,2,4,'C'],['Swablu',8,2,4,'C'],['Staravia',8,2,3,'C'],['Tauros',6,3,6,'U'],['Scyther',4,1,1,'R'],['Kricketune',6,1,2,'C'],['Hoothoot',6,1,2,'C'],['Stunky',5,1,2,'C']],
+    off:[['Rapidash',9,2,4,'U',8],['Altaria',8,1,2,'U',8],['Tauros',8,4,8,'U',8],['Staraptor',6,1,2,'U'],['Scyther',4,1,1,'R',8],['Noctowl',6,1,1,'U'],['Skuntank',4,1,1,'U'],['Absol',2,1,1,'R']]
+  },
+  power:{
+    semi:[['Shinx',10,2,4,'C'],['Luxio',8,1,3,'U'],['Pachirisu',8,1,2,'C'],['Magnemite',9,2,4,'C'],['Voltorb',6,1,2,'C'],['Elekid',4,1,1,'U'],['Raichu',3,1,1,'R']],
+    off:[['Luxray',10,1,3,'U',10],['Magneton',8,1,2,'U'],['Electabuzz',5,1,1,'U'],['Electrode',5,1,2,'U'],['Raichu',4,1,1,'R'],['Electivire',2,1,1,'R',10],['Magnezone',2,1,1,'R'],['Rotom',1,1,1,'R']]
+  }
+};
+/* each route: [biomes in order of weight, has a semi-route, has an off-route]. Paved roads near towns have no off-route left. */
+const ZN_ROUTES={
+  'route-201':[['grass','lake'],1,1],'route-202':[['forest','grass'],1,0],'route-203':[['mountain','cave'],1,1],'route-204':[['flower','grass'],1,0],
+  'route-205':[['lake','forest'],1,1],'route-206':[['mountain','grass'],1,1],'route-207':[['cave'],1,1],'route-208':[['grass','mountain'],1,1],
+  'route-209':[['grass','ghost','flower'],1,1],'route-210':[['moor','ghost','mountain'],1,1],'route-211':[['mountain','snow','cave'],1,1],'route-212':[['marsh','lake'],1,1],
+  'route-213':[['coast'],1,1],'route-214':[['grass','lake'],1,1],'route-215':[['mountain','grass'],1,1],'route-216':[['snow','mountain'],1,1],
+  'route-217':[['snow'],1,1],'route-218':[['grass','coast'],1,0],'route-219':[['coast'],1,0],'route-220':[['coast','grass'],1,1],
+  'route-221':[['grass','coast'],1,0],'route-222':[['coast','grass'],1,1],'route-224':[['forest','flower'],1,1],'route-225':[['power','grass'],1,1],
+  'route-226':[['snow','grass','mountain'],1,1],'route-227':[['cave','lake'],1,1],'route-228':[['snow','forest'],1,1],'route-229':[['snow','flower'],1,1],
+  'route-230':[['forest'],1,1],'route-231':[['moor'],1,1],'route-232':[['coast'],1,1],'route-233':[['flower','grass'],1,0],
+  'route-234':[['flower','grass'],1,1],'route-235':[['mountain','lake'],1,1],'route-236':[['grass'],1,0],'route-237':[['mountain','grass'],1,0],
+  'route-238':[['forest'],1,1],'route-239':[['mountain','lake'],1,1],'route-240':[['grass'],1,0],'route-241':[['lake','grass'],1,0],
+  'route-242':[['grass','marsh'],1,0],'battle-resort-route-225':[['forest'],1,1],'battle-resort-route-226':[['moor','lake'],1,1],
+  'battle-resort-route-227':[['volcanic'],1,1],'battle-resort-route-228':[['mountain','coast'],1,1],'battle-resort-route-229':[['coast'],1,1]
+};
+const ZN_TIER=[1,2,2,1];
+function znTable(id,zone){
+  const r=ZN_ROUTES[id];if(!r)return null;
+  const f=PD_BY[id],dg=f?((String(plFact(f,'Danger')).match(/★+/)||[''])[0]).length||1:1;
+  const by=new Map();
+  r[0].forEach((b,i)=>{
+    const m=[1,0.6,0.4][i]||0.3;
+    (ZN_POOL[b][zone]||[]).forEach(([sp,w,lo,hi,bk,al])=>{
+      const o=by.get(sp);
+      if(o){o.w+=w*m;}else by.set(sp,{sp,w:w*m,lo,hi,bk,al:al||0});
+    });
+  });
+  const rows=[...by.values()].sort((a,b)=>b.w-a.w).slice(0,12).map(o=>Object.assign({sp:o.sp,w:Math.max(1,Math.round(o.w)),lo:o.lo,hi:o.hi,bk:o.bk},o.al?{al:o.al}:{}));
+  return {nm:zone==='semi'?'Semi-route':'Off-route',dg:Math.min(5,dg+(zone==='semi'?1:2)),enc:rows,em:[],ev:[]};
+}
+/* the route pages say which zones each route has */
+Object.keys(ZN_ROUTES).forEach(id=>{
+  const f=PD_BY[id],r=ZN_ROUTES[id];if(!f)return;
+  f.facts.push(['Wild zones',r[2]?'Road, semi-route and off-route. Off the road is advised from Pathfinder (2+ badges); the off-route from Warden (5+). Not enforced, but Rangers only come with a filed route plan.':'Road and semi-route only: farms and towns have taken the rest. The semi-route is advised from Pathfinder (2+ badges).']);
+});
+function znLoad(){
+  if(!S.me.admin)return;
+  let n=0;
+  Object.keys(ZN_ROUTES).forEach(id=>{
+    const g=encGp(id),ex=Array.isArray(g.ex)?g.ex.slice():[];
+    const add=[];
+    if(ZN_ROUTES[id][1]&&!ex.some(e=>e&&e.nm==='Semi-route'))add.push(znTable(id,'semi'));
+    if(ZN_ROUTES[id][2]&&!ex.some(e=>e&&e.nm==='Off-route'))add.push(znTable(id,'off'));
+    if(!add.length)return;
+    edit('gp',id,'ex',ex.concat(add.filter(Boolean)));n+=add.length;
+  });
+  toast(n?'Added '+n+' semi-route and off-route tables.':'Every route already has its zone tables.',true);
+  render();
+}
+function znMissing(){return Object.keys(ZN_ROUTES).reduce((a,id)=>{const ex=Array.isArray(encGp(id).ex)?encGp(id).ex:[];return a+(ZN_ROUTES[id][1]&&!ex.some(e=>e&&e.nm==='Semi-route')?1:0)+(ZN_ROUTES[id][2]&&!ex.some(e=>e&&e.nm==='Off-route')?1:0);},0);}
 
 /* rings round towns keep a steady on-screen size whatever the zoom */
 function sizeHot(){
@@ -10297,6 +10418,8 @@ function act(b,e){
   if(d.act&&d.act.indexOf('hpx_')===0){hpxAct(b);return;}
   if(d.act&&d.act.indexOf('cd_')===0){cdAct(b);return;}
   if(d.act&&d.act.indexOf('cl_')===0){clAct(b);return;}
+  if(d.act==='zn_load'){znLoad();return;}
+  if(d.act==='zn_zone'){if(S.me.admin&&clTrip()){const t=JSON.parse(JSON.stringify(clTrip()));t.zone=d.v;edit('cd','conditions','trip',t);render();}return;}
   if(d.act&&d.act.indexOf('sp_')===0){shAct(b);return;}
   if(d.act&&d.act.indexOf('rb_')===0){ribAct(b);return;}
   if(d.act&&d.act.indexOf('nt_')===0){ntAct(b,e);return;}
