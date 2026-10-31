@@ -538,6 +538,22 @@ input[type=search]{appearance:none}
 .hs.p .hv{fill:rgba(255,212,59,.16);stroke:#FFD43B;stroke-width:3.5px}
 .hs:hover .hc,.hs:hover .hv,.hs.on .hc,.hs.on .hv{opacity:1}
 .mapwrap.placing .hs .ht{pointer-events:none}
+.clrov{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.clrov path,.clrov circle{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}
+.clrov .cb{stroke:rgba(8,14,26,.75);stroke-width:7px}
+.clrov .cr{stroke-width:4px}
+.clrov .cr.seas{stroke-dasharray:7 6}
+.rst{pointer-events:auto;cursor:pointer}
+.rst .rsb,.rsk .rsb{fill:#1F6B4A;stroke:#fff;stroke-width:1.2px;vector-effect:non-scaling-stroke}
+.rst .rsi,.rsk .rsi{fill:none;stroke:#fff;stroke-width:1.6px;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.rst:hover .rsb{fill:#2C8F63}
+.mapwrap.placing .rst{pointer-events:none}
+.clrleg{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:13px;margin-top:6px}
+.clrleg span{display:inline-flex;align-items:center;gap:6px}
+.clrleg .ln{display:inline-block;width:22px;height:4px;border-radius:2px}
+.clrleg .ln.dash{background:repeating-linear-gradient(90deg,var(--muted) 0 6px,transparent 6px 10px)}
+.rsk{width:16px;height:17px}
+
 .plq{margin:0}
 .plrows{display:flex;flex-direction:column;max-height:560px;overflow-y:auto;margin-inline:-6px}
 .plrow{appearance:none;border:0;background:none;display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:6px;border-radius:6px;cursor:pointer;min-height:34px}
@@ -571,6 +587,9 @@ input[type=search]{appearance:none}
 .pl-facts div{display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--line-soft);padding-top:8px}
 .pl-facts dt{font:800 13px var(--f-body);color:var(--muted)}
 .pl-facts dd{margin:0;font-size:14.5px}
+.clrd{margin:6px 0 10px}.clrd summary{cursor:pointer;font:800 13px var(--f-body);color:var(--muted)}
+.clrl{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.clrr{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line-soft);padding-top:6px}
 .plchips{gap:6px}
 .plink{appearance:none;border:0;background:none;padding:0;color:var(--accent);font:600 14px var(--f-body);cursor:pointer;text-align:left}
 .plink:hover{text-decoration:underline}
@@ -1291,5 +1310,5 @@ input,select,textarea{border-radius:9px}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-10-25-Trainer-sheet-sections"></script>
+<script src="app.js?v=2026-10-30-map-clearance"></script>
 </body></html>
