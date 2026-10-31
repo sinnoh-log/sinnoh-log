@@ -548,6 +548,15 @@ input[type=search]{appearance:none}
 .rst .rsi,.rsk .rsi{fill:none;stroke:#fff;stroke-width:1.6px;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
 .rst:hover .rsb{fill:#2C8F63}
 .mapwrap.placing .rst{pointer-events:none}
+.tpov .tpb{stroke:rgba(8,14,26,.85);stroke-width:11px;fill:none}
+.tpov .tpr{stroke:#3FA9F5;stroke-width:6px;fill:none}
+.tpsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0}
+.tpm{display:flex;flex-direction:column;gap:2px;background:var(--accent-soft);border-radius:8px;padding:10px 12px}
+.tpm b{font-size:17px}.tpwarn{color:var(--bad)}
+.tplegs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.tplegs li{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line-soft);padding:7px 0}
+.tplegs .tpn{flex:1;min-width:220px}
+.tpalt{margin-top:8px}.tprules{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:14px}
 .clrleg{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:13px;margin-top:6px}
 .clrleg span{display:inline-flex;align-items:center;gap:6px}
 .clrleg .ln{display:inline-block;width:22px;height:4px;border-radius:2px}
@@ -1310,5 +1319,5 @@ input,select,textarea{border-radius:9px}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-10-30-map-clearance"></script>
+<script src="app.js?v=2026-10-31-travel"></script>
 </body></html>
