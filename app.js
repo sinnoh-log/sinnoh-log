@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-31 · Calendar and daily travel';
+const BUILD='2026-10-31 · Contest halls and monthly contests';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -5933,17 +5933,32 @@ function shAct(b){
    tick it and the existing rules already allow it.
    Which ribbons exist, and how many a trainer needs for the Grand Festival, belongs to the whole table, so it is kept with the
    other table settings (meta/table: "ribbonHalls" and "ribbonNeed"), which every member reads and only the GM writes.
-   Until the GM changes the list, the table uses the Sinnoh ribbons from the anime: 17 contest-hall towns and the Aqua Ribbon,
-   the prize of the Wallace Cup at Lake Valor. Five were needed to enter the Sinnoh Grand Festival.
+   Until the GM changes the list, the table uses the 16 contest halls on its map (CT_HALLS), including the Aqua Ribbon of the
+   Wallace Cup at Lake Valor. Five ribbons from five different halls open the Grand Festival.
    Nothing here is handbook text. The contest rules it points to are written in the table's own words. */
-const RIB_DEFAULT=[
-  ['jubilife','Jubilife','Jubilife City'],['floaroma','Floaroma','Floaroma Town'],['alamos','Alamos','Alamos Town'],
-  ['hearthome','Hearthome','Hearthome City'],['sage','Sage','Sage Town'],['solaceon','Solaceon','Solaceon Town'],
-  ['aqua','Aqua','Lake Valor · Wallace Cup'],['celestic','Celestic','Celestic Town'],['majolica','Majolica','Majolica Town'],
-  ['gerbera','Gerbera','Gerbera Town'],['beachrose','Beach Rose','Beach Rose Town'],['chocovine','Chocovine','Chocovine Town'],
-  ['sandalstraw','Sandalstraw','Sandalstraw Town'],['lilypad','Lilypad','Lilypad Town'],['brussel','Brussel','Brussel Town'],
-  ['daybreak','Daybreak','Daybreak Town'],['neighborly','Neighborly','Neighborly Town'],['arrowroot','Arrowroot','Arrowroot Town']
+/* the contest halls on the table's map. [ribbon key, ribbon name, place id, hall, contest type, monthly rule, when (words)]
+   A monthly rule is {n: which week (1-4, or -1 for the last), wd: weekday (0 Sunday ... 6 Saturday), len: days, mo: months it runs (1-12)}. */
+const CT_HALLS=[
+  ['jubilife','Jubilife','jubilife-city','Jubilife Contest Hall (Broadcast District)','Cool',{n:4,wd:0,len:1},'the fourth Sunday of every month, televised'],
+  ['floaroma','Floaroma','floaroma-town','Floaroma Contest Hall','Cute',{n:1,wd:0,len:1},'the first Sunday of every month'],
+  ['hearthome','Hearthome','hearthome-city','Super Contest Hall','All categories, the hardest field',{n:1,wd:6,len:2},'the first weekend of every month'],
+  ['majolica','Majolica','majolica-town','The Glaze Hall','A different category each month; ceramic ribbons',{n:2,wd:6,len:2},'the second weekend of every month'],
+  ['solaceon','Solaceon','solaceon-town','Solaceon Contest Center','Any category, beginner-friendly',{n:3,wd:6,len:1},'the third Saturday of every month'],
+  ['celestic','Celestic','celestic-town','The Rite Hall','Beauty (Heritage Contests, judged on composure)',null,'four times a year: 20 March, 21 June, 22 September and 21 December'],
+  ['sage','Sage','sage-town','The Spice Hall','Clever, with tasting rounds',{n:2,wd:6,len:1},'the second Saturday of every month'],
+  ['chocovine','Chocovine','chocovine-town','The Sweet Stage','Cute, with the Poffin Cook-Off the night before',{n:-1,wd:6,len:2},'the last weekend of every month'],
+  ['sandalstraw','Sandalstraw','sandalstraw-town','The Rotunda','Tough (natural, woven costumes win favor)',{n:1,wd:6,len:1},'the first Saturday of every month'],
+  ['lilypad','Lilypad','lilypad-town','The Steam Hall','Beauty and Cute, plus the Lily Cup in February',{n:4,wd:6,len:1},'the fourth Saturday of every month'],
+  ['snowpoint','Snowpoint','snowpoint-city','Frost Hall','Cool, plus the Midwinter Appeal Cup',{n:3,wd:6,len:2,mo:[12,1,2,3]},'the third weekend of each month, December to March'],
+  ['arrowroot','Millrace','arrowroot-town','Millhall','Tough',{n:2,wd:6,len:1,mo:[10,11,12,1,2,3,4,5,6,7]},'the second Saturday of each month, October to July; the Valor Circuit qualifier on 15 August'],
+  ['brussel','Greenhouse','brussel-town','The Greenhouse Hall','Beauty',{n:3,wd:6,len:1,mo:[10,11,12,1,2,3,4,5,6,7]},'the third Saturday of each month, October to July; the Valor Circuit qualifier on 25 August'],
+  ['neighborly','Crossroads','neighborly-town','Crossroads Hall','Clever',{n:4,wd:6,len:1,mo:[10,11,12,1,2,3,4,5,6,7]},'the fourth Saturday of each month, October to July; the Valor Circuit qualifier on 4 September'],
+  ['daybreak','Sunrise','daybreak-town','Sunrise Hall','Cool (the final round at first light)',{n:1,wd:0,len:1,mo:[10,11,12,1,2,3,4,5,6,7]},'the first Sunday of each month at dawn, October to July; the Valor Circuit final qualifier on 12 September'],
+  ['aqua','Aqua','valor-lakefront-and-grand-festival','The Wallace Cup at Lake Valor','Invitational, all categories',null,'once a year, 25–26 July']
 ];
+const RIB_DEFAULT=CT_HALLS.map(x=>[x[0],x[1],(PD_BY[x[2]]?PD_BY[x[2]].name:'')+' · '+x[3]+' · '+x[4].split(/[,(;]/)[0].trim()]);
+/* each hall's place page says what it runs and when */
+CT_HALLS.forEach(x=>{const f=PD_BY[x[2]];if(!f)return;f.facts.push(['Contest hall',x[3]+': '+x[4]+'. Contests '+x[6]+'. Wins earn the '+x[1]+' Ribbon.']);});
 const RIB_NEED=5,RIB_MAX=40;
 S.ui.rib=S.ui.rib||{reset:false};
 ['rb_ready','rb_road','rb_gf'].forEach(k=>{if(S.ui.ref&&S.ui.ref.open&&!(k in S.ui.ref.open))S.ui.ref.open[k]=true;});
@@ -6001,7 +6016,7 @@ function ribView(){
     ${refSec('rb_ready','Who is ready for the Grand Festival',ids.length?h`<div class="ribrows">${ready}</div><p class="sub">${need} ribbons from ${need} different contest halls qualify a trainer.</p>`:h`<p class="sub">No trainers yet.</p>`)}
     ${refSec('rb_road','The road to the Grand Festival',h`<ul class="reful">
       <li><b>Win ribbons.</b> A contest hall gives its Contest Ribbon to whoever has the most Star Points at the end of the Award stage. Each hall has its own ribbon, which goes in the ribbon case on the trainer sheet. Winning again at a hall whose ribbon you already hold does not add to the count: it is one honour per contest hall.</li>
-      <li><b>${need} ribbons from ${need} different halls.</b> Collect that many and you are invited to the Grand Festival. This is the anime’s rule: five ribbons from one region. The GM can change the number below.</li>
+      <li><b>${need} ribbons from ${need} different halls.</b> Collect that many and you are invited to the Grand Festival. Each must come from a different hall. The GM can change the number below.</li>
       <li><b>Registering.</b> Your first ribbon registers you in the region’s contest circuit. The GM’s Guide says the Grand Festival is usually held a week or two before the League championships, and that circuits can have strict expectations for attire and how you carry yourself.</li>
       <li><b>Using the ribbons up.</b> In the anime, the ribbons used to enter a Grand Festival cannot be used again. If your table wants that, the GM can untick those ribbons on the sheet afterwards.</li>
     </ul>`)}
@@ -6013,7 +6028,7 @@ function ribView(){
       <li>The handbook’s Double Performance and Rival Showcase rules are on the <button class="lnk" data-act="ct_view" data-v="how">How contests work</button> page under Variations.</li>
     </ul>`)}
     ${refSec('rb_circ',custom?'This table’s contest circuit':'The Sinnoh contest circuit',h`
-      <p class="sub">${custom?'The GM has set up this table’s own list of ribbons.':'This is the list of ribbons from the anime’s Sinnoh region: 17 contest-hall towns and the Aqua Ribbon, the prize of the Wallace Cup at Lake Valor. Most of these towns exist only in the anime, and the Alamos Ribbon was only ever seen in an end-credits sequence. The GM can rename them, swap in places from your own map, and add or remove ribbons.'}</p>
+      <p class="sub">${custom?'The GM has set up this table’s own list of ribbons.':'These are the contest halls on the region map: one ribbon each, plus the Aqua Ribbon of the Wallace Cup at Lake Valor. Each hall has its own type of contest and holds one every month; see the Calendar and each town’s page. The GM can rename them or add others.'}</p>
       ${halls.length?h`<ul class="ribl">${halls.map(x=>{const w=holders(x.k);return h`<li><span class="ribdot" ${raw('style="--bc:'+ribColor(x.k)+'"')}></span><b>${x.n} Ribbon</b>${x.t?h` <span class="sub">${x.t}</span>`:''}${w.length?h`<span class="ribwho">${w.join(', ')}</span>`:''}</li>`;})}</ul>`:h`<p class="sub">No ribbons yet.</p>`}`)}
     ${S.me.admin?ribEditor(custom):''}
   </div>`;
@@ -6028,9 +6043,9 @@ function ribEditor(custom){
     ${custom?h`<div class="spedlist">${raws.map((x,i)=>h`<div class="spedrow"><div class="sped1">${fText('Ribbon name (without the word Ribbon)','meta','table','ribbonHalls.'+i+'.n',S.meta,{ph:'e.g. Jubilife'})}${fText('Town or event','meta','table','ribbonHalls.'+i+'.t',S.meta,{ph:'e.g. Jubilife City'})}</div>
         <div class="row sp"><span class="sub">${ids_holding(x&&x.k)} of ${tids().length} trainers hold it</span>${rowBtns('meta','table','ribbonHalls',i,raws.length,false)}</div></div>`)}</div>
       <div class="row"><button class="btn sm" data-act="rb_add" ${raws.length>=RIB_MAX?raw('disabled'):''}>Add a ribbon</button>
-        ${S.ui.rib.reset?h`<button class="btn sm danger" data-act="rb_resetyes">Yes, go back to the anime’s list</button><button class="btn sm" data-act="rb_resetno">Keep my list</button>`:h`<button class="btn sm ghost" data-act="rb_reset">Use the anime’s list again</button>`}</div>
+        ${S.ui.rib.reset?h`<button class="btn sm danger" data-act="rb_resetyes">Yes, go back to the map’s list</button><button class="btn sm" data-act="rb_resetno">Keep my list</button>`:h`<button class="btn sm ghost" data-act="rb_reset">Use the map’s list again</button>`}</div>
       <p class="sub">Removing a ribbon takes it out of every trainer’s case and count. The ticks stay saved on the sheets, but only ribbons on this list are counted or shown.</p>`
-      :h`<p class="sub">The table is using the anime’s list of ${RIB_DEFAULT.length} ribbons. To rename them, remove some, or add your own, start from that list.</p>
+      :h`<p class="sub">The table is using the ${RIB_DEFAULT.length} contest halls on the map. To rename them, remove some, or add your own, start from that list.</p>
       <div class="row"><button class="btn sm" data-act="rb_custom">Edit the list</button></div>`}
   </section>`;
 }
@@ -8544,7 +8559,7 @@ const BADGE_LIFE=730;
 function clNextEvent(re,from){
   const base=from||clToday();if(!base)return '';
   let best='';
-  clEvents().filter(e=>re.test(e.n)).forEach(e=>{
+  clEvents().filter(e=>typeof re==='function'?re(e):re.test(e.n)).forEach(e=>{
     let d=e.d;
     if(e.y){const y=+base.slice(0,4);d=y+e.d.slice(4);if(d<base&&!(e.to&&(y+e.to.slice(4))>=base))d=(y+1)+e.d.slice(4);}
     else if(d<base&&!(e.to&&e.to>=base))return;
@@ -8555,7 +8570,7 @@ function clNextEvent(re,from){
 function badgeValid(t){
   const won=BADGES.filter(b=>t.badges&&t.badges[b[0]]);
   if(!won.length)return '';
-  const conf=clNextEvent(/conference/i);
+  const conf=clNextEvent(clIsConf);
   const bd=t.bdate||{};
   const late=conf?won.filter(b=>bd[b[0]]&&clDiff(bd[b[0]],conf)>BADGE_LIFE):[];
   const ok=won.length-late.length;
@@ -9456,10 +9471,26 @@ function clMoon(s){
 const clToday=()=>{const c=S.cond||{};return clParse(c.date)?c.date:'';};
 const clStart=()=>{const c=S.cond||{};return clParse(c.start)?c.start:clToday();};
 const clDayNo=s=>s&&clStart()?clDiff(clStart(),s)+1:0;
+const clIsConf=e=>/conference/i.test(e.n)&&!/registration|closed|gyms/i.test(e.n);
+const clIsFest=e=>/grand festival/i.test(e.n);
 const clEvents=()=>{const c=S.cond||{};return Array.isArray(c.ev)?c.ev.filter(e=>e&&e.n&&clParse(e.d)):[];};
+function clNth(y,m,n,wd){
+  if(n>0){const f=new Date(Date.UTC(y,m,1)),day=1+((wd-f.getUTCDay()+7)%7)+(n-1)*7;return day>new Date(Date.UTC(y,m+1,0)).getUTCDate()?null:new Date(Date.UTC(y,m,day));}
+  const l=new Date(Date.UTC(y,m+1,0));return new Date(Date.UTC(y,m,l.getUTCDate()-((l.getUTCDay()-wd+7)%7)));
+}
+function clMonthlyOn(r,d){
+  for(let back=0;back<2;back++){
+    const y=d.getUTCFullYear(),m=d.getUTCMonth()-back,yy=y+Math.floor(m/12),mm=((m%12)+12)%12;
+    if(r.mo&&r.mo.indexOf(mm+1)<0)continue;
+    const st=clNth(yy,mm,r.n,r.wd);
+    if(st&&d>=st&&(d-st)/864e5<(r.len||1))return true;
+  }
+  return false;
+}
 function clEventsOn(s){
   const d=clParse(s);if(!d)return [];
   return clEvents().filter(e=>{
+    if(e.mr)return clMonthlyOn(e.mr,d);
     const x=clParse(e.d),end=e.to&&clParse(e.to)?clParse(e.to):x;
     if(e.y){const md=v=>v.getUTCMonth()*40+v.getUTCDate(),k=md(d);return md(x)<=md(end)?k>=md(x)&&k<=md(end):k>=md(x)||k<=md(end);}
     return d>=x&&d<=end;
@@ -9470,7 +9501,7 @@ const CL_SAIL={
   'the Ironwright: Mon, Wed and Fri at dawn':d=>[1,3,5].indexOf(d.getUTCDay())>=0,
   'the Badge Ferry, alternate days':d=>Math.floor(d/864e5)%2===0,
   'the freighter Gannet, three times a week':d=>[2,4,6].indexOf(d.getUTCDay())>=0,
-  'the Valerian, Conference season only':d=>clEventsOn(clFmt(d)).some(e=>/conference/i.test(e.n)),
+  'the Valerian, Conference season only':d=>clEventsOn(clFmt(d)).some(clIsConf),
   'seasonal ferry':d=>clSeason(clFmt(d))==='summer'
 };
 const clSails=(sea,s)=>{const d=clParse(s);if(!d)return true;const f=CL_SAIL[sea[3]];return f?f(d):true;};
@@ -9599,6 +9630,53 @@ function clTripPanel(){
 }
 
 /* ----- the Calendar page ----- */
+/* Sinnoh's yearly calendar: [name, start MM-DD, end MM-DD, place id, long season (shown on the day, not in the grid)] */
+const CL_PRESET=[
+  ['Spring Flower Festival','03-20','03-22','floaroma-town'],
+  ['Spring Launch (the Hoppip release)','04-10','','dandelion-island'],
+  ['Rainy Day Rumble','04-18','','pastoria-city'],
+  ['The Gift Walk','04-25','','lucario-kingdom'],
+  ['Wool Fair','05-03','05-04','alamos-town'],
+  ['Gracidea bloom','05-10','05-31','gracidea-flower-garden',1],
+  ['Conference registration closes','05-13','','lily-of-the-valley-conference'],
+  ['Gratitude Festival','05-17','05-18','emeragrove-town'],
+  ['Gyms closed for the Conference','06-10','06-24','',1],
+  ['Lily of the Valley Conference','06-13','06-21','lily-of-the-valley-conference'],
+  ['Survival Area summer cohorts','06-01','08-31','battle-resort-survival-area',1],
+  ['Lantern Terraces summer festival','07-15','07-17','floaroma-flower-fields'],
+  ['Wallace Cup','07-25','07-26','valor-lakefront-and-grand-festival'],
+  ['Millhall Qualifier (Valor Circuit 1)','08-15','','arrowroot-town'],
+  ['Ladder Finals','08-20','08-23','battle-resort-fight-area'],
+  ['Greenhouse Hall Qualifier (Valor Circuit 2)','08-25','','brussel-town'],
+  ['Trainer school year starts','09-01','','sandgem-town'],
+  ['Crossroads Qualifier (Valor Circuit 3)','09-04','','neighborly-town'],
+  ['Sunrise Hall final qualifier (Valor Circuit 4)','09-12','','daybreak-town'],
+  ['Grand Festival (Festival Week)','09-18','09-21','valor-lakefront-and-grand-festival'],
+  ['Equinox lamp-setting','09-22','','michina-town'],
+  ['Weighing Hall harvest','10-01','10-03','arrowroot-town'],
+  ['Forge Fair (Fuego Ironworks)','10-08','10-09',''],
+  ['Squall Night','10-15','','squallville'],
+  ['Eterna Lantern Walk','10-24','10-26','eterna-city'],
+  ['Route 217 marker poles replaced','10-27','10-31','route-217'],
+  ['The Sleeper is burned','12-21','','sandalstraw-town'],
+  ['Midwinter Appeal Cup','12-23','','snowpoint-city'],
+  ['Ski season','12-01','03-31','snowpoint-city',1],
+  ['Frost Festival','01-08','01-11','snowpoint-city'],
+  ['Winter Bloom lantern festival','02-01','02-07','camellia-town'],
+  ['Lily Cup','02-14','02-15','lilypad-town'],
+  ['The Vigil','02-20','','acuity-lakefront'],
+  ['Celestic Heritage Contest, spring (Beauty)','03-20','','celestic-town'],
+  ['Celestic Heritage Contest, summer (Beauty)','06-21','','celestic-town'],
+  ['Celestic Heritage Contest, autumn (Beauty)','09-22','','celestic-town'],
+  ['Celestic Heritage Contest, winter (Beauty)','12-21','','celestic-town']
+];
+/* each hall's monthly contest, for the calendar: [name, hall key] */
+const CL_CONTESTS=[['Jubilife contest (Cool)','jubilife'],['Floaroma contest (Cute)','floaroma'],['Hearthome Super Contest (all categories)','hearthome'],
+  ['Majolica contest (category changes monthly)','majolica'],['Solaceon contest (any category)','solaceon'],['Sage contest (Clever)','sage'],
+  ['Chocovine contest (Cute)','chocovine'],['Sandalstraw contest (Tough)','sandalstraw'],['Lilypad contest (Beauty, Cute)','lilypad'],
+  ['Snowpoint contest (Cool)','snowpoint'],['Arrowroot contest (Tough)','arrowroot'],['Brussel contest (Beauty)','brussel'],
+  ['Neighborly contest (Clever)','neighborly'],['Daybreak contest (Cool)','daybreak']];
+const clAllPresetNames=()=>CL_PRESET.map(p=>p[0]).concat(CL_CONTESTS.map(c=>c[0]));
 function calTab(){
   const today=clToday(),u=S.ui.cl,gm=!!S.me.admin;
   const view=u.view&&clParse(u.view+'-01')?u.view:(today||clFmt(new Date())).slice(0,7);
@@ -9609,13 +9687,13 @@ function calTab(){
   const sel=u.sel&&clParse(u.sel)?u.sel:today;
   const prevM=clFmt(new Date(Date.UTC(y,mo-1,1))).slice(0,7),nextM=clFmt(new Date(Date.UTC(y,mo+1,1))).slice(0,7);
   const selEv=sel?clEventsOn(sel):[],selSail=sel?clSailingsOn(sel):[],selLog=t&&sel?t.log.filter(e=>e.date===sel):[];
-  return h`<section class="panel"><div class="ph"><h2>Calendar</h2>${today?h`<span class="sub">Today: ${clNice(today,{y:1})} · day ${clDayNo(today)} of the journey${clNextEvent(/conference/i)?' · '+clDiff(today,clNextEvent(/conference/i))+' days to the Conference':''}${clNextEvent(/grand festival/i)?' · '+clDiff(today,clNextEvent(/grand festival/i))+' to the Grand Festival':''}</span>`:h`<span class="sub">The GM has not set the date yet.</span>`}</div>
+  return h`<section class="panel"><div class="ph"><h2>Calendar</h2>${today?h`<span class="sub">Today: ${clNice(today,{y:1})} · day ${clDayNo(today)} of the journey${clNextEvent(clIsConf)?' · '+clDiff(today,clNextEvent(clIsConf))+' days to the Conference':''}${clNextEvent(clIsFest)?' · '+clDiff(today,clNextEvent(clIsFest))+' to the Grand Festival':''}</span>`:h`<span class="sub">The GM has not set the date yet.</span>`}</div>
     ${gm?h`<div class="row"><label class="fld"><span class="fl">${today?'Change the date':'Set the date'}</span><input type="date" data-u="cl.date" value="${u.date||today}" data-nr></label>
       <button class="btn sm" data-act="cl_set">Set</button>${today?h`<button class="btn sm primary" data-act="cl_next">Next day</button>`:''}</div>
       <p class="sub">Season and moon follow the date. Next day also rolls the weather and starts the day at dawn.</p>`:''}
     <div class="calhd"><button class="btn sm ghost" data-act="cl_view" data-v="${prevM}" aria-label="Previous month">‹</button><b>${CL_MON[mo]} ${y}</b><button class="btn sm ghost" data-act="cl_view" data-v="${nextM}" aria-label="Next month">›</button>${today?h`<button class="btn sm ghost" data-act="cl_view" data-v="${today.slice(0,7)}">Today</button>`:''}</div>
     <div class="calgrid" role="grid">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(w=>h`<span class="calwd">${w}</span>`)}
-      ${cells.map(s=>s?h`<button class="calday ${s===today?'today':''} ${s===sel?'sel':''} ${tripDays.has(s)?'trip':''}" data-act="cl_sel" data-v="${s}" aria-label="${clNice(s,{y:1})}"><span>${+s.slice(8)}</span>${clEventsOn(s).slice(0,2).map(e=>h`<i>${e.n}</i>`)}</button>`:h`<span></span>`)}</div>
+      ${cells.map(s=>s?h`<button class="calday ${s===today?'today':''} ${s===sel?'sel':''} ${tripDays.has(s)?'trip':''}" data-act="cl_sel" data-v="${s}" aria-label="${clNice(s,{y:1})}"><span>${+s.slice(8)}</span>${clEventsOn(s).filter(e=>!e.bg).slice(0,2).map(e=>h`<i>${e.n}</i>`)}${clEventsOn(s).filter(e=>!e.bg).length>2?h`<i class="calmore">+${clEventsOn(s).filter(e=>!e.bg).length-2} more</i>`:''}${clEventsOn(s).some(e=>e.bg)?h`<b class="calbg" title="${clEventsOn(s).filter(e=>e.bg).map(e=>e.n).join(', ')}"></b>`:''}</button>`:h`<span></span>`)}</div>
     ${sel?h`<div class="calsel"><b>${clNice(sel,{y:1})}</b>${clDayNo(sel)>0?h` <span class="sub">· day ${clDayNo(sel)}</span>`:''} <span class="sub">· ${CD_LAB[clSeason(sel)]} · ${CD_LAB[clMoon(sel)]}</span>
       ${selEv.length?h`<ul class="mini-list">${selEv.map(e=>h`<li>${e.n}${e.pl&&PD_BY[e.pl]?h` <span class="sub">· ${PD_BY[e.pl].name}</span>`:''}</li>`)}</ul>`:''}
       ${selSail.length?h`<p class="sub">Sailing: ${selSail.join('; ')}.</p>`:''}
@@ -9623,7 +9701,7 @@ function calTab(){
   </section>
   ${clTripPanel()}
   <section class="panel"><div class="ph"><h2>Events</h2><span class="sub">${clEvents().length}</span></div>
-    ${clEvents().length?h`<ul class="calev">${clEvents().slice().sort((a,b)=>a.d.slice(5).localeCompare(b.d.slice(5))).map((e,i)=>h`<li><span><b>${e.n}</b> <span class="sub">${clNice(e.d,{wd:false,y:!e.y})}${e.to?' to '+clNice(e.to,{wd:false,y:!e.y}):''}${e.y?' · every year':''}${e.pl&&PD_BY[e.pl]?' · '+PD_BY[e.pl].name:''}</span></span>${gm?h`<button class="btn sm ghost" data-act="cl_evdel" data-v="${e.k}">Remove</button>`:''}</li>`)}</ul>`
+    ${clEvents().length?h`<ul class="calev">${clEvents().slice().sort((a,b)=>(a.mr?1:0)-(b.mr?1:0)||a.d.slice(5).localeCompare(b.d.slice(5))).map((e,i)=>h`<li><span><b>${e.n}</b> <span class="sub">${e.mr?(e.sched||'every month'):h`${clNice(e.d,{wd:false,y:!e.y})}${e.to?' to '+clNice(e.to,{wd:false,y:!e.y}):''}${e.y?' · every year':''}`}${e.bg?' · season':''}${e.pl&&PD_BY[e.pl]?' · '+PD_BY[e.pl].name:''}</span></span>${gm?h`<button class="btn sm ghost" data-act="cl_evdel" data-v="${e.k}">Remove</button>`:''}</li>`)}</ul>`
       :h`<p class="sub">${gm?'Add the dates that matter: the Grand Festival, the Conference, festivals and deadlines.':'No events yet.'}</p>`}
     ${gm?h`<div class="mgd"><b>Add an event</b><div class="fgrid">
       <label class="fld"><span class="fl">Name</span><input type="text" data-u="cl.en" value="${u.en}" placeholder="Lily of the Valley Conference" data-nr></label>
@@ -9632,7 +9710,7 @@ function calTab(){
       <label class="fld"><span class="fl">Where (optional)</span><select data-u="cl.ep" data-nr><option value="">Nowhere in particular</option>${PD.slice().sort(natural).map(f=>h`<option value="${f.id}" ${f.id===u.ep?raw('selected'):''}>${f.name}</option>`)}</select></label></div>
       <div class="row"><label class="row"><input type="checkbox" data-u="cl.ey" ${u.ey?raw('checked'):''} data-nr><span>Every year</span></label><button class="btn sm" data-act="cl_evadd">Add the event</button></div>
       <p class="sub">An event named with "Conference" runs the Valerian ferry from Sunyshore while it lasts.</p>
-      ${clEvents().some(e=>/conference/i.test(e.n))&&clEvents().some(e=>/grand festival/i.test(e.n))?'':h`<div class="row"><button class="btn sm" data-act="cl_preset">Add the League's yearly dates</button><span class="sub">Lily of the Valley Conference, 13–21 June; Grand Festival, 18–21 September. Change them after if you like.</span></div>`}</div>`:''}
+      ${clAllPresetNames().every(n=>clEvents().some(e=>e.n.toLowerCase()===n.toLowerCase()))?'':h`<div class="row"><button class="btn sm" data-act="cl_preset">Add Sinnoh's yearly calendar</button><span class="sub">The Conference, the Grand Festival, a monthly contest at every hall, the Valor Circuit, and the local festivals and seasons. Ones already here are skipped; change or remove any after.</span></div>`}</div>`:''}
   </section>`;
 }
 function clAct(b){
@@ -9650,10 +9728,12 @@ function clAct(b){
       edit('cd','conditions','ev',ev);u.en='';u.ed='';u.ee='';u.ey=false;u.ep='';render();break;}
     case 'cl_preset':{
       if(!gm)break;
-      const y=(clToday()||clFmt(new Date())).slice(0,4),ev=clEvents().slice(),k=()=>Math.random().toString(36).slice(2,9);
-      if(!ev.some(e=>/conference/i.test(e.n)))ev.push({k:k(),n:'Lily of the Valley Conference',d:y+'-06-13',to:y+'-06-21',y:true,pl:'lily-of-the-valley-conference'});
-      if(!ev.some(e=>/grand festival/i.test(e.n)))ev.push({k:k(),n:'Grand Festival (Festival Week)',d:y+'-09-18',to:y+'-09-21',y:true,pl:'valor-lakefront-and-grand-festival'});
-      edit('cd','conditions','ev',ev);render();break;}
+      const y=(clToday()||clFmt(new Date())).slice(0,4),ev=clEvents().slice();
+      const have=n=>ev.some(e=>e.n.toLowerCase()===n.toLowerCase())||(n==='Lily of the Valley Conference'&&ev.some(clIsConf))||(n==='Grand Festival (Festival Week)'&&ev.some(clIsFest));
+      let n=0;
+      CL_PRESET.forEach(([name,a,b,pl,bg])=>{if(have(name))return;ev.push({k:Math.random().toString(36).slice(2,9),n:name,d:y+'-'+a,to:b?y+'-'+b:'',y:true,pl:PD_BY[pl]?pl:'',bg:!!bg});n++;});
+      CL_CONTESTS.forEach(([name,key])=>{const hl=CT_HALLS.find(x=>x[0]===key);if(!hl||!hl[5]||have(name))return;ev.push({k:Math.random().toString(36).slice(2,9),n:name,d:y+'-01-01',to:'',y:false,mr:hl[5],sched:hl[6],pl:hl[2]});n++;});
+      edit('cd','conditions','ev',ev);toast(n?'Added '+n+' yearly events.':'They are all on the calendar already.',true);render();break;}
     case 'cl_evdel':if(gm){edit('cd','conditions','ev',clEvents().filter(e=>e.k!==d.v));render();}break;
     case 'cl_start':{
       if(!gm)break;
