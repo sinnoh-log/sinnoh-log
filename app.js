@@ -8472,7 +8472,7 @@ function badgeCase(uid,t,ro){
   const n=badgeCount(t);
   const pop=S.ui.pop;
   return h`<div class="case ${n===8?'full':''}" role="group" aria-label="Badge case, ${n} of 8 earned">
-    ${BADGES.map(([k,nameB,leader])=>h`<button class="slot ${bg[k]?'on':''}${bg[k]&&pop&&pop.uid===uid&&pop.key===k?' pop':''}" ${raw('style="--bc:'+BADGE_COL[k]+'"')} data-act="badge" data-key="${k}" data-uid="${uid}" aria-pressed="${String(!!bg[k])}" title="${nameB} Badge, from ${leader}" ${dis(ro)}><span class="medal">${badgeGlyph(k)}</span><span class="bn">${nameB}</span><small>${leader}</small></button>`)}
+    ${BADGES.map(([k,nameB,leader])=>h`<button class="slot ${bg[k]?'on':''}${bg[k]&&pop&&pop.uid===uid&&pop.key===k?' pop':''}" ${raw('style="--bc:'+BADGE_COL[k]+'"')} data-act="badge" data-key="${k}" data-uid="${uid}" aria-pressed="${String(!!bg[k])}" title="${nameB} Badge, from ${leader}${t.bdate&&t.bdate[k]?', won '+clNice(t.bdate[k],{y:1}):''}" ${dis(ro)}><span class="medal">${badgeGlyph(k)}</span><span class="bn">${nameB}</span><small>${leader}</small></button>`)}
   </div>`;
 }
 /* ---------- Clearance: which restricted places a trainer may enter ----------
@@ -8538,6 +8538,29 @@ function clrPanel(uid,t,ro){
       <div class="fld"><span class="fl">Credentials</span>${fCheck('Research permit','t',uid,'clr.permit',t,lock)}${fCheck('Hired guide with the party','t',uid,'clr.guide',t,lock)}</div></div>`:''}`;
 }
 
+/* ----- badges count toward a Conference for two years after they are won (a table rule) -----
+   Each badge remembers the in-game date it was won (trainers/<uid>, field "bdate"), when the calendar has a date. */
+const BADGE_LIFE=730;
+function clNextEvent(re,from){
+  const base=from||clToday();if(!base)return '';
+  let best='';
+  clEvents().filter(e=>re.test(e.n)).forEach(e=>{
+    let d=e.d;
+    if(e.y){const y=+base.slice(0,4);d=y+e.d.slice(4);if(d<base&&!(e.to&&(y+e.to.slice(4))>=base))d=(y+1)+e.d.slice(4);}
+    else if(d<base&&!(e.to&&e.to>=base))return;
+    if(!best||d<best)best=d;
+  });
+  return best;
+}
+function badgeValid(t){
+  const won=BADGES.filter(b=>t.badges&&t.badges[b[0]]);
+  if(!won.length)return '';
+  const conf=clNextEvent(/conference/i);
+  const bd=t.bdate||{};
+  const late=conf?won.filter(b=>bd[b[0]]&&clDiff(bd[b[0]],conf)>BADGE_LIFE):[];
+  const ok=won.length-late.length;
+  return h`<p class="sub">Badges count toward a Conference for two years after they are won.${conf?h` Next Conference: <b>${clNice(conf,{y:1})}</b>. ${ok} of ${won.length} badges count for it${late.length?h`; expired by then: ${late.map(b=>b[1]+' (won '+clNice(bd[b[0]],{wd:false,y:1})+')').join(', ')}`:''}.`:''}</p>`;
+}
 function honorsPanel(uid,t,ro){
   const bg=t.badges||{};
   const hs=t.honors||[];
@@ -8545,6 +8568,7 @@ function honorsPanel(uid,t,ro){
   return h`<section class="panel"><div class="ph"><h2>Honors</h2><span class="mono sub">${badgeCount(t)}/8 Sinnoh badges</span></div>
     ${aw.length?h`<div class="list"><span class="fl">Awarded by the GM</span>${aw.map(a=>h`<div class="award"><div class="row sp"><b>${a.title}</b><span class="pill gm">${a.type}</span></div>${a.note?h`<p class="sub prewrap">${a.note}</p>`:''}<span class="sub">${dt(a.createdAt)}${a.session?' · Session '+a.session:''}${a.levelUp?' · +1 level':''}</span></div>`)}</div>`:''}
     ${badgeCase(uid,t,ro)}
+    ${badgeValid(t)}
     ${ribCase(uid,t,ro)}
     ${clrPanel(uid,t,ro)}
     <div class="fgrid">${fNum('Pokédex owned','t',uid,'dex',t,{ro,min:0,max:999})}<p class="sub">Next certificate at ${(Math.floor(num(t.dex)/30)+1)*30} owned.</p></div>
@@ -9585,7 +9609,7 @@ function calTab(){
   const sel=u.sel&&clParse(u.sel)?u.sel:today;
   const prevM=clFmt(new Date(Date.UTC(y,mo-1,1))).slice(0,7),nextM=clFmt(new Date(Date.UTC(y,mo+1,1))).slice(0,7);
   const selEv=sel?clEventsOn(sel):[],selSail=sel?clSailingsOn(sel):[],selLog=t&&sel?t.log.filter(e=>e.date===sel):[];
-  return h`<section class="panel"><div class="ph"><h2>Calendar</h2>${today?h`<span class="sub">Today: ${clNice(today,{y:1})} · day ${clDayNo(today)} of the journey</span>`:h`<span class="sub">The GM has not set the date yet.</span>`}</div>
+  return h`<section class="panel"><div class="ph"><h2>Calendar</h2>${today?h`<span class="sub">Today: ${clNice(today,{y:1})} · day ${clDayNo(today)} of the journey${clNextEvent(/conference/i)?' · '+clDiff(today,clNextEvent(/conference/i))+' days to the Conference':''}${clNextEvent(/grand festival/i)?' · '+clDiff(today,clNextEvent(/grand festival/i))+' to the Grand Festival':''}</span>`:h`<span class="sub">The GM has not set the date yet.</span>`}</div>
     ${gm?h`<div class="row"><label class="fld"><span class="fl">${today?'Change the date':'Set the date'}</span><input type="date" data-u="cl.date" value="${u.date||today}" data-nr></label>
       <button class="btn sm" data-act="cl_set">Set</button>${today?h`<button class="btn sm primary" data-act="cl_next">Next day</button>`:''}</div>
       <p class="sub">Season and moon follow the date. Next day also rolls the weather and starts the day at dawn.</p>`:''}
@@ -9607,7 +9631,8 @@ function calTab(){
       <label class="fld"><span class="fl">Ends (optional)</span><input type="date" data-u="cl.ee" value="${u.ee||''}" data-nr></label>
       <label class="fld"><span class="fl">Where (optional)</span><select data-u="cl.ep" data-nr><option value="">Nowhere in particular</option>${PD.slice().sort(natural).map(f=>h`<option value="${f.id}" ${f.id===u.ep?raw('selected'):''}>${f.name}</option>`)}</select></label></div>
       <div class="row"><label class="row"><input type="checkbox" data-u="cl.ey" ${u.ey?raw('checked'):''} data-nr><span>Every year</span></label><button class="btn sm" data-act="cl_evadd">Add the event</button></div>
-      <p class="sub">An event named with "Conference" runs the Valerian ferry from Sunyshore while it lasts.</p></div>`:''}
+      <p class="sub">An event named with "Conference" runs the Valerian ferry from Sunyshore while it lasts.</p>
+      ${clEvents().some(e=>/conference/i.test(e.n))&&clEvents().some(e=>/grand festival/i.test(e.n))?'':h`<div class="row"><button class="btn sm" data-act="cl_preset">Add the League's yearly dates</button><span class="sub">Lily of the Valley Conference, 13–21 June; Grand Festival, 18–21 September. Change them after if you like.</span></div>`}</div>`:''}
   </section>`;
 }
 function clAct(b){
@@ -9623,6 +9648,12 @@ function clAct(b){
       if(!n||!clParse(u.ed)){toast('Give the event a name and a start date.');break;}
       const ev=clEvents().concat([{k:Math.random().toString(36).slice(2,9),n,d:u.ed,to:clParse(u.ee)?u.ee:'',y:!!u.ey,pl:u.ep||''}]);
       edit('cd','conditions','ev',ev);u.en='';u.ed='';u.ee='';u.ey=false;u.ep='';render();break;}
+    case 'cl_preset':{
+      if(!gm)break;
+      const y=(clToday()||clFmt(new Date())).slice(0,4),ev=clEvents().slice(),k=()=>Math.random().toString(36).slice(2,9);
+      if(!ev.some(e=>/conference/i.test(e.n)))ev.push({k:k(),n:'Lily of the Valley Conference',d:y+'-06-13',to:y+'-06-21',y:true,pl:'lily-of-the-valley-conference'});
+      if(!ev.some(e=>/grand festival/i.test(e.n)))ev.push({k:k(),n:'Grand Festival (Festival Week)',d:y+'-09-18',to:y+'-09-21',y:true,pl:'valor-lakefront-and-grand-festival'});
+      edit('cd','conditions','ev',ev);render();break;}
     case 'cl_evdel':if(gm){edit('cd','conditions','ev',clEvents().filter(e=>e.k!==d.v));render();}break;
     case 'cl_start':{
       if(!gm)break;
@@ -10119,7 +10150,7 @@ function giveAwards(){
     const id=S.db.collection('awards').doc().id;
     newDoc('aw',id,{uid,type:a.type,title,note:a.note||'',badge:a.type==='Gym Badge'?a.badge:'',ribbon:rib?rib.k:'',levelUp:!!a.levelUp,session:num(S.meta.session)||1,by:S.me.id,createdAt:now});
     const t=S.trainers[uid];
-    if(a.type==='Gym Badge'&&a.badge){edit('t',uid,'badges.'+a.badge,true);const p={uid,key:a.badge};S.ui.pop=p;setTimeout(()=>{if(S.ui.pop===p)S.ui.pop=null;},1400);}
+    if(a.type==='Gym Badge'&&a.badge){edit('t',uid,'badges.'+a.badge,true);edit('t',uid,'bdate.'+a.badge,clToday());const p={uid,key:a.badge};S.ui.pop=p;setTimeout(()=>{if(S.ui.pop===p)S.ui.pop=null;},1400);}
     if(rib){edit('t',uid,'ribbons.'+rib.k,true);const p={uid,key:'r:'+rib.k};S.ui.pop=p;setTimeout(()=>{if(S.ui.pop===p)S.ui.pop=null;},1400);}
     if(a.levelUp&&t)edit('t',uid,'level',clamp(num(t.level||1)+1,1,20));
   });
@@ -10321,6 +10352,7 @@ function act(b,e){
       if(!t)break;
       const turnOn=!(t.badges&&t.badges[d.key]);
       edit('t',d.uid,'badges.'+d.key,turnOn);
+      edit('t',d.uid,'bdate.'+d.key,turnOn?clToday():'');
       if(turnOn){const p={uid:d.uid,key:d.key};S.ui.pop=p;setTimeout(()=>{if(S.ui.pop===p)S.ui.pop=null;},1400);}
       else S.ui.pop=null;
       render();break;}
