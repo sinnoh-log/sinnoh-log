@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-02 · Battle log and a simulated season';
+const BUILD='2026-11-02 · Gym reputations, headlines, badge expiry, road rivals';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -8638,7 +8638,7 @@ function trainerTab(){
   if(!t)return h`${trainerPicker()}${emptyTrainer()}`;
   const ro=!canEditT(uid);
   const tab=sheetTabNow(),show=g=>tab==='all'||tab===g;
-  const c1=[show('prof')?identityPanel(uid,t,ro):'',show('stats')?vitalsPanel(uid,t,ro):'',show('honors')?honorsPanel(uid,t,ro):''];
+  const c1=[show('prof')?identityPanel(uid,t,ro):'',show('stats')?vitalsPanel(uid,t,ro):'',show('honors')?honorsPanel(uid,t,ro):'',show('honors')?rkSheetPanel(uid):''];
   const c2=[show('stats')?skillsPanel(uid,t,ro):'',show('feat')?featuresPanel(uid,t,ro):'',show('bag')?itemsPanel(uid,t,ro):''];
   const n1=c1.filter(Boolean).length,n2=c2.filter(Boolean).length;
   return h`${trainerPicker()}
@@ -9616,12 +9616,13 @@ function clRollDay(){
     }else if(!entry.prog||move>0)entry.prog=(entry.prog?entry.prog+' ':'')+'About '+(Math.round(left*2)/2)+(left===1?' day':' days')+' left on this stretch.';
   }
   if(t.pos>=t.steps.length){t.done=true;entry.prog=entry.prog.replace('Reached '+trName(t.to)+'.','').trim();entry.prog=(entry.prog?entry.prog+' ':'')+'Arrived at '+trName(t.to)+'.';}
+  if(!st.sea&&Math.random()<0.12){const pool=rkRoadPool();if(pool.length){const r=pool[Math.floor(Math.random()*pool.length)];entry.riv={id:r.id,c:r.c,n:r.name,txt:r.name+' ('+(r.c==='con'?'Contest':'Gym')+' circuit #'+r.pos+', '+r.rec+')'};}}
   t.log=t.log.concat([entry]).slice(-120);
   edit('cd','conditions','trip',t);
   render();
 }
 function clTripText(t){
-  return t.log.map(e=>'Day '+e.n+(e.date?' ('+clNice(e.date)+')':'')+': '+e.at+'. '+e.wx+'. '+e.prog+(e.enc?' '+e.enc+(e.sp.length?': '+e.sp.join(', '):'')+'.':'')+(e.ev?' '+e.ev:'')+(e.push?' Pushed: Constitution check.':'')+(e.zone?' ('+(e.zone==='semi'?'semi-route':'off-route')+')':'')).join('\n');
+  return t.log.map(e=>'Day '+e.n+(e.date?' ('+clNice(e.date)+')':'')+': '+e.at+'. '+e.wx+'. '+e.prog+(e.enc?' '+e.enc+(e.sp.length?': '+e.sp.join(', '):'')+'.':'')+(e.ev?' '+e.ev:'')+(e.riv?' On the road: '+e.riv.txt+'.':'')+(e.push?' Pushed: Constitution check.':'')+(e.zone?' ('+(e.zone==='semi'?'semi-route':'off-route')+')':'')).join('\n');
 }
 function clTripPanel(){
   const t=clTrip();if(!t)return '';
@@ -9632,7 +9633,7 @@ function clTripPanel(){
     <div class="rbar" role="img" aria-label="${Math.round(100*doneDays/Math.max(total,1))}% of the way"><i ${raw('style="width:'+Math.min(100,Math.round(100*doneDays/Math.max(total,1)))+'%"')}></i></div>
     ${t.done?h`<p><b>Arrived at ${trName(t.to)}</b> after ${t.day} ${t.day===1?'day':'days'}.</p>`:''}
     ${last.length?h`<ol class="tplog">${last.map(e=>h`<li><b>Day ${e.n}${e.date?h` · ${clNice(e.date)}`:''}</b> <span class="sub">${e.wx}</span><div>${e.at}. ${e.prog}</div>
-      ${e.enc?h`<div class="tpenc">${e.enc}${gm&&e.sp.length?': '+e.sp.join(', '):''}</div>`:''}${e.ev?h`<div>${e.ev}</div>`:''}${e.push?h`<div class="sub">Pushed: every trainer makes a Constitution check tonight.</div>`:''}${e.zone==='semi'?h`<div class="sub">Semi-route: Nature 12 to keep the heading; Perception 13 before any encounter.</div>`:e.zone==='off'?h`<div class="sub">Off-route: Nature 16 twice today; Perception 16 on watch; Insight or Pokémon Handling 17 before any fight; Constitution 14 tonight without a proper camp.</div>`:''}</li>`)}</ol>`
+      ${e.enc?h`<div class="tpenc">${e.enc}${gm&&e.sp.length?': '+e.sp.join(', '):''}</div>`:''}${e.ev?h`<div>${e.ev}</div>`:''}${gm&&e.riv?h`<div class="tpenc">On the road: ${e.riv.txt}. <button class="btn sm ghost" data-act="rk_goto" data-c="${e.riv.c}" data-id="${e.riv.id}">Open their card</button></div>`:''}${e.push?h`<div class="sub">Pushed: every trainer makes a Constitution check tonight.</div>`:''}${e.zone==='semi'?h`<div class="sub">Semi-route: Nature 12 to keep the heading; Perception 13 before any encounter.</div>`:e.zone==='off'?h`<div class="sub">Off-route: Nature 16 twice today; Perception 16 on watch; Insight or Pokémon Handling 17 before any fight; Constitution 14 tonight without a proper camp.</div>`:''}</li>`)}</ol>`
       :h`<p class="sub">${gm?'Roll the first day when the party sets out.':'The party is about to set out.'}</p>`}
     ${gm&&!t.done?h`<div class="row"><span class="fl">Where the party travels</span><span class="seg" role="group" aria-label="Zone">${[['road','On the road'],['semi','Semi-route'],['off','Off-route']].map(([v,l])=>h`<button data-act="zn_zone" data-v="${v}" aria-pressed="${String((t.zone||'road')===v)}">${l}</button>`)}</span></div>`:''}
     ${gm?h`<div class="row">${t.done?'':h`<button class="btn primary sm" data-act="cl_roll">Roll the day</button>`}<button class="btn sm" data-act="cl_journal" ${t.log.length?'':raw('disabled')}>Copy the log to the journal</button><button class="btn sm ghost" data-act="cl_end">${t.done?'Clear the trip':'Abandon the trip'}</button></div>
@@ -9779,6 +9780,12 @@ const rkWt=age=>age<RK_FULL?1:age<RK_HALF?0.5:0;
 function rkPtsAt(res,W){let s=0;for(const r of res){if(num(r.wk)>W)continue;s+=num(r.p)*rkWt(W-num(r.wk));}return Math.round(s);}
 const RK_GYMS=BADGES.map((b,i)=>({id:'g_'+b[0],k:b[0],badge:b[1],name:b[2],lvl:i}));
 const rkGymSkill=l=>1350+50*l;
+/* each Gym's reputation shifts how hard its Leader is for every challenger; the GM can also rename a Leader. Kept in rk.gym */
+const RK_REPS=[['easy','Easy',-100],['standard','Standard',0],['tough','Tough',90],['brutal','Brutal',180]];
+const rkGymSet=()=>{const g=S.cond&&S.cond.rk&&S.cond.rk.gym;return g||{};};
+const rkGymRep=id=>{const r=(rkGymSet()[id]||{}).rep;return RK_REPS.find(x=>x[0]===r)||RK_REPS[1];};
+const rkGymName=g=>(rkGymSet()[g.id]||{}).name||g.name;
+const RK_BADGE_LIFE=104;
 const rkSkillOf=P=>1300+1.5*Math.max(0,P);
 const rkWinP=(a,b)=>1/(1+Math.pow(10,(b-a)/400));
 const rkStrHash=s=>{let x=7;for(const c of String(s))x=(Math.imul(x,31)+c.charCodeAt(0))|0;return x;};
@@ -9790,7 +9797,9 @@ function rkTraits(R,P0,rookie){
     for(let j=0;j<5;j++){const w=-(1+Math.floor(R(20+j)*77)),r=0.3+R(30+j);wk.push(w);rr.push(r);tot+=r*rkWt(-w);}
     for(let j=0;j<5;j++)pre.push({wk:wk[j],p:tot?rr[j]*P0/tot:0,pre:1});
   }
-  return {P0,pre,skill0:rkSkillOf(P0)+(R(9)-0.5)*120,grow:rookie?1+R(10)*4:-0.5+R(10)*2,act:0.4+R(11)*0.6,b0:rookie?0:Math.min(8,Math.floor(P0/20+R(12)*3))};
+  const b0=rookie?0:Math.min(8,Math.floor(P0/20+R(12)*3)),bw=[];
+  for(let j=0;j<b0;j++)bw.push(-(1+Math.floor(R(50+j)*(RK_BADGE_LIFE-1))));
+  return {P0,pre,skill0:rkSkillOf(P0)+(R(9)-0.5)*120,grow:rookie?1+R(10)*4:-0.5+R(10)*2,act:0.4+R(11)*0.6,b0,bw};
 }
 const rkFieldMemo={};
 function rkGenField(seed,n){
@@ -9825,11 +9834,13 @@ const rkEngMemo={};
 function rkEngine(){
   const C=rkC(),gymC=C===RK_C.gym,b=rkB(),W=num(b.wk),seed=num(b.seed)||7,n=b.seed?(num(b.n)||300):0;
   const log=rkLog(),bt=rkBattles(),npcs=rkNpcs(),gone=b.gone||{};
-  const key=[C.d,seed,n,W,JSON.stringify(npcs.map(x=>[x.k,x.b,x.p])),JSON.stringify(gone),log.length,log.length?log[log.length-1].k:'',bt.length,bt.length?bt[bt.length-1].k:''].join('|');
+  const key=[C.d,seed,n,W,JSON.stringify(npcs.map(x=>[x.k,x.b,x.p])),JSON.stringify(gone),log.length,log.length?log[log.length-1].k:'',bt.length,bt.length?bt[bt.length-1].k:'',JSON.stringify(rkGymSet())].join('|');
   if(rkEngMemo[C.d]&&rkEngMemo[C.d].key===key)return rkEngMemo[C.d].out;
   const field=n?rkGenField(seed,n):[];
   const E={},REC={},CON={};
-  const mk=(id,g)=>({id,g,res:g.pre.slice().sort((x,y)=>x.wk-y.wk),badges:g.b0,full:0,half:0,i52:0,i78:0});
+  const mk=(id,g)=>{const held={};(g.bw||[]).forEach((wk,j)=>{held[j]=wk;});return {id,g,res:g.pre.slice().sort((x,y)=>x.wk-y.wk),held,full:0,half:0,i52:0,i78:0};};
+  const nb=e=>Object.keys(e.held).length;
+  const UP={};
   field.forEach(g=>{if(!gone[g.i])E['b'+g.i]=mk('b'+g.i,g);});
   npcs.forEach(r=>{const g=r.b!=null&&field[r.b]?field[r.b]:rkGenRival(seed,r);E['n_'+r.k]=mk('n_'+r.k,g);});
   const ents=Object.values(E);
@@ -9837,6 +9848,7 @@ function rkEngine(){
   const logW=byW(log.filter(e=>E[e.u])),btW=byW(bt);
   const add=(e,w,p)=>{e.res.push({wk:w,p});e.full+=p;};
   const age=w=>ents.forEach(e=>{
+    for(const j in e.held)if(w-e.held[j]>=RK_BADGE_LIFE)delete e.held[j];
     const r=e.res;
     while(e.i52<r.length&&r[e.i52].wk<=w-RK_FULL){e.full-=r[e.i52].p;e.half+=r[e.i52].p;e.i52++;}
     while(e.i78<r.length&&r[e.i78].wk<=w-RK_HALF){e.half-=r[e.i78].p;e.i78++;}
@@ -9860,12 +9872,14 @@ function rkEngine(){
     const pos={};order.forEach((e,i)=>{pos[e.id]=i;});
     if(gymC){
       order.forEach(e=>{
-        if(e.badges>=8||R(e,w,1)>=0.2)return;
-        const gym=RK_GYMS[e.badges],s=skill(e,w);
-        if(R(e,w,2)>=rkWinP(s,rkGymSkill(gym.lvl)-150))return;
+        const n0=nb(e);
+        if(n0>=8||R(e,w,1)>=0.2)return;
+        let gi=0;while(e.held[gi]!=null)gi++;
+        const gym=RK_GYMS[gi],s=skill(e,w),gs=rkGymSkill(n0)+rkGymRep(gym.id)[2];
+        if(R(e,w,2)>=rkWinP(s,gs-150))return;
         add(e,w,5);
-        const win=R(e,w,3)<rkWinP(s,rkGymSkill(gym.lvl));
-        add(e,w,win?25:-10);if(win)e.badges++;
+        const win=R(e,w,3)<rkWinP(s,gs);
+        add(e,w,win?25:-10);if(win)e.held[gi]=w;
         rkRecAdd(REC,e.id,gym.id,win,'gym',w);rkRecAdd(REC,gym.id,e.id,!win,'gym',w);
       });
       for(let rd=0;rd<3;rd++){
@@ -9878,6 +9892,7 @@ function rkEngine(){
           taken[a.id]=taken[o.id]=1;
           const aw=R(a,w,30+rd)<rkWinP(skill(a,w),skill(o,w)),wn=aw?a:o,ls=aw?o:a;
           add(wn,w,pos[ls.id]<pos[wn.id]?10:5);add(ls,w,-5);
+          const gap=pos[wn.id]-pos[ls.id];if(gap>0&&(!UP[w]||gap>UP[w].gap))UP[w]={wn:wn.id,ls:ls.id,gap};
           rkRecAdd(REC,a.id,o.id,aw,'public',w);rkRecAdd(REC,o.id,a.id,!aw,'public',w);
         }
       }
@@ -9896,8 +9911,8 @@ function rkEngine(){
     }
     endOfWeek(w);
   }
-  const out={W,E:{},REC,CON};
-  ents.forEach(e=>{out.E[e.id]={pts:Math.round(pts(e)),prev:W?rkPtsAt(e.res,W-1):Math.round(pts(e)),badges:e.badges};});
+  const out={W,E:{},REC,CON,UP};
+  ents.forEach(e=>{out.E[e.id]={pts:Math.round(pts(e)),prev:W?rkPtsAt(e.res,W-1):Math.round(pts(e)),badges:nb(e)};});
   rkEngMemo[C.d]={key,out};
   return out;
 }
@@ -10020,7 +10035,7 @@ function rkStreak(seq){
 /* a lookup from any id on the board (or a Gym) to a display name */
 function rkNamer(rows){
   const m={};rows.forEach(r=>{m[r.id]=r.name;});
-  RK_GYMS.forEach(g=>{m[g.id]=g.name+' ('+g.badge+' Gym)';});
+  RK_GYMS.forEach(g=>{m[g.id]=rkGymName(g)+' ('+g.badge+' Gym)';});
   return id=>m[id]||'Someone no longer listed';
 }
 function rkProfile(r,nameOf){
@@ -10081,7 +10096,7 @@ function rkBattlePanel(rows){
   const u=S.ui.rk,nameOf=rkNamer(rows);
   const opts=cur=>{
     const og=(l,list)=>list.length?h`<optgroup label="${l}">${list.map(r=>h`<option value="${r.id}" ${r.id===cur?raw('selected'):''}>${r.name}${r.kind?' (#'+r.pos+')':''}</option>`)}</optgroup>`:'';
-    return h`<option value="">Pick a trainer</option>${og('Players',rows.filter(r=>r.kind==='pc'))}${og('Rivals',rows.filter(r=>r.kind==='rival'))}${og('Gyms',RK_GYMS.map(g=>({id:g.id,name:g.name+' ('+g.badge+' Gym)'})))}${og('Field',rows.filter(r=>r.kind==='bg').slice().sort((x,y)=>x.name.localeCompare(y.name)))}`;
+    return h`<option value="">Pick a trainer</option>${og('Players',rows.filter(r=>r.kind==='pc'))}${og('Rivals',rows.filter(r=>r.kind==='rival'))}${og('Gyms',RK_GYMS.map(g=>({id:g.id,name:rkGymName(g)+' ('+g.badge+' Gym)'})))}${og('Field',rows.filter(r=>r.kind==='bg').slice().sort((x,y)=>x.name.localeCompare(y.name)))}`;
   };
   const pv=rkBattlePts(u.ba,u.bb,u.bwin,u.bk,rows);
   const side=k=>h`<button class="btn sm ${u.bwin===k?'primary':'ghost'}" data-act="rk_bwin" data-v="${k}" aria-pressed="${u.bwin===k?'true':'false'}">${u.bwin===k?'Winner':'Won?'}</button>`;
@@ -10096,15 +10111,79 @@ function rkBattlePanel(rows){
   </section>`;
 }
 function rkGymPanel(){
-  const EN=rkEngine();
-  return h`<section class="panel"><div class="ph"><h2>The Gyms</h2><span class="sub">Challengers this season</span></div>
-    ${cxTable(['Gym','Leader','Challengers beaten','Lost to challengers','Win rate'],RK_GYMS.map(g=>{const c=EN.REC[g.id]||rkRec(),t=c.w+c.l;return [g.badge+' Badge',g.name,c.w,c.l,t?Math.round(100*c.w/t)+'%':'—'];}))}
-    <p class="sub">Leaders scale their teams to the challenger's badges, so later Gyms are harder for everyone.</p></section>`;
+  const EN=rkEngine(),gm=!!S.me.admin,set=rkGymSet();
+  const rows=RK_GYMS.map(g=>{const c=EN.REC[g.id]||rkRec(),t=c.w+c.l,st=rkStreak(c.seq),rep=rkGymRep(g.id);
+    return [g.badge+' Badge',
+      gm?h`<input type="text" class="rkgname" data-rkgym="${g.id}" data-f="name" value="${(set[g.id]||{}).name||''}" placeholder="${g.name}" aria-label="Leader of the ${g.badge} Gym">`:rkGymName(g),
+      gm?h`<select class="clcatsel" data-rkgym="${g.id}" data-f="rep" aria-label="Reputation">${RK_REPS.map(r=>h`<option value="${r[0]}" ${r===rep?raw('selected'):''}>${r[1]}</option>`)}</select>`:(rep[0]==='standard'?h`<span class="sub">Standard</span>`:h`<span class="pill ${rep[0]==='brutal'||rep[0]==='tough'?'rkrep':''}">${rep[1]}</span>`),
+      h`${c.w}–${c.l}${st?h` <span class="sub">· ${st}</span>`:''}`,t?Math.round(100*c.w/t)+'%':'—'];});
+  return h`<section class="panel"><div class="ph"><h2>The Gyms</h2><span class="sub">Against challengers this season</span></div>
+    ${cxTable(['Gym','Leader','Reputation','Record','Win rate'],rows)}
+    <p class="sub">Leaders scale their teams to the challenger's badges, so later Gyms are harder for everyone; a Tough or Brutal Gym is harder still.${gm?' Renaming a Leader here changes the name on this page only.':''}</p></section>`;
 }
+/* ----- weekly headlines: drafted when the GM runs a week, published when the GM says so. rk.heads [{k, wk, txt, pub}] ----- */
+const rkHeads=()=>Array.isArray(rkD().heads)?rkD().heads:[];
+function rkDraftHeads(W){
+  if(!W)return [];
+  const C=rkC(),gymC=C===RK_C.gym,EN=rkEngine(),rows=rkRows(),nameOf=rkNamer(rows),out=[];
+  const before=rows.slice().sort((a,b)=>(b.pts-b.wk)-(a.pts-a.wk)||a.name.localeCompare(b.name)),pp={};before.forEach((r,i)=>{pp[r.id]=i+1;});
+  const mv=rows.map(r=>({r,d:pp[r.id]-r.pos}));
+  const pick=(arr,i)=>arr[Math.abs(rkHash(W,i,C===RK_C.gym?1:2)*arr.length|0)%arr.length];
+  const dash=(t)=>'Dash Moreno: '+t,ing=(t)=>'Ingrid Solberg: '+t;
+  const up=mv.filter(x=>x.r.kind!=='pc'&&x.r.pos<=150).sort((a,b)=>b.d-a.d)[0];
+  if(up&&up.d>=5)out.push(pick([dash(up.r.name+' rockets up '+up.d+' spots to #'+up.r.pos+'! Somebody check what they’re eating!'),ing(up.r.name+' climbed '+up.d+' places to #'+up.r.pos+'. A good week, but one good week is not a season.'),up.r.name+' is the week’s biggest climber: up '+up.d+' to #'+up.r.pos+'.'],1));
+  const dn=mv.filter(x=>x.r.kind!=='pc'&&pp[x.r.id]<=150).sort((a,b)=>a.d-b.d)[0];
+  if(dn&&dn.d<=-5)out.push(pick([ing(dn.r.name+' fell '+(-dn.d)+' spots to #'+dn.r.pos+'. A week to forget, and the field won\u2019t wait.'),dash('Ouch. '+dn.r.name+' tumbles '+(-dn.d)+' places to #'+dn.r.pos+'. Rough week!'),dn.r.name+' slides '+(-dn.d)+' spots to #'+dn.r.pos+'.'],2));
+  mv.filter(x=>x.r.kind==='pc'&&x.d>=8).forEach(x=>out.push(dash('Keep an eye on '+x.r.name+': up '+x.d+' places to #'+x.r.pos+' this week.')));
+  rows.filter(r=>r.pos<=10&&pp[r.id]>10).slice(0,1).forEach(r=>out.push(r.name+' breaks into the top 10 at #'+r.pos+'.'));
+  const u=EN.UP&&EN.UP[W];
+  if(gymC&&u&&u.gap>=15)out.push(pick([dash('UPSET! '+nameOf(u.wn)+' takes down '+nameOf(u.ls)+', ranked '+u.gap+' places higher!'),ing(nameOf(u.wn)+' beat '+nameOf(u.ls)+' despite a '+u.gap+'-place gap. Not a fluke, judging by the tape.')],3));
+  if(gymC){
+    const gw=RK_GYMS.map(g=>{const c=EN.REC[g.id]||rkRec(),wk=c.seq.filter(x=>x.wk===W);return {g,w:wk.filter(x=>x.win).length,l:wk.filter(x=>!x.win).length,st:rkStreak(c.seq)};});
+    const wall=gw.filter(x=>x.w>=3&&x.l===0).sort((a,b)=>b.w-a.w)[0];
+    if(wall)out.push(pick([dash('Nobody got past '+rkGymName(wall.g)+' this week: '+wall.w+' challengers, '+wall.w+' losses!'),ing(rkGymName(wall.g)+' went '+wall.w+'–0 at the '+wall.g.badge+' Gym. Challengers keep bringing the wrong answers.')],4));
+    const soft=gw.filter(x=>x.l>=4&&x.l>x.w).sort((a,b)=>b.l-a.l)[0];
+    if(soft)out.push(ing(soft.l+' challengers left the '+soft.g.badge+' Gym with a badge this week. '+rkGymName(soft.g)+' will want answers.'));
+  }else{
+    const rib=rows.filter(r=>r.kind!=='pc'&&r.con&&r.con.seq.some(x=>x.wk===W&&x.pl===1)&&r.con.r>=3).sort((a,b)=>b.con.r-a.con.r)[0];
+    if(rib)out.push(dash(rib.name+' takes another ribbon, that’s '+rib.con.r+' this season!'));
+  }
+  return out.slice(0,5).map(txt=>({k:rkKey(),wk:W,txt,pub:false}));
+}
+function rkHeadPanel(){
+  const dr=rkHeads().filter(x=>!x.pub);
+  if(!dr.length)return '';
+  return h`<section class="panel"><div class="ph"><h2>Headline drafts</h2><span class="sub">Only you see these until you publish</span></div>
+    <ul class="mini-list">${dr.map(x=>h`<li><textarea rows="2" data-rkhead="${x.k}" aria-label="Headline">${x.txt}</textarea><div class="row"><button class="btn sm" data-act="rk_hpub" data-k="${x.k}">Publish</button><button class="btn sm ghost" data-act="rk_hdel" data-k="${x.k}">Delete</button><span class="sub">Week ${x.wk}</span></div></li>`)}</ul>
+    <div class="row"><button class="btn sm primary" data-act="rk_hpuball">Publish all</button></div></section>`;
+}
+/* ----- the circuits on a trainer's own sheet ----- */
+function rkWith(c,fn){const u=S.ui.rk,old=u.c;u.c=c;try{return fn();}finally{u.c=old;}}
+function rkSheetPanel(uid){
+  const g=rkWith('gym',()=>{const rows=rkRows();return {r:rows.find(x=>x.id===uid),n:rows.length,nm:rkNamer(rows)};});
+  const c=rkWith('con',()=>{const rows=rkRows();return {r:rows.find(x=>x.id===uid),n:rows.length};});
+  if(!g.r&&!c.r)return '';
+  const gr=g.r&&g.r.rec||rkRec(),last=gr.seq.slice(-5),st=rkStreak(gr.seq),cc=c.r&&c.r.con||{e:0,r:0};
+  return h`<section class="panel"><div class="ph"><h2>On the circuits</h2><button class="btn sm ghost" data-act="tab" data-tab="rank">Rankings</button></div>
+    <div class="rkstats rkstats2">
+      <div><span class="sub">Gym circuit</span><b>${g.r?'#'+g.r.pos:'—'}</b><span class="sub">${g.r?g.r.pts+' RP of '+g.n+' trainers':''}</span></div>
+      <div><span class="sub">Record</span><b>${gr.w}–${gr.l}</b><span class="sub">${st?'Streak '+st:'No battles yet'}</span></div>
+      <div><span class="sub">Contest circuit</span><b>${c.r?'#'+c.r.pos:'—'}</b><span class="sub">${c.r?c.r.pts+' CP of '+c.n:''}</span></div>
+      <div><span class="sub">Contests</span><b>${cc.e}</b><span class="sub">${rkPl(c.r?Math.max(c.r.rb||0,cc.r):cc.r,'ribbon')}</span></div></div>
+    ${last.length?h`<div class="rklast"><span class="sub">${last.length===1?'Last battle':'Last '+last.length+' battles'}</span>${last.map(x=>h`<i class="rkdot ${x.win?'w':'l'}" title="${x.win?'Beat':'Lost to'} ${g.nm(x.o)}, week ${x.wk}"></i>`)}</div>`:''}
+  </section>`;
+}
+/* ----- rivals on the road: who might turn up on a travel day (tracked rivals and anyone the party has met, either board) ----- */
+function rkRoadPool(){
+  const out=[];
+  ['gym','con'].forEach(c=>rkWith(c,()=>rkRows().forEach(r=>{if((r.kind==='rival'||r.met)&&!out.some(o=>o.name===r.name))out.push({id:r.id,c,name:r.name,pos:r.pos,unit:rkC().unit,rec:rkRecText(r),home:r.home||''});})));
+  return out;
+}
+function rkGoto(c,id){const u=S.ui.rk;u.c=c==='con'?'con':'gym';u.open=id;u.view='known';u.q='';setTab('rank');}
 function rkTab(){
   const gm=!!S.me.admin,u=S.ui.rk,rows=rkRows(),nameOf=rkNamer(rows),C=rkC(),gymC=C===RK_C.gym;
   const log=rkLog(),bts=gymC?rkBattles():[],btK={};bts.forEach(x=>{btK[x.k]=x;});
-  const items=log.filter(e=>!e.bt).map(e=>({t:'e',e,wk:num(e.wk),at:num(e.at)})).concat(bts.map(x=>({t:'b',x,wk:num(x.wk),at:num(x.at)}))).sort((a,b)=>b.wk-a.wk||b.at-a.at);
+  const items=log.filter(e=>!e.bt).map(e=>({t:'e',e,wk:num(e.wk),at:num(e.at)})).concat(bts.map(x=>({t:'b',x,wk:num(x.wk),at:num(x.at)}))).concat(rkHeads().filter(x=>x.pub).map(x=>({t:'h',x,wk:num(x.wk),at:num(x.at)||1e15}))).sort((a,b)=>b.wk-a.wk||b.at-a.at);
   const big=rows.length>40,b=rkB(),known=rows.filter(r=>r.met).length;
   const ev=C.events.find(e=>e[0]===u.ev)||C.events[0];
   const feed=u.all?items:items.slice(0,25);
@@ -10113,6 +10192,7 @@ function rkTab(){
   const ptsOf=(bk,id)=>{const e=log.find(x=>x.bt===bk&&x.u===id);return e?num(e.p):0;};
   const chip=p=>p?h` <span class="mono rkp ${p>0?'up':'down'}">${rkSgn(p)}</span>`:'';
   const item=it=>{
+    if(it.t==='h')return h`<li class="rkhead"><div class="row sp"><span><span class="pill">Headline</span> ${it.x.txt}</span>${rm('rk_hdel',it.x.k)}</div><span class="sub">Week ${it.wk}</span></li>`;
     if(it.t==='b'){const x=it.x,wn=x.win==='a'?x.a:x.b,ls=x.win==='a'?x.b:x.a,kn=(RK_BKINDS.find(k=>k[0]===x.kind)||['',''])[1];
       return h`<li><div class="row sp"><span><b>${nameOf(wn)}</b>${chip(ptsOf(x.k,wn))} ${x.kind==='trial'?'passed the Trial against':'beat'} <b>${nameOf(ls)}</b>${chip(ptsOf(x.k,ls))}</span>${rm('rk_btdel',x.k)}</div>${x.w?h`<span>${x.w}</span>`:''}<span class="sub">${kn} · week ${x.wk}${x.d?' · '+clNice(x.d,{y:1}):''}</span></li>`;}
     const e=it.e;
@@ -10132,6 +10212,7 @@ function rkTab(){
   </section>
   ${pcs.length?h`<section class="panel"><div class="ph"><h2>The climb</h2><span class="sub">Place on the board, week by week</span></div>
     <div class="rksparks">${pcs.map(r=>rkSpark(r.id,r.name))}</div></section>`:''}
+  ${gm?rkHeadPanel():''}
   ${gm&&gymC?rkBattlePanel(rows):''}
   ${gm?h`<section class="panel"><div class="ph"><h2>The week</h2><span class="sub">Only you see this</span></div>
     <p class="sub">Week ${num(b.wk)} of the season. Running a week records where each player stands for The climb, and the ${b.seed?'field and tracked rivals':'tracked rivals'} ${gymC?'battle each other and take on the Gyms':'enter the week’s contests'}. Players only move when you record their results.</p>
@@ -10176,6 +10257,7 @@ function rkAct(b){
   if(d.act==='rk_all'){u.all=!u.all;render();return;}
   if(d.act==='rk_c'){u.c=d.v==='con'?'con':'gym';u.who={};u.q='';u.lim=50;u.open='';u.ev=rkC().def;u.pts='';u.both=false;render();return;}
   if(d.act==='rk_view'){u.view=d.v;u.q='';u.lim=50;render();return;}
+  if(d.act==='rk_goto'){rkGoto(d.c,d.id);return;}
   if(d.act==='rk_open'){u.open=u.open===d.id?'':d.id;rkListRefresh();return;}
   if(d.act==='rk_more'){u.view=u.view==='near'?'all':u.view;u.lim+=50;rkListRefresh();return;}
   if(!gm)return;
@@ -10235,8 +10317,12 @@ function rkAct(b){
       if(!hist.some(e=>num(e.w)===W))hist.push(rkSnap(W));
       rkSaveB({wk:W+1});
       rkSaveB({hist:hist.concat([rkSnap(W+1)]).slice(-80)});
+      const dr=rkDraftHeads(W+1);if(dr.length)rkSave({heads:rkHeads().concat(dr).slice(-200)});
       toast('Week '+(W+1)+': the results are in.',true);render();break;}
-    case 'rk_unweek':{const w=Math.max(0,W-1);rkSaveB({wk:w,hist:(Array.isArray(bb.hist)?bb.hist:[]).filter(e=>num(e.w)<=w)});render();break;}
+    case 'rk_unweek':{const w=Math.max(0,W-1);rkSaveB({wk:w,hist:(Array.isArray(bb.hist)?bb.hist:[]).filter(e=>num(e.w)<=w)});if(rkHeads().some(x=>num(x.wk)>w))rkSave({heads:rkHeads().filter(x=>num(x.wk)<=w)});render();break;}
+    case 'rk_hpub':rkSave({heads:rkHeads().map(x=>x.k===d.k?Object.assign({},x,{pub:true,at:Date.now()}):x)});render();break;
+    case 'rk_hpuball':{const at=Date.now();rkSave({heads:rkHeads().map((x,i)=>x.pub?x:Object.assign({},x,{pub:true,at:at+i}))});render();break;}
+    case 'rk_hdel':rkSave({heads:rkHeads().filter(x=>x.k!==d.k)});render();break;
     case 'rk_met':{const m=Object.assign({},bb.met||{});if(m[d.id])delete m[d.id];else m[d.id]=true;rkSaveB({met:m});rkListRefresh();break;}
     case 'rk_track':{
       const i=num(d.i),f=bb.seed?rkGenField(num(bb.seed),num(bb.n)||300)[i]:null;if(!f)break;
@@ -10254,6 +10340,8 @@ function rkChange(t){
   const d=t.dataset;
   if(d.rkwho!=null){S.ui.rk.who[d.rkwho]=t.checked;return true;}
   if(!S.me.admin)return false;
+  if(d.rkhead!=null){rkSave({heads:rkHeads().map(x=>x.k===d.rkhead?Object.assign({},x,{txt:String(t.value||'').trim()}):x)});return true;}
+  if(d.rkgym!=null&&d.f){const cur=(S.cond&&S.cond.rk)||{},g=Object.assign({},cur.gym||{});g[d.rkgym]=Object.assign({},g[d.rkgym]||{},{[d.f]:String(t.value||'').trim()});edit('cd','conditions','rk',Object.assign({},cur,{gym:g}));render();return true;}
   if(d.rkcard!=null&&d.f){const cards=Object.assign({},rkCards());cards[d.rkcard]=Object.assign({},cards[d.rkcard]||{},{[d.f]:String(t.value||'').trim()});rkSave({card:cards});if(d.f==='mood')rkListRefresh();return true;}
   if(d.rklab!=null){rkSave({lab:Object.assign({},rkD().lab||{},{[d.rklab]:t.value})});render();return true;}
   if(d.rknlab!=null){rkSave({npc:rkNpcs().map(n=>n.k===d.rknlab?Object.assign({},n,{s:t.value}):n)});render();return true;}
