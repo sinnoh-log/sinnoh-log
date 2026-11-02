@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-10-31 · Event categories';
+const BUILD='2026-11-01 · Circuit rankings';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -66,10 +66,10 @@ const DEF_META={campaign:'Sinnoh Trainer Log',subtitle:'Post-game Sinnoh · ten 
 const NAV=[
   ['Narrative',[['overview','Overview'],['journal','Journal'],['timeline','Timeline'],['cal','Calendar']]],
   ['World',[['people','People'],['leads','Leads'],['map','Map']]],
-  ['Table',[['trainer','Trainer'],['pokemon','Pokémon'],['dex','Pokédex'],['battle','Battle'],['contest','Contests'],['shop','Shop']]]
+  ['Table',[['trainer','Trainer'],['pokemon','Pokémon'],['dex','Pokédex'],['battle','Battle'],['contest','Contests'],['rank','Rankings'],['shop','Shop']]]
 ];
 const GM_NAV=['Game Master',[['gm','GM Desk'],['npc','NPC Trainers']]];
-const PAGE_LABEL={cal:'Calendar',overview:'Overview',journal:'Journal',timeline:'Timeline',people:'People',leads:'Leads',map:'Map',place:'Place',trainer:'Trainer sheet',pokemon:'Pokémon',dex:'Pokédex',battle:'Battle',contest:'Contests',shop:'Shop',gm:'GM Desk',npc:'NPC Trainers',account:'Account'};
+const PAGE_LABEL={cal:'Calendar',overview:'Overview',journal:'Journal',timeline:'Timeline',people:'People',leads:'Leads',map:'Map',place:'Place',trainer:'Trainer sheet',pokemon:'Pokémon',dex:'Pokédex',battle:'Battle',contest:'Contests',rank:'Rankings',shop:'Shop',gm:'GM Desk',npc:'NPC Trainers',account:'Account'};
 const PIN_KINDS=[['place','Place'],['party','Party'],['danger','Danger'],['lead','Lead']];
 const AWARD_TYPES=['Gym Badge','Trial Medal','Frontier Symbol','Contest Ribbon','Certificate','Emblem of Recognition','Loyal Partner','Moment of Destiny','Other'];
 
@@ -9723,6 +9723,128 @@ const CL_CONTESTS=[['Jubilife contest (Cool)','jubilife'],['Floaroma contest (Cu
   ['Snowpoint contest (Cool)','snowpoint'],['Arrowroot contest (Tough)','arrowroot'],['Brussel contest (Beauty)','brussel'],
   ['Neighborly contest (Clever)','neighborly'],['Daybreak contest (Cool)','daybreak']];
 const clAllPresetNames=()=>CL_PRESET.map(p=>p[0]).concat(CL_CONTESTS.map(c=>c[0]));
+/* ---------- Circuit rankings ----------
+   The Gym circuit is a televised sport (see the League doc). Every competitor has Ranking Points (RP).
+   Kept in meta/conditions under "rk", which only the GM can write and everyone at the table can read:
+     rk.log  [{k, u, p, w, d, at}]  one entry per award; u = trainer uid, or "n_<k>" for a rival
+     rk.npc  [{k, n, p, s, h}]       rivals: name, starting RP, style label, home town
+     rk.lab  {uid: label}            style label the commentators gave each trainer
+   A trainer's RP is the sum of their entries; a rival's is their starting RP plus theirs. */
+const RK_EVENTS=[['trial','Passed a Gym Trial',5],['badge','Won a Gym badge',25],['gymloss','Lost a Gym challenge',-10],['up','Beat a higher-ranked trainer',10],['down','Beat a lower-ranked trainer',5],['loss','Lost a public battle',-5],['ribbon','Won a contest ribbon',15],['viral','A moment went viral',5],['scandal','Scandal or bad press',-15],['break','Won against their label',10],['other','Something else',0]];
+const RK_TIERS=[[300,'Top 10','Headline matches, the Champion’s attention, enemies'],[200,'Top 50','Interviews, agency offers, Ace recruiters watching'],[100,'Top 150','Sponsor offers start; Halfway Cup seeding'],[50,'Ranked','A name on the board; local fans'],[-Infinity,'Unranked rookie','Nothing yet']];
+const RK_LABELS=['Aggressor','Defender','Generalist','Trickster','Specialist','Showman'];
+const RK_CURVE=[[50,300],[100,150],[200,50],[300,10],[400,1]];
+const RK_SAMPLE=[{n:'Mira Castellane',p:260,s:'Aggressor',h:'Ace cadet; last year’s Conference top eight'},{n:'Harper Vance',p:180,s:'Defender',h:'Canalave'},{n:'Tomás Reyes',p:120,s:'Generalist',h:'Hearthome'},{n:'Lena Okabe',p:70,s:'Showman',h:'Jubilife; a coordinator who battles'},{n:'Kit Halloway',p:35,s:'',h:'Twinleaf; a rookie this season'}];
+S.ui.rk=Object.assign({who:{},ev:'badge',pts:'',why:'',nn:'',np:'',ns:'',nh:'',all:false},S.ui.rk||{});
+const rkD=()=>(S.cond&&S.cond.rk)||{};
+const rkLog=()=>Array.isArray(rkD().log)?rkD().log:[];
+const rkNpcs=()=>Array.isArray(rkD().npc)?rkD().npc:[];
+const rkKey=()=>Math.random().toString(36).slice(2,9);
+function rkSave(patch){edit('cd','conditions','rk',Object.assign({},rkD(),patch));}
+/* where RP puts a trainer among everyone in Sinnoh's circuit; 0 = unranked */
+function rkEst(p){
+  if(p<RK_CURVE[0][0])return 0;
+  for(let i=1;i<RK_CURVE.length;i++){
+    const [a,ra]=RK_CURVE[i-1],[b,rb]=RK_CURVE[i];
+    if(p<b)return Math.max(1,Math.round(ra+(rb-ra)*(p-a)/(b-a)));
+  }
+  return 1;
+}
+const rkTier=p=>RK_TIERS.find(t=>p>=t[0]);
+function rkRows(){
+  const log=rkLog(),sum=u=>log.filter(e=>e.u===u).reduce((a,e)=>a+num(e.p),0);
+  const today=clToday(),wk=today?clAdd(today,-6):'';
+  const week=u=>wk?log.filter(e=>e.u===u&&e.d&&e.d>=wk&&e.d<=today).reduce((a,e)=>a+num(e.p),0):0;
+  const lab=rkD().lab||{};
+  const rows=entriesOf(S.trainers).filter(t=>t.name).map(t=>({id:t.id,name:tName(t),pts:sum(t.id),wk:week(t.id),lab:lab[t.id]||'',pc:true,bd:badgeCount(t),rb:ribCount(t)}))
+    .concat(rkNpcs().map(n=>({id:'n_'+n.k,k:n.k,name:n.n||'Unnamed rival',pts:num(n.p)+sum('n_'+n.k),wk:week('n_'+n.k),lab:n.s||'',pc:false,home:n.h||''})));
+  return rows.sort((a,b)=>b.pts-a.pts||a.name.localeCompare(b.name));
+}
+const rkSgn=n=>n>0?'+'+n:n<0?'−'+Math.abs(n):'0';
+function rkLabSel(attr,cur){
+  return h`<select class="clcatsel" ${raw(attr)} aria-label="Style label"><option value="">No label yet</option>${RK_LABELS.map(l=>h`<option ${l===cur?raw('selected'):''}>${l}</option>`)}</select>`;
+}
+function rkTab(){
+  const gm=!!S.me.admin,u=S.ui.rk,rows=rkRows(),log=rkLog().slice().sort((a,b)=>(b.d||'').localeCompare(a.d||'')||num(b.at)-num(a.at));
+  const nameOf=id=>{const r=rows.find(x=>x.id===id);return r?r.name:'Someone no longer listed';};
+  const board=rows.map((r,i)=>{
+    const est=rkEst(r.pts),tier=rkTier(r.pts);
+    return [h`<b class="mono">${i+1}</b>`,
+      h`<b>${r.name}</b>${r.pc?h` <span class="pill">Player</span>`:''}${r.home?h`<br><span class="sub">${r.home}</span>`:''}`,
+      h`<b class="mono">${r.pts<0?'\u2212'+Math.abs(r.pts):r.pts}</b>${r.wk?h` <span class="sub rkwk ${r.wk>0?'up':'down'}">${rkSgn(r.wk)} this week</span>`:''}`,
+      h`${tier[1]}<br><span class="sub">${est?'about #'+est+' in Sinnoh':'not on the regional board yet'}</span>`,
+      gm?(r.pc?rkLabSel('data-rklab="'+r.id+'"',r.lab):rkLabSel('data-rknlab="'+r.k+'"',r.lab)):(r.lab?h`<span class="pill">${r.lab}</span>`:h`<span class="sub">None yet</span>`),
+      r.pc?h`<span class="sub">${r.bd} badge${r.bd===1?'':'s'} · ${r.rb} ribbon${r.rb===1?'':'s'}</span>`:h`<span class="sub">Rival</span>`];
+  });
+  const ev=RK_EVENTS.find(e=>e[0]===u.ev)||RK_EVENTS[1];
+  const feed=(u.all?log:log.slice(0,25));
+  return h`<section class="panel"><div class="ph"><h2>Circuit rankings</h2><span class="sub">${clToday()?'Standings as of '+clNice(clToday(),{y:1}):'Standings'}</span></div>
+    <p class="sub">Every Gym battle, Trial, public battle and contest on the circuit is broadcast, and Ranking Points decide seeds, sponsors and who the recruiters watch. The League posts the standings weekly.</p>
+    ${rows.length?cxTable(['#','Trainer','RP','Standing','Style label','Record'],board,'rkt'):h`<p class="sub">No one is on the board yet.</p>`}
+  </section>
+  ${gm?h`<section class="panel"><div class="ph"><h2>Award points</h2><span class="sub">Only you see this</span></div>
+    <div class="rkwho">${rows.map(r=>h`<label class="row"><input type="checkbox" data-rkwho="${r.id}" ${u.who[r.id]?raw('checked'):''}><span>${r.name}</span></label>`)}</div>
+    <div class="fgrid">
+      <label class="fld"><span class="fl">What happened</span><select data-u="rk.ev">${RK_EVENTS.map(e=>h`<option value="${e[0]}" ${e[0]===u.ev?raw('selected'):''}>${e[1]}${e[0]==='other'?'':' ('+rkSgn(e[2])+')'}</option>`)}</select></label>
+      <label class="fld"><span class="fl">Points (blank = ${rkSgn(ev[2])})</span><input type="number" step="1" data-u="rk.pts" value="${u.pts}" data-nr></label>
+      <label class="fld"><span class="fl">Headline (optional)</span><input type="text" data-u="rk.why" value="${u.why}" placeholder="Beat Gardenia in Eterna" data-nr></label></div>
+    <div class="row"><button class="btn sm primary" data-act="rk_add">Award</button><span class="sub">Logged on ${clToday()?clNice(clToday(),{y:1}):'no date (set one on the calendar)'}.</span></div>
+  </section>`:''}
+  <section class="panel"><div class="ph"><h2>Ranking news</h2><span class="sub">${log.length}</span></div>
+    ${log.length?h`<ul class="mini-list">${feed.map(e=>h`<li><div class="row sp"><span><b>${nameOf(e.u)}</b> <span class="mono rkp ${num(e.p)>=0?'up':'down'}">${rkSgn(num(e.p))} RP</span></span>${gm?h`<button class="btn sm ghost" data-act="rk_del" data-k="${e.k}" aria-label="Remove this entry">Remove</button>`:''}</div><span>${e.w}</span>${e.d?h`<span class="sub">${clNice(e.d,{y:1})}</span>`:''}</li>`)}</ul>
+      ${log.length>25?h`<button class="btn sm ghost" data-act="rk_all">${u.all?'Show the latest 25':'Show all '+log.length}</button>`:''}`
+      :h`<p class="sub">No results yet this season.</p>`}
+  </section>
+  <section class="panel"><div class="ph"><h2>What the standings get you</h2></div>
+    ${cxTable(['RP','Standing','What it gets you'],RK_TIERS.map((t,i)=>[i===RK_TIERS.length-1?'0–49':t[0]+(i?'–'+(RK_TIERS[i-1][0]-1):'+'),t[1],t[2]]))}
+    ${cxTable(['Result','RP'],RK_EVENTS.filter(e=>e[0]!=='other').map(e=>[e[1],rkSgn(e[2])]))}
+    <p class="sub">After a trainer's second Gym, the commentators give them a style label. Rivals and Gym Leaders prepare for it, so winning against type pays.</p>
+  </section>
+  ${gm?h`<section class="panel"><div class="ph"><h2>Rivals</h2><span class="sub">${rkNpcs().length}</span></div>
+    ${rkNpcs().length?h`<ul class="mini-list">${rkNpcs().map(n=>h`<li><div class="row sp"><span><b>${n.n}</b> <span class="sub">starts at ${num(n.p)} RP${n.h?' · '+n.h:''}</span></span><button class="btn sm ghost" data-act="rk_ndel" data-k="${n.k}">Remove</button></div></li>`)}</ul>`:h`<p class="sub">Rivals fill out the board so the players have someone to chase.</p>`}
+    <div class="fgrid">
+      <label class="fld"><span class="fl">Name</span><input type="text" data-u="rk.nn" value="${u.nn}" data-nr></label>
+      <label class="fld"><span class="fl">Starting RP</span><input type="number" step="1" data-u="rk.np" value="${u.np}" placeholder="0" data-nr></label>
+      <label class="fld"><span class="fl">Home or note</span><input type="text" data-u="rk.nh" value="${u.nh}" placeholder="Veilstone" data-nr></label>
+      <label class="fld"><span class="fl">Style label</span><select data-u="rk.ns" data-nr><option value="">None yet</option>${RK_LABELS.map(l=>h`<option ${l===u.ns?raw('selected'):''}>${l}</option>`)}</select></label></div>
+    <div class="row"><button class="btn sm" data-act="rk_nadd">Add the rival</button>${rkNpcs().some(n=>RK_SAMPLE.some(s=>s.n===n.n))?'':h`<button class="btn sm ghost" data-act="rk_sample">Add five sample rivals</button>`}</div>
+  </section>`:''}`;
+}
+function rkAct(b){
+  const d=b.dataset,u=S.ui.rk,gm=!!S.me.admin;
+  if(d.act==='rk_all'){u.all=!u.all;render();return;}
+  if(!gm)return;
+  const box=k=>u[k];
+  switch(d.act){
+    case 'rk_add':{
+      const ids=Object.keys(u.who).filter(k=>u.who[k]);
+      if(!ids.length){toast('Pick who earned the points.');break;}
+      const ev=RK_EVENTS.find(e=>e[0]===(box('ev')||u.ev))||RK_EVENTS[1];
+      const ps=String(box('pts')||'').trim(),p=ps===''?ev[2]:Math.round(num(ps));
+      if(!p){toast('Give a number of points.');break;}
+      const w=String(box('why')||'').trim()||ev[1];
+      const add=ids.map(id=>({k:rkKey(),u:id,p,w,d:clToday()||'',at:Date.now()}));
+      rkSave({log:rkLog().concat(add)});
+      u.who={};u.pts='';u.why='';toast(rkSgn(p)+' RP logged for '+ids.length+(ids.length===1?' trainer.':' trainers.'),true);render();break;}
+    case 'rk_del':rkSave({log:rkLog().filter(e=>e.k!==d.k)});render();break;
+    case 'rk_nadd':{
+      const n=String(box('nn')||'').trim();
+      if(!n){toast('Give the rival a name.');break;}
+      rkSave({npc:rkNpcs().concat([{k:rkKey(),n,p:Math.round(num(box('np'))),s:box('ns')||'',h:String(box('nh')||'').trim()}])});
+      u.nn='';u.np='';u.ns='';u.nh='';render();break;}
+    case 'rk_ndel':rkSave({npc:rkNpcs().filter(n=>n.k!==d.k),log:rkLog().filter(e=>e.u!=='n_'+d.k)});render();break;
+    case 'rk_sample':rkSave({npc:rkNpcs().concat(RK_SAMPLE.filter(s=>!rkNpcs().some(n=>n.n===s.n)).map(s=>Object.assign({k:rkKey()},s)))});render();break;
+  }
+}
+function rkChange(t){
+  const d=t.dataset;
+  if(d.rkwho!=null){S.ui.rk.who[d.rkwho]=t.checked;return true;}
+  if(!S.me.admin)return false;
+  if(d.rklab!=null){rkSave({lab:Object.assign({},rkD().lab||{},{[d.rklab]:t.value})});render();return true;}
+  if(d.rknlab!=null){rkSave({npc:rkNpcs().map(n=>n.k===d.rknlab?Object.assign({},n,{s:t.value}):n)});render();return true;}
+  return false;
+}
+/* end circuit rankings */
 function calTab(){
   const today=clToday(),u=S.ui.cl,gm=!!S.me.admin;
   const view=u.view&&clParse(u.view+'-01')?u.view:(today||clStart()||CL_YEAR+'-07-01').slice(0,7);
@@ -10247,7 +10369,7 @@ function footer(){
 function mainHtml(){
   if(S.noDb)return emptyState('This tracker needs a signed-in view','Open it from your claude.ai link while signed in. The shared table is stored with the page, so it cannot load anywhere else.');
   if(!S.ready)return h`<p class="loading">OPENING THE TABLE…</p>`;
-  const views={cal:calTab,overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,dex:dexTab,battle:battleTab,contest:ctTab,shop:shopTab,gm:gmTab,npc:npcTab,account:accountTab};
+  const views={cal:calTab,overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,dex:dexTab,battle:battleTab,contest:ctTab,rank:rkTab,shop:shopTab,gm:gmTab,npc:npcTab,account:accountTab};
   let tab=S.tab;
   if((tab==='gm'||tab==='npc')&&!S.me.admin)tab='overview';
   if(tab==='account'&&!CFG)tab='overview';
@@ -10468,6 +10590,7 @@ function act(b,e){
   if(d.act&&d.act.indexOf('hpx_')===0){hpxAct(b);return;}
   if(d.act&&d.act.indexOf('cd_')===0){cdAct(b);return;}
   if(d.act&&d.act.indexOf('cl_')===0){clAct(b);return;}
+  if(d.act&&d.act.indexOf('rk_')===0){rkAct(b);return;}
   if(d.act==='zn_load'){znLoad();return;}
   if(d.act==='zn_zone'){if(S.me.admin&&clTrip()){const t=JSON.parse(JSON.stringify(clTrip()));t.zone=d.v;edit('cd','conditions','trip',t);render();}return;}
   if(d.act&&d.act.indexOf('sp_')===0){shAct(b);return;}
@@ -10808,6 +10931,7 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('change',async e=>{
   const t=e.target;
+  if(t&&t.dataset&&rkChange(t))return;
   if(t&&t.dataset&&t.dataset.clcat&&S.me.admin){edit('cd','conditions','ev',clEvents().map(x=>x.k===t.dataset.clcat?Object.assign({},x,{c:t.value}):x));render();return;}
   if(t&&t.dataset&&t.dataset.b&&onSpeciesChange(t))return;
   if(t&&t.dataset&&t.dataset.evot!=null){evoTarget(t.dataset.pid,t.value);return;}
