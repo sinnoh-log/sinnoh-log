@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-01 · Contest rankings';
+const BUILD='2026-11-01 · The climb, rival cards, tier alerts';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -9846,17 +9846,69 @@ function rkVisible(rows){
   if(!q&&(u.view==='all'||!big)&&out.length>u.lim)return out.slice(0,u.lim).concat(['more']);
   return out;
 }
+/* rival cards: what the party knows about a rival or someone they've met. rk.card {id: {team, seen, mood, notes}} */
+const RK_MOODS=['Friendly','Neutral','Rival','Hostile'];
+const rkCards=()=>rkD().card||{};
+const rkHasCard=id=>{const c=rkCards()[id];return !!(c&&(c.team||c.seen||c.mood||c.notes));};
+const rkCanCard=r=>r.kind==='rival'||r.met||(!!S.me.admin&&r.kind!=='pc');
+function rkCard(r){
+  const c=rkCards()[r.id]||{},gm=!!S.me.admin;
+  if(gm){
+    const f=(k,l,ph,area)=>h`<label class="fld"><span class="fl">${l}</span>${area?h`<textarea rows="3" data-rkcard="${r.id}" data-f="${k}" placeholder="${ph}">${c[k]||''}</textarea>`:h`<input type="text" data-rkcard="${r.id}" data-f="${k}" value="${c[k]||''}" placeholder="${ph}">`}</label>`;
+    return h`<div class="rkcard"><div class="fgrid">${f('team','Known team','Garchomp, Togekiss, ???')}${f('seen','Last seen','Hearthome Gym, week 3')}
+      <label class="fld"><span class="fl">How they feel about the party</span><select data-rkcard="${r.id}" data-f="mood"><option value="">Unknown</option>${RK_MOODS.map(m=>h`<option ${m===c.mood?raw('selected'):''}>${m}</option>`)}</select></label></div>
+      ${f('notes','Notes the players can read','Opens with Sandstorm; hates losing to coordinators.',true)}
+      <p class="sub">${r.kind==='rival'||r.met?'Players can read this card.':'Players see this card once you mark this trainer as met.'}</p></div>`;
+  }
+  if(!rkHasCard(r.id))return h`<div class="rkcard"><p class="sub">The party doesn’t know much about ${r.name} yet.</p></div>`;
+  return h`<div class="rkcard">${c.mood?h`<span class="pill rkmood ${c.mood.toLowerCase()}">${c.mood}</span>`:''}
+    ${c.team?h`<p><span class="fl">Team</span><br>${c.team}</p>`:''}${c.seen?h`<p><span class="fl">Last seen</span><br>${c.seen}</p>`:''}${c.notes?h`<p class="prewrap"><span class="fl">Notes</span><br>${c.notes}</p>`:''}</div>`;
+}
+/* rank history: a snapshot of the players' places each time the GM runs a week. rkb.hist [{w, d, r:{uid:[pos, of]}}] */
+function rkSnap(w){
+  const rows=rkRows(),r={};
+  rows.forEach(x=>{if(x.kind==='pc')r[x.id]=[x.pos,rows.length,x.pts];});
+  return {w,d:clToday()||'',r};
+}
+function rkSpark(uid,name){
+  const hist=(Array.isArray(rkB().hist)?rkB().hist:[]).filter(e=>e.r&&e.r[uid]);
+  if(hist.length<2)return h`<div class="rkspark"><b>${name}</b><p class="sub">${hist.length?'#'+hist[0].r[uid][0]+' in week '+hist[0].w+'. The line starts after the next week.':'The line starts when the GM runs the first week.'}</p></div>`;
+  const W=320,H=120,L=34,Rr=14,T=14,B=26;
+  const ps=hist.map(e=>e.r[uid][0]),lo=Math.min(...ps),hi=Math.max(...ps),span=Math.max(4,hi-lo);
+  const X=i=>L+(W-L-Rr)*i/(hist.length-1),Y=v=>T+(H-T-B)*(v-lo)/span;
+  const pts=hist.map((e,i)=>X(i).toFixed(1)+','+Y(e.r[uid][0]).toFixed(1)).join(' ');
+  const first=ps[0],last=ps[ps.length-1],moved=first-last;
+  return h`<div class="rkspark"><div class="row sp"><b>${name}</b><span class="mono ${moved>0?'rkp up':moved<0?'rkp down':'sub'}">#${last}${moved?h` (${moved>0?'up '+moved:'down '+(-moved)})`:''}</span></div>
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${name}: from #${first} to #${last} over ${hist.length-1} weeks">
+      <line x1="${L}" x2="${W-Rr}" y1="${Y(lo)}" y2="${Y(lo)}" stroke="var(--line)" stroke-dasharray="3 3"/>
+      <line x1="${L}" x2="${W-Rr}" y1="${Y(hi)}" y2="${Y(hi)}" stroke="var(--line)" stroke-dasharray="3 3"/>
+      <text x="${L-6}" y="${Y(lo)+4}" text-anchor="end" font-size="11" fill="var(--muted)">#${lo}</text>
+      <text x="${L-6}" y="${Y(hi)+4}" text-anchor="end" font-size="11" fill="var(--muted)">#${hi}</text>
+      <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${hist.map((e,i)=>h`<circle cx="${X(i).toFixed(1)}" cy="${Y(e.r[uid][0]).toFixed(1)}" r="${i===hist.length-1?4:2.5}" fill="var(--accent)"><title>Week ${e.w}: #${e.r[uid][0]} of ${e.r[uid][1]}</title></circle>`)}
+      <text x="${L}" y="${H-6}" font-size="11" fill="var(--muted)">Week ${hist[0].w}</text>
+      <text x="${W-Rr}" y="${H-6}" text-anchor="end" font-size="11" fill="var(--muted)">Week ${hist[hist.length-1].w}</text>
+    </svg></div>`;
+}
+/* tier alerts: a news line when a player's points cross into a new standing */
+function rkTierNews(C,id,before,after){
+  const tb=C.tiers.find(t=>before>=t[0]),ta=C.tiers.find(t=>after>=t[0]);
+  if(!tb||!ta||tb===ta)return null;
+  const tr=S.trainers[id],nm=tr?tName(tr):'A player',up=after>before;
+  return {k:rkKey(),u:id,p:0,t:'tier',w:up?nm+' is now '+ta[1]+' on the '+C.name+': '+ta[2].charAt(0).toLowerCase()+ta[2].slice(1)+'.':nm+' has dropped to '+ta[1]+' on the '+C.name+'.',d:clToday()||'',at:Date.now()+1};
+}
 function rkBoardHtml(){
   const gm=!!S.me.admin,rows=rkRows(),bg=rows.some(r=>r.kind==='bg'),vis=rkVisible(rows);
   if(!vis.length)return h`<p class="sub">${S.ui.rk.q?'No one matches that search.':S.ui.rk.view==='known'?'The party hasn’t met anyone on the board yet.':'No one is on the board yet.'}</p>`;
   const cell=(r)=>{
     return h`<tr class="${r.kind==='pc'?'rkpc':''} ${r.met?'rkmet':''}">
       <td data-l="#"><div class="cxc"><b class="mono">${r.pos}</b></div></td>
-      <td data-l="Trainer"><div class="cxc"><b>${r.name}</b>${r.kind==='pc'?h` <span class="pill rkpill">Player</span>`:''}${r.met?h` <span class="pill rkmetp">Met</span>`:''}${r.kind==='rival'?h` <span class="pill">Rival</span>`:''}${r.home?h`<br><span class="sub">${r.home}</span>`:''}</div></td>
+      <td data-l="Trainer"><div class="cxc">${rkCanCard(r)?h`<button class="rkname" data-act="rk_open" data-id="${r.id}" aria-expanded="${S.ui.rk.open===r.id?'true':'false'}"><b>${r.name}</b></button>`:h`<b>${r.name}</b>`}${rkHasCard(r.id)&&!gm?h` <span class="sub">· card</span>`:''}${r.kind==='pc'?h` <span class="pill rkpill">Player</span>`:''}${r.met?h` <span class="pill rkmetp">Met</span>`:''}${r.kind==='rival'?h` <span class="pill">Rival</span>`:''}${r.home?h`<br><span class="sub">${r.home}</span>`:''}</div></td>
       <td data-l="${rkC().unit}"><div class="cxc"><b class="mono">${r.pts<0?'−'+Math.abs(r.pts):r.pts}</b>${r.wk?h` <span class="sub rkwk ${r.wk>0?'up':'down'}">${rkSgn(r.wk)}</span>`:''}</div></td>
       <td data-l="${rkC().labWord}"><div class="cxc">${gm&&r.kind==='pc'?rkLabSel('data-rklab="'+r.id+'"',r.lab):gm&&r.kind==='rival'?rkLabSel('data-rknlab="'+r.k+'"',r.lab):r.lab?h`<span class="pill">${r.lab}</span>`:h`<span class="sub">None yet</span>`}</div></td>
       <td data-l="${gm?'':'Record'}"><div class="cxc">${r.kind==='pc'?h`<span class="sub">${rkC().rec(r)}</span>`
-        :gm?h`<div class="row"><button class="btn sm ghost" data-act="rk_met" data-id="${r.id}" aria-pressed="${r.met?'true':'false'}">${r.met?'Met ✓':'Mark met'}</button>${r.kind==='bg'?h`<button class="btn sm ghost" data-act="rk_track" data-i="${r.i}">Make a rival</button>`:''}</div>`:h`<span class="sub">${r.kind==='rival'?'Rival':'On the circuit'}</span>`}</div></td></tr>`;
+        :gm?h`<div class="row"><button class="btn sm ghost" data-act="rk_met" data-id="${r.id}" aria-pressed="${r.met?'true':'false'}">${r.met?'Met ✓':'Mark met'}</button>${r.kind==='bg'?h`<button class="btn sm ghost" data-act="rk_track" data-i="${r.i}">Make a rival</button>`:''}</div>`:h`<span class="sub">${r.kind==='rival'?'Rival':'On the circuit'}</span>`}</div></td></tr>
+    ${S.ui.rk.open===r.id&&rkCanCard(r)?h`<tr class="rkcardrow"><td colspan="5"><div class="cxc">${rkCard(r)}</div></td></tr>`:''}`;
   };
   return h`<div class="cxw"><table class="cxt rkt"><thead><tr>${['#','Trainer',rkC().unit,rkC().labWord,gm?'':'Record'].map(c=>h`<th scope="col">${c}</th>`)}</tr></thead><tbody>
     ${vis.map(r=>r===null?h`<tr class="rkgap"><td colspan="5"><div class="cxc sub">⋮</div></td></tr>`:r==='more'?h`<tr class="rkgap"><td colspan="5"><div class="cxc"><button class="btn sm ghost" data-act="rk_more">Show 50 more</button></div></td></tr>`:cell(r))}
@@ -9881,11 +9933,14 @@ function rkTab(){
     <div id="rklist">${rkBoardHtml()}</div>
     ${big&&u.view==='near'&&!u.q?h`<p class="sub">Showing the five trainers above and below each player.</p>`:''}
   </section>
-  ${gm?h`<section class="panel"><div class="ph"><h2>The field</h2><span class="sub">Only you see this</span></div>
-    ${b.seed?h`<p class="sub">${num(b.n)} background trainers, week ${num(b.wk)}. Running a week moves each one up or down a little; some are climbing and some are slipping. Tracked rivals and the players only move when you award points.</p>
-      <div class="row"><button class="btn sm primary" data-act="rk_week">Run the week</button>${num(b.wk)?h`<button class="btn sm ghost" data-act="rk_unweek">Undo a week</button>`:''}<button class="btn sm ghost" data-act="rk_bgclear">Remove the field</button></div>`
+  ${pcs.length?h`<section class="panel"><div class="ph"><h2>The climb</h2><span class="sub">Place on the board, week by week</span></div>
+    <div class="rksparks">${pcs.map(r=>rkSpark(r.id,r.name))}</div></section>`:''}
+  ${gm?h`<section class="panel"><div class="ph"><h2>The week</h2><span class="sub">Only you see this</span></div>
+    <p class="sub">Week ${num(b.wk)} of the season. Running a week records where each player stands for The climb${b.seed?', and moves each background trainer up or down a little':''}. Tracked rivals and the players only move when you award points.</p>
+    <div class="row"><button class="btn sm primary" data-act="rk_week">Run the week</button>${num(b.wk)?h`<button class="btn sm ghost" data-act="rk_unweek">Undo a week</button>`:''}${b.seed?h`<button class="btn sm ghost" data-act="rk_bgclear">Remove the field</button>`:''}</div>
+    ${b.seed?h`<p class="sub">${num(b.n)} background trainers on the board.</p>`
       :h`<p class="sub">Fill the board with a few hundred generated ${u.c==='con'?'coordinators':'trainers'} so the players can see where they stand in all of Sinnoh. Each has a name, home town, ${C.labWord.toLowerCase()} and ${C.unit}, and the whole field shifts each time you run a week.</p>
-      <div class="row"><button class="btn sm primary" data-act="rk_bgfill" data-n="300">Add 300 trainers</button><button class="btn sm ghost" data-act="rk_bgfill" data-n="150">Add 150</button></div>`}
+      <div class="row"><button class="btn sm" data-act="rk_bgfill" data-n="300">Add 300 trainers</button><button class="btn sm ghost" data-act="rk_bgfill" data-n="150">Add 150</button></div>`}
   </section>
   <section class="panel"><div class="ph"><h2>Award points</h2><span class="sub">Only you see this</span></div>
     <div class="rkwho">${rows.filter(r=>r.kind!=='bg').map(r=>h`<label class="row"><input type="checkbox" data-rkwho="${r.id}" ${u.who[r.id]?raw('checked'):''}><span>${r.name}</span></label>`)}</div>
@@ -9898,7 +9953,7 @@ function rkTab(){
     <div class="row"><button class="btn sm primary" data-act="rk_add">Award</button><span class="sub">Logged on ${clToday()?clNice(clToday(),{y:1}):'no date (set one on the calendar)'}.</span></div>
   </section>`:''}
   <section class="panel"><div class="ph"><h2>Ranking news</h2><span class="sub">${log.length}</span></div>
-    ${log.length?h`<ul class="mini-list">${feed.map(e=>h`<li><div class="row sp"><span><b>${nameOf(e.u)}</b> <span class="mono rkp ${num(e.p)>=0?'up':'down'}">${rkSgn(num(e.p))} ${C.unit}</span></span>${gm?h`<button class="btn sm ghost" data-act="rk_del" data-k="${e.k}" aria-label="Remove this entry">Remove</button>`:''}</div><span>${e.w}</span>${e.d?h`<span class="sub">${clNice(e.d,{y:1})}</span>`:''}</li>`)}</ul>
+    ${log.length?h`<ul class="mini-list">${feed.map(e=>e.t==='tier'?h`<li class="rktier"><div class="row sp"><span><span class="pill rkmetp">New standing</span> ${e.w}</span>${gm?h`<button class="btn sm ghost" data-act="rk_del" data-k="${e.k}" aria-label="Remove this entry">Remove</button>`:''}</div>${e.d?h`<span class="sub">${clNice(e.d,{y:1})}</span>`:''}</li>`:h`<li><div class="row sp"><span><b>${nameOf(e.u)}</b> <span class="mono rkp ${num(e.p)>=0?'up':'down'}">${rkSgn(num(e.p))} ${C.unit}</span></span>${gm?h`<button class="btn sm ghost" data-act="rk_del" data-k="${e.k}" aria-label="Remove this entry">Remove</button>`:''}</div><span>${e.w}</span>${e.d?h`<span class="sub">${clNice(e.d,{y:1})}</span>`:''}</li>`)}</ul>
       ${log.length>25?h`<button class="btn sm ghost" data-act="rk_all">${u.all?'Show the latest 25':'Show all '+log.length}</button>`:''}`
       :h`<p class="sub">No results yet this season.</p>`}
   </section>
@@ -9922,6 +9977,7 @@ function rkAct(b){
   if(d.act==='rk_all'){u.all=!u.all;render();return;}
   if(d.act==='rk_c'){u.c=d.v==='con'?'con':'gym';u.who={};u.q='';u.lim=50;u.ev=rkC().def;u.pts='';u.both=false;render();return;}
   if(d.act==='rk_view'){u.view=d.v;u.q='';u.lim=50;render();return;}
+  if(d.act==='rk_open'){S.ui.rk.open=S.ui.rk.open===d.id?'':d.id;rkListRefresh();return;}
   if(d.act==='rk_more'){u.view=u.view==='near'?'all':u.view;u.lim+=50;rkListRefresh();return;}
   if(!gm)return;
   const bb=rkB();
@@ -9934,10 +9990,15 @@ function rkAct(b){
       if(!p){toast('Give a number of points.');break;}
       const w=String(u.why||'').trim()||ev[1];
       const mk=()=>ids.map(id=>({k:rkKey(),u:id,p,w,d:clToday()||'',at:Date.now()}));
-      rkSave({log:rkLog().concat(mk())});
-      if(u.both){const o=u.c==='con'?'rk':'rkc',od=(S.cond&&S.cond[o])||{},oid=new Set(ids.filter(id=>id.indexOf('n_')!==0));
-        if(oid.size)edit('cd','conditions',o,Object.assign({},od,{log:(Array.isArray(od.log)?od.log:[]).concat(mk().filter(e=>oid.has(e.u)))}));}
-      u.who={};u.pts='';u.why='';toast(rkSgn(p)+' '+C.unit+' logged for '+ids.length+(ids.length===1?' trainer.':' trainers.'),true);render();break;}
+      const tot=(lg,id)=>lg.filter(e=>e.u===id).reduce((a,e)=>a+num(e.p),0);
+      const news=(Cx,lg,list)=>list.filter(id=>S.trainers[id]).map(id=>rkTierNews(Cx,id,tot(lg,id),tot(lg,id)+p)).filter(Boolean);
+      const tn=news(C,rkLog(),ids);
+      rkSave({log:rkLog().concat(mk(),tn)});
+      if(u.both){const ok=u.c==='con'?'gym':'con',O=RK_C[ok],od=(S.cond&&S.cond[O.d])||{},olog=Array.isArray(od.log)?od.log:[],oid=ids.filter(id=>id.indexOf('n_')!==0);
+        if(oid.length)edit('cd','conditions',O.d,Object.assign({},od,{log:olog.concat(mk().filter(e=>oid.includes(e.u)),news(O,olog,oid))}));}
+      if(tn.length)toast(tn[0].w,true);else
+      toast(rkSgn(p)+' '+C.unit+' logged for '+ids.length+(ids.length===1?' trainer.':' trainers.'),true);
+      u.who={};u.pts='';u.why='';render();break;}
     case 'rk_del':rkSave({log:rkLog().filter(e=>e.k!==d.k)});render();break;
     case 'rk_nadd':{
       const n=String(u.nn||'').trim();
@@ -9950,18 +10011,25 @@ function rkAct(b){
       if(n&&n.b!=null&&bb.gone){const g=Object.assign({},bb.gone);delete g[n.b];const m=Object.assign({},bb.met||{});if(m['n_'+d.k]){delete m['n_'+d.k];m['b'+n.b]=true;}rkSaveB({gone:g,met:m});}
       render();break;}
     case 'rk_sample':rkSave({npc:rkNpcs().concat(rkC().sample.filter(s=>!rkNpcs().some(n=>n.n===s.n)).map(s=>Object.assign({k:rkKey()},s)))});render();break;
-    case 'rk_bgfill':rkSaveB({seed:1+Math.floor(Math.random()*2e9),n:num(d.n)||300,wk:0,met:{},gone:{}});render();break;
+    case 'rk_bgfill':rkSaveB({seed:1+Math.floor(Math.random()*2e9),n:num(d.n)||300,wk:num(bb.wk),met:Object.fromEntries(Object.entries(bb.met||{}).filter(([k])=>k.indexOf('b')!==0)),gone:{}});render();break;
     case 'rk_bgclear':
       if(S.ui.confirm!=='rk_bgclear'){S.ui.confirm='rk_bgclear';toast('Press Remove the field again to remove all background trainers.');break;}
       S.ui.confirm=null;edit('cd','conditions',rkC().b,{met:Object.fromEntries(Object.entries(bb.met||{}).filter(([k])=>k.indexOf('b')!==0))});render();break;
-    case 'rk_week':rkSaveB({wk:num(bb.wk)+1});toast('Week '+(num(bb.wk)+1)+': the standings moved.',true);render();break;
-    case 'rk_unweek':rkSaveB({wk:Math.max(0,num(bb.wk)-1)});render();break;
+    case 'rk_week':{
+      const w=num(bb.wk),hist=(Array.isArray(bb.hist)?bb.hist:[]).filter(e=>num(e.w)<=w);
+      if(!hist.some(e=>num(e.w)===w))hist.push(rkSnap(w));
+      rkSaveB({wk:w+1});
+      rkSaveB({hist:hist.concat([rkSnap(w+1)]).slice(-60)});
+      toast('Week '+(w+1)+': the standings moved.',true);render();break;}
+    case 'rk_unweek':{const w=Math.max(0,num(bb.wk)-1);rkSaveB({wk:w,hist:(Array.isArray(bb.hist)?bb.hist:[]).filter(e=>num(e.w)<=w)});render();break;}
     case 'rk_met':{const m=Object.assign({},bb.met||{});if(m[d.id])delete m[d.id];else m[d.id]=true;rkSaveB({met:m});render();break;}
     case 'rk_track':{
       const i=num(d.i),x=rkBg().find(y=>y.i===i);if(!x)break;
       const k=rkKey(),m=Object.assign({},bb.met||{});
       if(m['b'+i]){delete m['b'+i];m['n_'+k]=true;}
-      rkSave({npc:rkNpcs().concat([{k,n:x.name,p:x.pts,s:x.lab,h:x.home,b:i}])});
+      const cards=Object.assign({},rkCards());if(cards['b'+i]){cards['n_'+k]=cards['b'+i];delete cards['b'+i];}
+      if(S.ui.rk.open==='b'+i)S.ui.rk.open='n_'+k;
+      rkSave({npc:rkNpcs().concat([{k,n:x.name,p:x.pts,s:x.lab,h:x.home,b:i}]),card:cards});
       rkSaveB({gone:Object.assign({},bb.gone||{},{[i]:true}),met:m});
       toast(x.name+' is now a tracked rival.',true);render();break;}
   }
@@ -9970,6 +10038,7 @@ function rkChange(t){
   const d=t.dataset;
   if(d.rkwho!=null){S.ui.rk.who[d.rkwho]=t.checked;return true;}
   if(!S.me.admin)return false;
+  if(d.rkcard!=null&&d.f){const cards=Object.assign({},rkCards());cards[d.rkcard]=Object.assign({},cards[d.rkcard]||{},{[d.f]:String(t.value||'').trim()});rkSave({card:cards});if(d.f==='mood')rkListRefresh();return true;}
   if(d.rklab!=null){rkSave({lab:Object.assign({},rkD().lab||{},{[d.rklab]:t.value})});render();return true;}
   if(d.rknlab!=null){rkSave({npc:rkNpcs().map(n=>n.k===d.rknlab?Object.assign({},n,{s:t.value}):n)});render();return true;}
   return false;
