@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-02 · Gym reputations, headlines, badge expiry, road rivals';
+const BUILD='2026-11-02 · Egg groups, proficiencies, TMs and breeding';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -1605,6 +1605,7 @@ function ptaDesk(){
       <div class="acts"><button class="btn sm" data-act="ptaPick" ${im.busy?raw('disabled'):''}>${I?'Import again':'Import handbook data'}</button></div></div>
     ${I?h`<p class="sub">${I.names.length} Pokémon from the PTA 3 books are in your database${when?', imported '+when:''}. Type a species and its stats, passives and moves fill in. Type a move or passive name and its details fill in.${I.ver>=2?' Evolution lines are included.':' This copy has no evolution lines. Import again with the newest file to turn evolution on.'}${I.ver>=3?' Contest moves are included.':' This copy has no contest moves. Import again with the newest file to add them.'}${I.ver>=4?' The legendary Pokémon from the Game Master’s Guide are included.':' This copy has no legendary Pokémon. Import again with the newest file to add them.'}</p>`
       :h`<p class="sub">Not imported yet. Choose <b>pta-handbook-data.json</b> from the update download. This fills in stats, passives and moves when someone types a species. The handbook text goes into your database, not into the public site.</p>`}
+    ${I?(pxLoad(),h`<p class="sub">${PX.d?'Egg groups and proficiencies: imported ('+Object.keys(PX.d.species||{}).length+' Pokémon). Import pta-extra.json again to replace them.':PX.busy?'Checking for egg groups and proficiencies…':h`Egg groups and proficiencies: not imported yet. Use Import again and pick <b>pta-extra.json</b>.`}</p>`):''}
     ${im.busy?h`<progress class="ptaprog" max="${num(im.total)}" value="${num(im.done)}" aria-label="Import progress"></progress>`:''}
     ${im.msg?h`<p class="sub ${im.bad?'bad':''}" role="status">${im.msg}</p>`:''}
   </section>`;
@@ -1614,6 +1615,13 @@ async function ptaImport(file){
   const say=(msg,bad)=>{im.msg=msg;im.bad=!!bad;im.busy=false;scheduleRender();};
   let d=null;
   try{d=JSON.parse(await file.text());}catch(e){}
+  if(d&&d.format==='sinnoh-pta-extra'&&d.species&&d.lists){
+    im.busy=true;im.done=0;im.total=1;im.msg='Importing egg groups and proficiencies…';im.bad=false;scheduleRender();
+    try{await S.db.collection('meta').doc('pta_extra').set({v:num(d.v)||1,t:Date.now(),j:JSON.stringify(d)});}
+    catch(e){say('The import stopped ('+((e&&e.code)||'error')+'). Run it again.',true);return;}
+    pxSet(d);pxLearnMemo.clear();
+    say('Imported egg groups and proficiencies for '+Object.keys(d.species).length+' Pokémon, '+Object.keys(d.lists).length+' move groups and '+(d.signature||[]).length+' signature moves.');return;
+  }
   if(!d||d.format!=='sinnoh-pta-handbook'||!Array.isArray(d.species)||!d.species.length){say('That is not the handbook data file. Use pta-handbook-data.json from the update download.',true);return;}
   const groups={};
   d.species.forEach(s=>{const k=ptaKey(s&&s.n);if(!k)return;const L=ptaLetter(k);(groups[L]||(groups[L]={}))[k]=s;});
@@ -3352,6 +3360,208 @@ function dxSyncRow(c){
   return h`<div class="row">${miss?h`<button class="btn sm" data-act="dx_rec">Record ${miss} owned species as caught</button>`:''}${need?h`<button class="btn sm" data-act="dx_sync">Set “Pokédex owned” on the trainer sheet to ${tl.got}</button>`:''}</div>`;
 }
 
+/* ---------- Breeding and move learning: egg groups, proficiencies, TMs ----------
+   From the PTA 3 Pokédex: each family's biology line (egg groups, hatch time, diet, habitat) and its proficiencies, plus
+   every proficiency group's move list, the signature moves (never teachable) and the basic tutoring list (Player's Handbook).
+   The GM imports pta-extra.json once (GM Desk, Handbook data); it is kept in meta/pta_extra like the rest of the handbook
+   text, so it is not part of the public site. Species records: {eg, hr, di, hb, fam, pr:[{g, only, note}]}. */
+const PX={d:null,busy:null,fail:0,sp:null,base:null};
+function pxLoad(){
+  if(PX.d)return Promise.resolve(PX.d);
+  if(PX.busy)return PX.busy;
+  if(!S.db||(PX.fail&&Date.now()-PX.fail<30000))return Promise.resolve(null);
+  PX.busy=S.db.collection('meta').doc('pta_extra').get().then(s=>{
+    PX.busy=null;
+    const d=s.exists?jparse((s.data()||{}).j):null;
+    if(d)pxSet(d);else PX.fail=Date.now();
+    scheduleRender();return PX.d;
+  },()=>{PX.busy=null;PX.fail=Date.now();return null;});
+  return PX.busy;
+}
+function pxSet(d){
+  PX.d=d;PX.sp=new Map();PX.base=new Map();
+  Object.entries(d.species||{}).forEach(([n,v])=>{
+    PX.sp.set(dexKey(n),Object.assign({n},v));
+    const b=dexKey(String(n).replace(/\s*\(.*$/,''));
+    if(!PX.base.has(b))PX.base.set(b,Object.assign({n},v));
+  });
+  PX.lists={};Object.entries(d.lists||{}).forEach(([g,a])=>{PX.lists[g]=new Set(a.map(dexKey));});
+  PX.sig=new Set((d.signature||[]).map(dexKey));PX.basic=new Set((d.basic||[]).map(dexKey));
+  PX.names={};Object.values(d.lists||{}).concat([d.basic||[]]).forEach(a=>a.forEach(m=>{PX.names[dexKey(m)]=m;}));
+}
+const pxReady=()=>{if(!PX.d)pxLoad();return !!PX.d;};
+/* the record for a species name, trying the exact form first and then the base species */
+function pxRec(name){
+  if(!PX.d||!name)return null;
+  return PX.sp.get(dexKey(name))||PX.base.get(dexKey(String(name).replace(/\s*\(.*$/,'')))||null;
+}
+/* which move-list keys a proficiency group opens */
+function pxGroupKeys(p){
+  const g=p.g,note=String(p.note||'').toLowerCase();
+  if(g==='Martial'){const k=['Martial','Punches','Kicks'];return note.includes('no kicks')?['Martial','Punches']:note.includes('no punches')?['Martial','Kicks']:k;}
+  if(g==='Elemental Attack')return ['Elemental Attack','Elemental Attack E','Elemental Attack F','Elemental Attack I'];
+  return [g];
+}
+/* every move a species can be taught: Map moveKey -> {name, via:[group labels]} */
+const pxLearnMemo=new Map();
+function pxLearnable(name,types){
+  const r=pxRec(name);if(!r)return null;
+  const key=r.n+'|'+(types||[]).join(',');
+  if(pxLearnMemo.has(key))return pxLearnMemo.get(key);
+  const out=new Map(),add=(mk,via)=>{if(PX.sig.has(mk))return;const o=out.get(mk)||{name:PX.names[mk]||mk,via:[]};if(!o.via.includes(via))o.via.push(via);out.set(mk,o);};
+  const pr=r.pr||[],noAny=pr.some(p=>/no moves from any/i.test(p.g));
+  pr.forEach(p=>{if(/no moves from any/i.test(p.g))return;pxGroupKeys(p).forEach(k=>{const L=PX.lists[k];if(L)L.forEach(mk=>add(mk,p.g));});});
+  if(!noAny&&PX.lists.Any)PX.lists.Any.forEach(mk=>add(mk,'Any'));
+  if((types||[]).includes('Normal')&&PX.lists['Normal Block']&&!pr.some(p=>p.g==='Normal Block'))PX.lists['Normal Block'].forEach(mk=>add(mk,'Normal Block'));
+  pxLearnMemo.set(key,out);
+  return out;
+}
+const pxCan=(name,types,move)=>{const L=pxLearnable(name,types);return L?L.get(dexKey(move))||null:null;};
+const pxMove=n=>{const L=PTA.lists;return (L&&L.moveMap&&L.moveMap.get(dexKey(n)))||null;};
+const pxFreq=n=>{const m=pxMove(n);return m&&m.f?String(m.f):'';};
+/* ----- the Pokédex: biology, proficiencies and the moves this species can be taught ----- */
+function dxLearn(id){
+  if(!PTA.idx)return '';
+  if(!pxReady())return PX.fail?h`<section class="panel"><div class="ph"><h2>Breeding and moves</h2></div><p class="sub">${S.me.admin?'Egg groups and proficiencies are not imported yet. Import pta-extra.json under Handbook data in the GM Desk.':'The GM has not imported egg groups and proficiencies yet.'}</p></section>`:'';
+  const nm=DEXA[id-1],r=pxRec(nm);
+  if(!r)return h`<section class="panel"><div class="ph"><h2>Breeding and moves</h2></div><p class="sub">${nm} has no biology or proficiency entry in the handbook.</p></section>`;
+  if(PTA.idx&&!PTA.lists)ptaLists();
+  const L=pxLearnable(nm,dxTypes(id))||new Map(),u=S.ui.dx;
+  const groups={};L.forEach((o,mk)=>{o.via.forEach(v=>{(groups[v]=groups[v]||[]).push(o.name);});});
+  const order=Object.keys(groups).sort((a,b)=>(a==='Any')-(b==='Any')||(a==='Normal Block')-(b==='Normal Block')||a.localeCompare(b));
+  const q=dexKey(u.lq||'');
+  const mv=n=>{const m=pxMove(n),bt=PX.basic.has(dexKey(n));return h`<span class="lmv ${q&&dexKey(n).includes(q)?'hit':''}" title="${m?[m.f,m.t,m.k].filter(Boolean).join(' · '):''}">${m&&m.t?chipsOf([m.t]):''}${n}${m&&m.f?h` <small>${m.f}</small>`:''}${bt?h` <small class="bt">basic tutor</small>`:''}</span>`;};
+  return h`<section class="panel"><div class="ph"><h2>Breeding and moves</h2><span class="sub">From the PTA Pokédex</span></div>
+    <div class="lbio">
+      <div><span class="fl">Egg groups</span><b>${(r.eg||[]).length?r.eg.join(' · '):'None listed'}</b></div>
+      <div><span class="fl">Hatches in</span><b>${r.hr||'—'}</b></div>
+      <div><span class="fl">Diet</span><b>${r.di||'—'}</b></div>
+      <div><span class="fl">Habitat</span><b>${r.hb||'—'}</b></div></div>
+    <p class="fl">Proficiencies</p>
+    <div class="row lprof">${(r.pr||[]).map(p=>h`<span class="pill ${/no moves/i.test(p.g)?'warn':''}">${p.g}${p.note?' ('+p.note+')':''}</span>`)}${(r.pr||[]).some(p=>/no moves from any/i.test(p.g))?'':h`<span class="pill">Any</span>`}${dxTypes(id).includes('Normal')&&!(r.pr||[]).some(p=>p.g==='Normal Block')?h`<span class="pill">Normal Block (Normal type)</span>`:''}</div>
+    <details class="lcan" ${u.lopen?raw('open'):''}><summary data-act="dx_lopen">Moves it can be taught (${L.size})</summary>
+      <p class="sub">A TM, a TR, a tutor or a breeding parent can teach any move below. Signature moves never appear. A note on a proficiency (like "Melee attacks") limits which of that list's moves fit; check it before teaching.</p>
+      <label class="fld"><span class="fl">Find a move</span><input type="search" data-u="dx.lq" value="${u.lq||''}" placeholder="Thunderbolt" data-nr autocomplete="off"></label>
+      <div id="lcanlist">${order.map(g=>h`<div class="lgrp"><b>${g}</b><div class="lmvs">${groups[g].slice().sort().map(mv)}</div></div>`)}</div>
+    </details>
+  </section>`;
+}
+/* the Pokédex home: which species can learn a move */
+function dxMoveFinder(){
+  if(!PTA.idx||!pxReady())return '';
+  const u=S.ui.dx;
+  return h`<section class="panel"><div class="ph"><h2>Who can learn it?</h2></div>
+    <label class="fld"><span class="fl">Move</span><input type="search" data-u="dx.mq" value="${u.mq||''}" list="dl-moves" placeholder="Will-O-Wisp" autocomplete="off" data-nr></label>
+    <div id="mqres">${dxMqRes()}</div>
+  </section>`;
+}
+function dxMqRes(){
+  const u=S.ui.dx,q=String(u.mq||'').trim();
+  let res=null;
+  if(q.length>=3&&PX.d){
+    const mk=dexKey(q),hits=[];
+    if(PX.sig.has(mk))res={sig:true};
+    else{DEXA.forEach((nm,i)=>{const o=pxCan(nm,dxTypes(i+1),q);if(o)hits.push([i+1,nm,o.via]);});res={hits,known:!!PX.names[mk]};}
+  }
+  return h`${res?res.sig?h`<p class="sub">${q} is a signature move: it can't be taught to anything.</p>`
+      :res.hits.length?h`<p class="sub">${res.hits.length} species can be taught ${PX.names[dexKey(q)]||q}.</p><div class="lwho">${res.hits.slice(0,120).map(([id,nm,via])=>h`<button class="btn sm ghost" data-act="dx_open" data-id="${id}" title="${via.join(', ')}">${nm}</button>`)}${res.hits.length>120?h`<span class="sub">and ${res.hits.length-120} more</span>`:''}</div>`
+      :h`<p class="sub">${res.known?'No species in the Pokédex has a proficiency for that move.':'That move isn’t on any proficiency list. Check the spelling, or it may only come from evolution.'}</p>`:h`<p class="sub">Type a move to see every species whose proficiencies let it be taught.</p>`}`;
+}
+/* ----- TMs and TRs in a trainer's bag ----- */
+const TM_RE=/^\s*(TM|TR|HM)\s*[:\-–]?\s*(.+?)\s*$/i;
+const tmParse=name=>{const m=TM_RE.exec(String(name||''));if(!m)return null;const mv=pxMove(m[2]);return mv?{kind:m[1].toUpperCase(),move:mv.n,mv}:null;};
+const tmUses=(x,kind)=>x.uses==null||x.uses===''?(kind==='TR'?1:kind==='HM'?Infinity:3):num(x.uses);
+const TM_PRICE={TM:{'At-Will':4800,'3/day':11800,'1/day':26800},TR:{'At-Will':2400,'3/day':5900,'1/day':13400}};
+function tmPrice(kind,mv){const f=/1\/day/i.test(mv.f||'')?'1/day':/3\/day/i.test(mv.f||'')?'3/day':'At-Will';return (TM_PRICE[kind]||{})[f]||null;}
+function tmRow(uid,t,x,i,ro){
+  const p=tmParse(x.name);if(!p)return '';
+  const u=S.ui.tm||{},open=u.uid===uid&&u.i===i,uses=tmUses(x,p.kind);
+  if(!open)return h`<div class="tmrow"><span class="sub">${p.kind} for ${chipsOf([p.mv.t||'Normal'])} ${p.move} · ${p.mv.f||''} · ${uses===Infinity?'unlimited uses':uses+(uses===1?' use':' uses')+' left on this disk'}</span>${ro?'':h`<button class="btn sm" data-act="tm_open" data-uid="${uid}" data-i="${i}">Teach</button>`}</div>`;
+  const mons=partyOf(uid).concat(boxOf(uid));
+  const m=mons.find(z=>z.id===u.pid)||null;
+  const can=m?pxCan(m.species,m.types,p.move):null,known=m&&(m.moves||[]).some(z=>dexKey(z.name)===dexKey(p.move));
+  const cap=t&&/move tutor/i.test([t.cls,t.adv].join(' '))?8:6,full=m&&(m.moves||[]).length>=cap;
+  return h`<div class="tmrow open"><div class="fgrid"><label class="fld"><span class="fl">Teach ${p.move} to</span><select data-u="tm.pid"><option value="">Pick a Pokémon</option>${mons.map(z=>h`<option value="${z.id}" ${z.id===u.pid?raw('selected'):''}>${mName(z)}${z.nick&&z.species?' ('+z.species+')':''}</option>`)}</select></label>
+    ${m&&full?h`<label class="fld"><span class="fl">It knows ${cap} moves. Replace</span><select data-u="tm.rep"><option value="">Pick a move to forget</option>${(m.moves||[]).map((z,k)=>h`<option value="${k}" ${String(k)===String(u.rep)?raw('selected'):''}>${z.name}</option>`)}</select></label>`:''}</div>
+    ${m?known?h`<p class="sub">${mName(m)} already knows ${p.move}.</p>`:!PX.d?h`<p class="sub">Proficiency data isn’t loaded, so the machine can’t check compatibility.</p>`:can?h`<p class="sub good">Compatible: ${p.move} is on its ${can.via.join(' and ')} list.</p>`:h`<p class="sub bad">The machine refuses: ${mName(m)} has no proficiency for ${p.move}.</p>`:''}
+    <div class="row"><button class="btn sm primary" data-act="tm_use" data-uid="${uid}" data-i="${i}" ${m&&!known&&(can||!PX.d)&&(!full||u.rep!=='')?'':raw('disabled')}>Use the ${p.kind}</button><button class="btn sm ghost" data-act="tm_close">Cancel</button></div></div>`;
+}
+function tmAct(b){
+  const d=b.dataset;S.ui.tm=S.ui.tm||{};const u=S.ui.tm;
+  if(d.act==='tm_open'){S.ui.tm={uid:d.uid,i:num(d.i),pid:'',rep:''};if(PTA.idx&&!PTA.lists)ptaLists();pxLoad();render();return;}
+  if(d.act==='tm_close'){S.ui.tm={};render();return;}
+  if(d.act!=='tm_use')return;
+  const uid=d.uid,t=S.trainers[uid];if(!t||!canEditT(uid))return;
+  const items=(t.items||[]).map(x=>Object.assign({},x)),x=items[num(d.i)],p=x&&tmParse(x.name);if(!p)return;
+  const m=partyOf(uid).concat(boxOf(uid)).find(z=>z.id===u.pid);if(!m){toast('Pick a Pokémon first.');return;}
+  if(PX.d&&!pxCan(m.species,m.types,p.move)){toast('The machine refuses: no proficiency for '+p.move+'.');return;}
+  const nm={name:p.mv.n,freq:p.mv.f||'At-Will',kind:p.mv.k||'Physical',range:p.mv.r||'',type:p.mv.t||'Normal',dice:p.mv.d||'',text:p.mv.x||'',used:0};
+  const mv=(m.moves||[]).slice(),cap=/move tutor/i.test([t.cls,t.adv].join(' '))?8:6;
+  let lost='';
+  if(mv.length>=cap){const k=num(u.rep);if(u.rep===''||!mv[k]){toast('Pick a move to forget.');return;}lost=mv[k].name;mv[k]=nm;}else mv.push(nm);
+  edit('p',uid+'/'+m.id,'moves',mv);
+  const left=tmUses(x,p.kind)-1;
+  if(left===Infinity||left>0)x.uses=left===Infinity?'':left;
+  else{const q=x.qty===''||x.qty==null?1:num(x.qty);if(q>1){x.qty=q-1;x.uses='';}else items.splice(num(d.i),1);}
+  edit('t',uid,'items',items);
+  S.ui.tm={};
+  toast(mName(m)+' learned '+p.move+(lost?' and forgot '+lost:'')+'.',true);render();
+}
+/* ----- breeding: can two Pokémon produce an egg, and what might it inherit ----- */
+function brPanel(uid,ro){
+  const mons=partyOf(uid).concat(boxOf(uid));
+  if(mons.length<1||!PTA.idx)return '';
+  if(!pxReady())return '';
+  if(!PTA.lists)ptaLists();
+  const u=S.ui.br=S.ui.br||{ma:'',pa:''};
+  const all=[];Object.keys(S.trainers).forEach(k=>partyOf(k).concat(boxOf(k)).forEach(z=>all.push([k,z])));
+  const find=id=>{const e=all.find(([k,z])=>k+'/'+z.id===id);return e?{uid:e[0],m:e[1]}:null;};
+  const A=find(u.ma),B=find(u.pa);
+  const opt=cur=>h`<option value="">Pick a Pokémon</option>${Object.keys(S.trainers).map(k=>{const ms=partyOf(k).concat(boxOf(k));return ms.length?h`<optgroup label="${tName(S.trainers[k])}">${ms.map(z=>h`<option value="${k}/${z.id}" ${k+'/'+z.id===cur?raw('selected'):''}>${mName(z)}${z.nick&&z.species?' ('+z.species+')':''}${z.gender?' '+(z.gender==='Male'?'♂':z.gender==='Female'?'♀':''):''}</option>`)}</optgroup>`:'';})}`;
+  let body='';
+  if(A&&B){
+    const ra=pxRec(A.m.species),rb=pxRec(B.m.species);
+    const isD=r=>r&&/^ditto$/i.test(r.n);
+    const ega=(ra&&ra.eg)||[],egb=(rb&&rb.eg)||[];
+    const shared=ega.filter(g=>egb.includes(g));
+    const und=g=>/undiscovered|no eggs/i.test(g.join(' '));
+    const ga=A.m.gender||'',gb=B.m.gender||'';
+    const prob=[];
+    if(u.ma===u.pa)prob.push('Pick two different Pokémon.');
+    if(!ra||!rb)prob.push('One of them has no biology entry in the handbook.');
+    else if(isD(ra)&&isD(rb))prob.push('Two Ditto can’t breed with each other.');
+    else if(!(isD(ra)||isD(rb))){
+      if(und(ega)||und(egb))prob.push('One of them is in a group that doesn’t breed.');
+      else if(!shared.length)prob.push('They share no egg group ('+(ega.join(' / ')||'none')+' and '+(egb.join(' / ')||'none')+').');
+      if(ga&&gb&&ga===gb)prob.push('They are both '+ga.toLowerCase()+'.');
+      if((ga==='Genderless'||gb==='Genderless'))prob.push('A genderless Pokémon can only breed with a Ditto.');
+    }else if(und(isD(ra)?egb:ega))prob.push('That Pokémon can’t breed, even with a Ditto.');
+    const mom=isD(ra)?B:isD(rb)?A:(ga==='Female'?A:gb==='Female'?B:A),dad=mom===A?B:A,rm=mom===A?ra:rb;
+    const baby=rm?String(rm.fam||rm.n).split(' / ')[0]:'';
+    const bt=pxRec(baby)||rm;
+    const bid=DEXA.findIndex(n=>dexKey(n)===dexKey(baby))+1;
+    const inh=prob.length?[]:(dad.m.moves||[]).filter(z=>pxCan(baby,bid?dxTypes(bid):[],z.name));
+    const kids=z=>num(z.kids);
+    body=h`${prob.length?h`<p class="sub bad">${prob.join(' ')}</p>`:h`<p class="sub good">They can produce an egg${shared.length?' (shared egg group: '+shared.join(', ')+')':' (Ditto breeds with any Pokémon that can)'}.</p>`}
+      ${prob.length?'':h`<div class="lbio"><div><span class="fl">The egg hatches as</span><b>${baby||'—'}</b></div><div><span class="fl">Hatches in</span><b>${(bt&&bt.hr)||'—'}</b></div><div><span class="fl">Nature</span><b>Either parent’s, or new</b></div></div>
+        <p class="fl">Moves it might inherit from ${mName(dad.m)}</p>
+        ${inh.length?h`<div class="lmvs">${inh.map(z=>h`<span class="lmv">${chipsOf([z.type||'Normal'])}${z.name}</span>`)}</div>`:h`<p class="sub">None of the father’s moves fit the baby’s proficiencies.</p>`}
+        <p class="sub">Each day both have spent at least 4 hours together, and get along at least as acquaintances, each owner may roll for an egg. Both must be at least two weeks old.</p>
+        <div class="row"><span class="sub">Eggs raised in your care: ${mName(A.m)} ${kids(A.m)}, ${mName(B.m)} ${kids(B.m)}. Breeders’ Prolific Parents starts at 3.</span>${ro?'':h`<button class="btn sm" data-act="br_egg">Record an egg</button>`}</div>`}`;
+  }
+  return h`<section class="panel"><div class="ph"><h2>Breeding</h2><span class="sub">Egg groups from the PTA Pokédex</span></div>
+    <div class="fgrid"><label class="fld"><span class="fl">One parent</span><select data-u="br.ma">${opt(u.ma)}</select></label>
+      <label class="fld"><span class="fl">The other</span><select data-u="br.pa">${opt(u.pa)}</select></label></div>
+    ${body}</section>`;
+}
+function brAct(b){
+  const u=S.ui.br||{};
+  if(b.dataset.act!=='br_egg')return;
+  [u.ma,u.pa].forEach(id=>{if(!id)return;const k=id.indexOf('/'),uid=id.slice(0,k),pid=id.slice(k+1);if(!canEditT(uid))return;const m=partyOf(uid).concat(boxOf(uid)).find(z=>z.id===pid);if(m)edit('p',id,'kids',num(m.kids)+1);});
+  toast('Egg recorded for both parents.',true);render();
+}
+/* end breeding and move learning */
+S.ui.br=S.ui.br||{ma:'',pa:''};S.ui.tm=S.ui.tm||{};
 function dexTab(){
   const c=dxCtx();
   const d=S.ui.dx;
@@ -3377,7 +3587,8 @@ function dexTab(){
       <label class="fld"><span class="fl">Show</span><select data-u="dx.show">${[['all','Everything'],['seen','Seen or caught'],['caught','Caught'],['missing','Not caught yet']].map(([k,l])=>h`<option value="${k}" ${d.show===k?raw('selected'):''}>${l}</option>`)}</select></label>
     </div>
     <div id="dxres">${dxResults(c)}</div>
-  </section>`;
+  </section>
+  ${dxMoveFinder()}`;
 }
 
 /* ----- one entry ----- */
@@ -3541,6 +3752,7 @@ function dxDetail(c){
   return h`${top}${head}</section>
     <section class="panel"><div class="ph"><h2>Game entry</h2></div>${dxGameView(id)}</section>
     <section class="panel"><div class="ph"><h2>Handbook</h2></div>${dxHandbook(c,id)}</section>
+    ${dxLearn(id)}
     <section class="panel"><div class="ph"><h2>Evolution family</h2></div>${dxFamily(c,id)}</section>
     ${dxForms(id)}`;
 }
@@ -3553,6 +3765,7 @@ function dxMarkSet(uid,id,v){
 function dxAct(b){
   const d=b.dataset,x=S.ui.dx;
   switch(d.act){
+    case 'dx_lopen':x.lopen=!x.lopen;return;
     case 'dx_open':{
       const id=num(d.id);
       if(id<1||id>DXN)break;
@@ -5787,7 +6000,7 @@ function shEdit1(sid,s,P){
           ${stock==null?h`<span class="pill">Unlimited</span>`:h`<span class="pill">${sold} sold · ${Math.max(0,stock-sold)} left</span>`}${stock!=null&&sold>stock?h`<span class="pill warn">Sold ${sold-stock} too many</span>`:''}</span>
           ${rowBtns('sg','shops','shops.'+sid+'.items',i,items.length,false)}</div></div>`;})}</div>`:h`<p class="sub">Nothing on the shelves yet. Add items below.</p>`}
     <div class="mgd"><b>Stock the shelves</b>
-      <p class="sub">Type an item from the handbook and its price and description fill in. Anything else you type becomes a custom item you price yourself.</p>
+      <p class="sub">Type an item from the handbook and its price and description fill in. For a TM or TR, type it with its move, like <b>TM: Thunderbolt</b> or <b>TR: Dig</b>, and it's priced by the move's frequency. Anything else you type becomes a custom item you price yourself.</p>
       <div class="fgrid"><label class="fld"><span class="fl">Item</span><input type="text" list="dl-scat" data-u="shop.addq" value="${u.addq}" placeholder="e.g. Great Ball" data-nr></label>
         <label class="fld"><span class="fl">Stock (blank = unlimited)</span><input type="number" inputmode="numeric" min="0" data-u="shop.dstock" value="${u.dstock}" data-nr></label></div>
       <div class="row"><button class="btn sm" data-act="sp_additem" ${items.length>=SHOP_ITEMS_MAX?raw('disabled'):''}>Add the item</button></div>
@@ -5903,7 +6116,9 @@ function shAct(b){
       if(!name){toast('Type the item to add first.');break;}
       const items=(Array.isArray(s.items)?s.items:[]).slice();
       if(items.length>=SHOP_ITEMS_MAX)break;
-      const hit=SCAT_BY.get(dexKey(name));
+      if(TM_RE.test(name)&&!SCAT_BY.get(dexKey(name))&&PTA.idx&&!PTA.lists&&!b._again){ptaLists().then(()=>{b._again=1;shAct(b);});break;}
+      const hit=SCAT_BY.get(dexKey(name)),tm=!hit&&tmParse(name);
+      if(tm&&tm.kind!=='HM'){const nm=tm.kind+': '+tm.move;items.push({k:shKey(),name:nm,cat:'TMs and TRs',price:tmPrice(tm.kind,tm.mv),stock:shDefStock(),desc:'Teaches '+tm.move+' ('+(tm.mv.f||'At-Will')+', '+(tm.mv.t||'Normal')+'). '+(tm.kind==='TR'?'1 use.':'3 uses.')+' Only to a Pokémon with a proficiency for it.',unlock:'',hide:false});edit('sg','shops','shops.'+u.edit+'.items',items);u.addq='';toast('Added '+nm+'.',true);render();break;}
       items.push(hit?shMkItem(hit,shDefStock()):{k:shKey(),name,cat:'',price:null,stock:shDefStock(),desc:'',unlock:'',hide:false});
       edit('sg','shops','shops.'+u.edit+'.items',items);
       u.addq='';
@@ -8603,7 +8818,7 @@ function featuresPanel(uid,t,ro){
 function itemsPanel(uid,t,ro){
   const it=t.items||[];
   return h`<section class="panel"><div class="ph"><h2>Inventory</h2>${ro?'':h`<button class="btn sm" data-act="add" ${bp('t',uid,'items')} data-tpl="item">Add item</button>`}</div>
-    ${it.length?h`<div class="list">${it.map((x,i)=>h`<div class="item"><div class="irow ic">${itemTile(x.name)}${fText('Item','t',uid,'items.'+i+'.name',t,{ro,list:'dl-items'})}${fNum('Qty','t',uid,'items.'+i+'.qty',t,{ro,min:0})}${rowBtns('t',uid,'items',i,it.length,ro)}</div>${fText('Note','t',uid,'items.'+i+'.note',t,{ro})}${isKeyName(x.name)?h`<div class="kline">${keyChip(t)}<span class="sub">Lets your Pokémon Mega Evolve, once per battle.</span></div>`:''}</div>`)}</div>`:h`<p class="sub">Nothing carried yet.</p>`}
+    ${it.length?h`<div class="list">${it.map((x,i)=>h`<div class="item"><div class="irow ic">${itemTile(x.name)}${fText('Item','t',uid,'items.'+i+'.name',t,{ro,list:'dl-items'})}${fNum('Qty','t',uid,'items.'+i+'.qty',t,{ro,min:0})}${rowBtns('t',uid,'items',i,it.length,ro)}</div>${fText('Note','t',uid,'items.'+i+'.note',t,{ro})}${isKeyName(x.name)?h`<div class="kline">${keyChip(t)}<span class="sub">Lets your Pokémon Mega Evolve, once per battle.</span></div>`:''}${tmRow(uid,t,x,i,ro)}</div>`)}</div>`:h`<p class="sub">Nothing carried yet.</p>`}
   </section>`;
 }
 /* the trainer sheet's ID card header (Update 30): a read-out of the fields edited below */
@@ -8798,7 +9013,8 @@ function pokemonTab(){
       ${hasKey(t)?h`<div class="row">${keyChip(t,true)}</div>`:(pt.concat(bx).some(m=>m.mega)?h`<p class="sub">To Mega Evolve, add a Key Stone to the trainer’s inventory.</p>`:'')}</section>
     ${pt.length||bx.length?'':emptyState('No Pokémon yet',ro?'Nothing here yet.':'Add your starter to begin.')}
     ${pt.length?h`<div class="list"><div class="ph"><h2>Party</h2></div><div class="mons">${pt.map((m,i)=>monCard(uid,m,ro,i,pt.length))}</div></div>`:''}
-    ${bx.length?h`<div class="list"><div class="ph"><h2>Box</h2><span class="sub">${bx.length} stored</span></div><div class="mons">${bx.map((m,i)=>monCard(uid,m,ro,i,bx.length))}</div></div>`:''}`;
+    ${bx.length?h`<div class="list"><div class="ph"><h2>Box</h2><span class="sub">${bx.length} stored</span></div><div class="mons">${bx.map((m,i)=>monCard(uid,m,ro,i,bx.length))}</div></div>`:''}
+    ${brPanel(uid,ro)}`;
 }
 
 /* ---------- people tab ---------- */
@@ -11094,6 +11310,8 @@ function act(b,e){
   if(d.act&&d.act.indexOf('cd_')===0){cdAct(b);return;}
   if(d.act&&d.act.indexOf('cl_')===0){clAct(b);return;}
   if(d.act&&d.act.indexOf('rk_')===0){rkAct(b);return;}
+  if(d.act&&d.act.indexOf('tm_')===0){tmAct(b);return;}
+  if(d.act&&d.act.indexOf('br_')===0){brAct(b);return;}
   if(d.act==='zn_load'){znLoad();return;}
   if(d.act==='zn_zone'){if(S.me.admin&&clTrip()){const t=JSON.parse(JSON.stringify(clTrip()));t.zone=d.v;edit('cd','conditions','trip',t);render();}return;}
   if(d.act&&d.act.indexOf('sp_')===0){shAct(b);return;}
@@ -11417,6 +11635,8 @@ document.addEventListener('input',e=>{
   if(t.dataset.u!=null){
     const k=t.dataset.u.split('.');
     S.ui[k[0]][k[1]]=t.type==='checkbox'?t.checked:t.value;
+    if(k[0]==='dx'&&k[1]==='mq'){const el=document.getElementById('mqres');if(el)el.innerHTML=dxMqRes().s;return;}
+    if(k[0]==='dx'&&k[1]==='lq'){const q=dexKey(t.value);document.querySelectorAll('#lcanlist .lmv').forEach(el=>{el.classList.toggle('hit',!!q&&dexKey(el.textContent).includes(q));});return;}
     if(k[0]==='dx'){S.ui.dx.page=1;if(k[1]==='q'){dxRefresh();return;}}
     if(k[0]==='ct'&&ctInput(k[1],t))return;
     if(k[0]==='shop'&&k[1]==='q'){shRefresh();return;}
