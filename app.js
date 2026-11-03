@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-02 · Egg groups, proficiencies, TMs and breeding';
+const BUILD='2026-11-03 · TM, TR and HM numbers';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -3430,7 +3430,8 @@ function dxLearn(id){
   const groups={};L.forEach((o,mk)=>{o.via.forEach(v=>{(groups[v]=groups[v]||[]).push(o.name);});});
   const order=Object.keys(groups).sort((a,b)=>(a==='Any')-(b==='Any')||(a==='Normal Block')-(b==='Normal Block')||a.localeCompare(b));
   const q=dexKey(u.lq||'');
-  const mv=n=>{const m=pxMove(n),bt=PX.basic.has(dexKey(n));return h`<span class="lmv ${q&&dexKey(n).includes(q)?'hit':''}" title="${m?[m.f,m.t,m.k].filter(Boolean).join(' · '):''}">${m&&m.t?chipsOf([m.t]):''}${n}${m&&m.f?h` <small>${m.f}</small>`:''}${bt?h` <small class="bt">basic tutor</small>`:''}</span>`;};
+  const qn=/^\d{1,3}$/.test(q)?num(q):0;
+  const mv=n=>{const m=pxMove(n),bt=PX.basic.has(dexKey(n)),no=tmNo(n);return h`<span class="lmv ${q&&(qn?no===qn:dexKey(n).includes(q))?'hit':''}" title="${[no?'TM, TR or HM '+tmPad(no):''].concat(m?[m.f,m.t,m.k]:[]).filter(Boolean).join(' · ')}">${no?h`<small class="tmno">${tmPad(no)}</small> `:''}${m&&m.t?chipsOf([m.t]):''}${n}${m&&m.f?h` <small>${m.f}</small>`:''}${bt?h` <small class="bt">basic tutor</small>`:''}</span>`;};
   return h`<section class="panel"><div class="ph"><h2>Breeding and moves</h2><span class="sub">From the PTA Pokédex</span></div>
     <div class="lbio">
       <div><span class="fl">Egg groups</span><b>${(r.eg||[]).length?r.eg.join(' · '):'None listed'}</b></div>
@@ -3440,8 +3441,8 @@ function dxLearn(id){
     <p class="fl">Proficiencies</p>
     <div class="row lprof">${(r.pr||[]).map(p=>h`<span class="pill ${/no moves/i.test(p.g)?'warn':''}">${p.g}${p.note?' ('+p.note+')':''}</span>`)}${(r.pr||[]).some(p=>/no moves from any/i.test(p.g))?'':h`<span class="pill">Any</span>`}${dxTypes(id).includes('Normal')&&!(r.pr||[]).some(p=>p.g==='Normal Block')?h`<span class="pill">Normal Block (Normal type)</span>`:''}</div>
     <details class="lcan" ${u.lopen?raw('open'):''}><summary data-act="dx_lopen">Moves it can be taught (${L.size})</summary>
-      <p class="sub">A TM, a TR, a tutor or a breeding parent can teach any move below. Signature moves never appear. A note on a proficiency (like "Melee attacks") limits which of that list's moves fit; check it before teaching.</p>
-      <label class="fld"><span class="fl">Find a move</span><input type="search" data-u="dx.lq" value="${u.lq||''}" placeholder="Thunderbolt" data-nr autocomplete="off"></label>
+      <p class="sub">A TM, a TR, a tutor or a breeding parent can teach any move below. The small number is the move's disk number: TM, TR and HM with that number all teach it, so 024 is TM 024, TR 024 or HM 024. Signature moves never appear. A note on a proficiency (like "Melee attacks") limits which of that list's moves fit; check it before teaching.</p>
+      <label class="fld"><span class="fl">Find a move</span><input type="search" data-u="dx.lq" value="${u.lq||''}" placeholder="Thunderbolt or 024" data-nr autocomplete="off"></label>
       <div id="lcanlist">${order.map(g=>h`<div class="lgrp"><b>${g}</b><div class="lmvs">${groups[g].slice().sort().map(mv)}</div></div>`)}</div>
     </details>
   </section>`;
@@ -3451,12 +3452,13 @@ function dxMoveFinder(){
   if(!PTA.idx||!pxReady())return '';
   const u=S.ui.dx;
   return h`<section class="panel"><div class="ph"><h2>Who can learn it?</h2></div>
-    <label class="fld"><span class="fl">Move</span><input type="search" data-u="dx.mq" value="${u.mq||''}" list="dl-moves" placeholder="Will-O-Wisp" autocomplete="off" data-nr></label>
+    <label class="fld"><span class="fl">Move</span><input type="search" data-u="dx.mq" value="${u.mq||''}" list="dl-moves" placeholder="Will-O-Wisp or 061" autocomplete="off" data-nr></label>
     <div id="mqres">${dxMqRes()}</div>
   </section>`;
 }
 function dxMqRes(){
-  const u=S.ui.dx,q=String(u.mq||'').trim();
+  const u=S.ui.dx,raw0=String(u.mq||'').trim(),nq=/^(?:tm|tr|hm)?\s*#?\s*(\d{1,3})$/i.exec(raw0);
+  const q=nq&&TMNO[num(nq[1])-1]?TMNO[num(nq[1])-1]:raw0,qno=tmNo(q);
   let res=null;
   if(q.length>=3&&PX.d){
     const mk=dexKey(q),hits=[];
@@ -3464,19 +3466,29 @@ function dxMqRes(){
     else{DEXA.forEach((nm,i)=>{const o=pxCan(nm,dxTypes(i+1),q);if(o)hits.push([i+1,nm,o.via]);});res={hits,known:!!PX.names[mk]};}
   }
   return h`${res?res.sig?h`<p class="sub">${q} is a signature move: it can't be taught to anything.</p>`
-      :res.hits.length?h`<p class="sub">${res.hits.length} species can be taught ${PX.names[dexKey(q)]||q}.</p><div class="lwho">${res.hits.slice(0,120).map(([id,nm,via])=>h`<button class="btn sm ghost" data-act="dx_open" data-id="${id}" title="${via.join(', ')}">${nm}</button>`)}${res.hits.length>120?h`<span class="sub">and ${res.hits.length-120} more</span>`:''}</div>`
-      :h`<p class="sub">${res.known?'No species in the Pokédex has a proficiency for that move.':'That move isn’t on any proficiency list. Check the spelling, or it may only come from evolution.'}</p>`:h`<p class="sub">Type a move to see every species whose proficiencies let it be taught.</p>`}`;
+      :res.hits.length?h`<p class="sub">${res.hits.length} species can be taught ${PX.names[dexKey(q)]||q}${qno?h` with TM, TR or HM <b>${tmPad(qno)}</b>`:''}.</p><div class="lwho">${res.hits.slice(0,120).map(([id,nm,via])=>h`<button class="btn sm ghost" data-act="dx_open" data-id="${id}" title="${via.join(', ')}">${nm}</button>`)}${res.hits.length>120?h`<span class="sub">and ${res.hits.length-120} more</span>`:''}</div>`
+      :h`<p class="sub">${res.known?'No species in the Pokédex has a proficiency for that move.':'That move isn’t on any proficiency list. Check the spelling, or it may only come from evolution.'}</p>`:h`<p class="sub">Type a move or a disk number (like 024 or TM 24) to see every species whose proficiencies let it be taught.</p>`}`;
 }
 /* ----- TMs and TRs in a trainer's bag ----- */
-const TM_RE=/^\s*(TM|TR|HM)\s*[:\-–]?\s*(.+?)\s*$/i;
-const tmParse=name=>{const m=TM_RE.exec(String(name||''));if(!m)return null;const mv=pxMove(m[2]);return mv?{kind:m[1].toUpperCase(),move:mv.n,mv}:null;};
+/* Every teachable move has one number (GM Reference: TMs, TRs and HMs). As in the Player's Handbook (p. 171) the number names
+   the move and the disk sets the uses: TM 024, TR 024 and HM 024 all teach Thunderbolt. 001-092 keep Sinnoh's TM numbers,
+   093-102 are the field moves, 103-433 are the rest alphabetically. */
+const TMNO='Focus Punch|Dragon Claw|Water Pulse|Scald|Roar|Toxic|Hail|Bulldoze|Bullet Seed|Hidden Power|Sunny Day|Taunt|Ice Beam|Blizzard|Hyper Beam|Light Screen|Protect|Rain Dance|Giga Drain|Safeguard|Frustration|Solar Beam|Iron Tail|Thunderbolt|Thunder|Earthquake|Return|Dig|Psychic|Shadow Ball|Brick Break|Double Team|Reflect|Shock Wave|Flamethrower|Sludge Bomb|Sandstorm|Fire Blast|Rock Tomb|Aerial Ace|Wild Charge|Facade|Dazzling Gleam|Rest|Attract|Thief|Steel Wing|Smack Down|Round|Overheat|Roost|Focus Blast|Energy Ball|Echoed Voice|Brine|Acrobatics|Charge Beam|Endure|Dragon Pulse|Drain Punch|Will-O-Wisp|Silver Wind|Low Sweep|Incinerate|Shadow Claw|Payback|Venoshock|Giga Impact|Retaliate|Flash|Stone Edge|Avalanche|Thunder Wave|Gyro Ball|Snarl|Stealth Rock|Dragon Tail|Electro Ball|Dark Pulse|Rock Slide|X-Scissor|Sleep Talk|Sludge Wave|Poison Jab|Dream Eater|Grass Knot|Swagger|Psyshock|Hex|Substitute|Flash Cannon|Trick Room|Cut|Fly|Strength|Defog|Rock Smash|Surf|Waterfall|Rock Climb|Whirlpool|Dive|Absorb|Acid Spray|Acupressure|After You|Air Cutter|Air Dart|Air Slash|Alluring Voice|Ally Switch|Ancient Power|Aqua Jet|Aqua Ring|Aqua Tail|Aromatherapy|Assurance|Astonish|Aura Sphere|Aurora Beam|Aurora Veil|Axe Kick|Belch|Belly Drum|Bide|Bite|Blaze Kick|Block|Body Press|Body Slam|Boomburst|Brave Bird|Breaking Swipe|Brutal Hit|Brutal Swing|Bubble|Bubble Beam|Bug Bite|Bug Buzz|Bullet Punch|Burning Jealousy|Celebrate|Charge|Chilling Water|Chip Away|Clear Smog|Clearing Smog|Close Combat|Coaching|Comet Punch|Confuse Ray|Confusion|Confusioning|Corrosive Gas|Counter|Covet|Cross Chop|Cross Poison|Crunch|Crush Claw|Curse|Darkest Lariat|Destiny Bond|Detect|Disable|Disarming Voice|Discharge|Dizzy Punch|Double Edge|Double Hit|Double Kick|Double Slap|Draco Meteor|Dragon Breath|Dragon Rage|Dragon Rush|Draining Kiss|Drill Peck|Drill Run|Dual Chop|Dual Wingbeat|Dynamic Punch|Earth Power|Electric Terrain|Ember|Emberish|Encore|Endeavor|Expanding Force|Extrasensory|Fairy Wind|Fake Out|Feint Attack|Fell Stinger|Final Gambit|Fire Fang|Fire Punch|Fire Spin|Flail|Flame Burst|Flame Charge|Flame Wheel|Flare Blitz|Flatter|Focus Energy|Follow Me|Force Palm|Foresight|Freeze-Dry|Frost Breath|Fury Attack|Fury Cutter|Fury Swipes|Future Sight|Gastro Acid|Grassy Glide|Grassy Terrain|Gravity|Growl|Gunk Shot|Gust|Hammer Arm|Haze|Head Smash|Headbutt|Heal Block|Heal Pulse|Healing Wish|Heat Wave|Heavy Slam|Helping Hand|High Jump Kick|Hold Back|Horn Attack|Hurricane|Hydro Pump|Hyper Fang|Hyper Voice|Hypnosis|Ice Fang|Ice Punch|Ice Shard|Ice Spinner|Icicle Crash|Icicle Spear|Icy Breeze|Icy Wind|Inferno|Infestation|Iron Head|Jump Kick|Karate Chop|Karate Slap|Knock Off|Laser Focus|Lash Out|Lava Plume|Leaf Blade|Leaf Storm|Leafage|Leech Life|Leech Seed|Leer|Lick|Life Dew|Liquidation|Low Kick|Lucky Chant|Lunge|Mach Punch|Magic Coat|Magic Room|Magical Leaf|Magnet Pull|Magnet Rise|Mean Look|Mega Drain|Mega Kick|Mega Punch|Megahorn|Memento|Metal Burst|Metal Claw|Metal Cut|Meteor Beam|Meteor Rain|Mirror Coat|Mirror Move|Mist|Misty Terrain|Moonblast|Moonwrecker|Mud Bomb|Mud Shot|Mud Sport|Mud Throw|Mud-Slap|Muddy Water|Mystical Fire|Night Shade|Night Slash|Nuzzle|Ominous Wind|Outrage|P Stomping Tantrum|Pain Split|Peck|Petal Blizzard|Petal Dance|Phantom Force|Pin Missile|Play Rough|Poison Fang|Poison Gas|Poison Powder|Poison Sting|Poltergeist|Pounce|Pound|Powder|Powder Snow|Power Gem|Power-Up Punch|Psionic Fury|Psybeam|Psychic Fangs|Psychic Terrain|Psycho Cut|Punishment|Pursuit|Quash|Quick Attack|Rage|Rage Powder|Rapid Spin|Razor Leaf|Razor Wind|Refresh|Revenge|Reversal|Rising Voltage|Rock Blast|Rock Throw|Rolling Kick|Rollout|Sand Attack|Sand Tomb|Scale Shot|Scorching Sands|Scratch|Seed Bomb|Seismic Toss|Shadow Sneak|Signal Beam|Sing|Skitter Smack|Sky Attack|Sky Drop|Sky Uppercut|Slam|Slash|Sleep Powder|Slippin Slide|Smart Strike|Smog|Smoke Screen|Snore|Snowscape|Soak|Solar Blade|Sonic Boom|Spark|Spike Cannon|Spikes|Spit Up|Splash|Spook|Steamroller|Steel Beam|Steel Roller|Stockpile|Stomp|Stomping Tantrum|Struggle Bug|Struggling Bug|Stun Spore|Submission|Sucker Punch|Supercell Slam|Superpower|Supersonic|Swallow|Sweet Kiss|Sweet Scent|Swift|Switcheroo|Synchronoise|Synthesis|Tackle|Tail Slap|Take Down|Teleport|Temper Flare|Terrain Pulse|Terrify|Thrash|Throat Chop|Thunder Fang|Thunder Punch|Thunder Shock|Tickle|Tidepools|Toxic Spikes|Trailblaze|Trick|Triple Axel|Twineedle|Twister|Twisting Gust|Uproar|Vacuum Wave|Venom Drench|Vital Throw|Void Fury|Wake-Up Slap|Water Sport|Whirlwind|Wing Attack|Wish|Wonder Room|Yawn|Zap Cannon|Zen Headbutt'.split('|');
+const TMNO_BY=new Map(TMNO.map((n,i)=>[dexKey(n),i+1]));
+const tmNo=m=>TMNO_BY.get(dexKey(m))||0;
+const tmPad=n=>String(n).padStart(3,'0');
+const tmLabel=(kind,m)=>{const n=tmNo(m);return kind+(n?' '+tmPad(n):'')+' '+m;};
+const TM_RE=/^\s*(TM|TR|HM)\s*(?:[:\-–#]\s*)?(?:(\d{1,3})\b\s*[:\-–]?\s*)?(.*?)\s*$/i;
+const tmParse=name=>{const m=TM_RE.exec(String(name||''));if(!m)return null;
+  const byNo=m[2]?TMNO[num(m[2])-1]:'',mv=pxMove(m[3]||byNo)||(byNo&&m[3]?pxMove(byNo):null);
+  return mv?{kind:m[1].toUpperCase(),move:mv.n,mv,no:tmNo(mv.n)}:null;};
 const tmUses=(x,kind)=>x.uses==null||x.uses===''?(kind==='TR'?1:kind==='HM'?Infinity:3):num(x.uses);
 const TM_PRICE={TM:{'At-Will':4800,'3/day':11800,'1/day':26800},TR:{'At-Will':2400,'3/day':5900,'1/day':13400}};
 function tmPrice(kind,mv){const f=/1\/day/i.test(mv.f||'')?'1/day':/3\/day/i.test(mv.f||'')?'3/day':'At-Will';return (TM_PRICE[kind]||{})[f]||null;}
 function tmRow(uid,t,x,i,ro){
   const p=tmParse(x.name);if(!p)return '';
   const u=S.ui.tm||{},open=u.uid===uid&&u.i===i,uses=tmUses(x,p.kind);
-  if(!open)return h`<div class="tmrow"><span class="sub">${p.kind} for ${chipsOf([p.mv.t||'Normal'])} ${p.move} · ${p.mv.f||''} · ${uses===Infinity?'unlimited uses':uses+(uses===1?' use':' uses')+' left on this disk'}</span>${ro?'':h`<button class="btn sm" data-act="tm_open" data-uid="${uid}" data-i="${i}">Teach</button>`}</div>`;
+  if(!open)return h`<div class="tmrow"><span class="sub">${p.no?p.kind+' '+tmPad(p.no):p.kind} for ${chipsOf([p.mv.t||'Normal'])} ${p.move} · ${p.mv.f||''} · ${uses===Infinity?'unlimited uses':uses+(uses===1?' use':' uses')+' left on this disk'}</span>${ro?'':h`<button class="btn sm" data-act="tm_open" data-uid="${uid}" data-i="${i}">Teach</button>`}</div>`;
   const mons=partyOf(uid).concat(boxOf(uid));
   const m=mons.find(z=>z.id===u.pid)||null;
   const can=m?pxCan(m.species,m.types,p.move):null,known=m&&(m.moves||[]).some(z=>dexKey(z.name)===dexKey(p.move));
@@ -3670,7 +3682,7 @@ function dxRecView(r,many){
     <div class="dxst">${stats.map(([l,v,m])=>h`<div class="dxs"><span>${l}</span><b>${num(v)}</b>${m?h`<small>${sgn(mod(num(v)))}</small>`:(l==='HP'&&hpx()!==1?h`<small title="The handbook’s HP, before the table’s ×${hpx()} multiplier">book ${num(r.hp)}</small>`:'')}</div>`)}</div>
     ${sk.length?h`<p><b>Skills</b> ${sk.map(x=>x.n+(x.t?' ('+x.t+')':'')).join(', ')}</p>`:''}
     ${ps.length?h`<h3 class="refg">Passives</h3><dl class="refdl">${ps.map(x=>h`<dt>${x.n}${x.lg?h` <span class="pill leg">${lt}</span>`:''}</dt><dd>${x.t||''}</dd>`)}</dl>`:''}
-    ${mv.length?h`<h3 class="refg">Moves</h3><ul class="dxmvs">${mv.map(x=>h`<li><div class="row"><b>${x.n}</b>${chipsOf([x.t])}<span class="pill">${x.k||''}</span><span class="pill">${x.f||''}</span>${x.lg?h`<span class="pill leg">${lt}</span>`:''}</div>
+    ${mv.length?h`<h3 class="refg">Moves</h3><ul class="dxmvs">${mv.map(x=>h`<li><div class="row"><b>${x.n}</b>${tmNo(x.n)?h`<span class="pill tmno" title="TM, TR or HM ${tmPad(tmNo(x.n))} teaches this move">No. ${tmPad(tmNo(x.n))}</span>`:''}${chipsOf([x.t])}<span class="pill">${x.k||''}</span><span class="pill">${x.f||''}</span>${x.lg?h`<span class="pill leg">${lt}</span>`:''}</div>
       <p class="sub">${[x.r,x.d].filter(Boolean).join(' · ')}</p>${x.x?h`<p>${x.x}</p>`:''}</li>`)}</ul>`:''}
   </div>`;
 }
@@ -6000,7 +6012,7 @@ function shEdit1(sid,s,P){
           ${stock==null?h`<span class="pill">Unlimited</span>`:h`<span class="pill">${sold} sold · ${Math.max(0,stock-sold)} left</span>`}${stock!=null&&sold>stock?h`<span class="pill warn">Sold ${sold-stock} too many</span>`:''}</span>
           ${rowBtns('sg','shops','shops.'+sid+'.items',i,items.length,false)}</div></div>`;})}</div>`:h`<p class="sub">Nothing on the shelves yet. Add items below.</p>`}
     <div class="mgd"><b>Stock the shelves</b>
-      <p class="sub">Type an item from the handbook and its price and description fill in. For a TM or TR, type it with its move, like <b>TM: Thunderbolt</b> or <b>TR: Dig</b>, and it's priced by the move's frequency. Anything else you type becomes a custom item you price yourself.</p>
+      <p class="sub">Type an item from the handbook and its price and description fill in. For a TM or TR, type it with its move or its number, like <b>TM Thunderbolt</b>, <b>TM 024</b> or <b>TR 028</b>, and it's priced by the move's frequency. Anything else you type becomes a custom item you price yourself.</p>
       <div class="fgrid"><label class="fld"><span class="fl">Item</span><input type="text" list="dl-scat" data-u="shop.addq" value="${u.addq}" placeholder="e.g. Great Ball" data-nr></label>
         <label class="fld"><span class="fl">Stock (blank = unlimited)</span><input type="number" inputmode="numeric" min="0" data-u="shop.dstock" value="${u.dstock}" data-nr></label></div>
       <div class="row"><button class="btn sm" data-act="sp_additem" ${items.length>=SHOP_ITEMS_MAX?raw('disabled'):''}>Add the item</button></div>
@@ -6118,7 +6130,7 @@ function shAct(b){
       if(items.length>=SHOP_ITEMS_MAX)break;
       if(TM_RE.test(name)&&!SCAT_BY.get(dexKey(name))&&PTA.idx&&!PTA.lists&&!b._again){ptaLists().then(()=>{b._again=1;shAct(b);});break;}
       const hit=SCAT_BY.get(dexKey(name)),tm=!hit&&tmParse(name);
-      if(tm&&tm.kind!=='HM'){const nm=tm.kind+': '+tm.move;items.push({k:shKey(),name:nm,cat:'TMs and TRs',price:tmPrice(tm.kind,tm.mv),stock:shDefStock(),desc:'Teaches '+tm.move+' ('+(tm.mv.f||'At-Will')+', '+(tm.mv.t||'Normal')+'). '+(tm.kind==='TR'?'1 use.':'3 uses.')+' Only to a Pokémon with a proficiency for it.',unlock:'',hide:false});edit('sg','shops','shops.'+u.edit+'.items',items);u.addq='';toast('Added '+nm+'.',true);render();break;}
+      if(tm&&tm.kind!=='HM'){const nm=tmLabel(tm.kind,tm.move);items.push({k:shKey(),name:nm,cat:'TMs and TRs',price:tmPrice(tm.kind,tm.mv),stock:shDefStock(),desc:'Teaches '+tm.move+' ('+(tm.mv.f||'At-Will')+', '+(tm.mv.t||'Normal')+'). '+(tm.kind==='TR'?'1 use.':'3 uses.')+' Only to a Pokémon with a proficiency for it.',unlock:'',hide:false});edit('sg','shops','shops.'+u.edit+'.items',items);u.addq='';toast('Added '+nm+'.',true);render();break;}
       items.push(hit?shMkItem(hit,shDefStock()):{k:shKey(),name,cat:'',price:null,stock:shDefStock(),desc:'',unlock:'',hide:false});
       edit('sg','shops','shops.'+u.edit+'.items',items);
       u.addq='';
