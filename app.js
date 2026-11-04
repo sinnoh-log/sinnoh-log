@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-03 · Fishing at every place with water';
+const BUILD='2026-11-04 · More agencies and sponsors';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -603,9 +603,10 @@ const TPL={
   passive:()=>({name:'',text:''}),
   feature:()=>({name:'',text:''}),
   item:()=>({name:'',qty:1,note:''}),
-  honor:()=>({type:'Other',name:'',note:''})
+  honor:()=>({type:'Other',name:'',note:''}),
+  sponsor:()=>({name:'',offer:'',ask:'',until:''})
 };
-const TPL_MAX={moves:6,passives:8};
+const TPL_MAX={moves:6,passives:8,sponsors:6};
 
 /* ---------- images: downscale to small JPEG data URLs, show through blob URLs ---------- */
 const JPEG_RE=/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/;
@@ -8856,7 +8857,7 @@ function sheetCard(uid,t){
   </article>`;
 }
 /* the sheet's sections (Update 34). On a phone one section shows at a time; on a wide screen "All" shows everything, as before. */
-const SHEET_TABS=[['stats','Stats & skills'],['feat','Features'],['bag','Bag'],['honors','Badges & ribbons'],['prof','Profile'],['all','All']];
+const SHEET_TABS=[['stats','Stats & skills'],['feat','Features'],['bag','Bag'],['honors','Honors & career'],['prof','Profile'],['all','All']];
 function sheetTabNow(){
   const v=S.ui.sheetTab;
   if(SHEET_TABS.some(x=>x[0]===v))return v;
@@ -8868,7 +8869,7 @@ function trainerTab(){
   if(!t)return h`${trainerPicker()}${emptyTrainer()}`;
   const ro=!canEditT(uid);
   const tab=sheetTabNow(),show=g=>tab==='all'||tab===g;
-  const c1=[show('prof')?identityPanel(uid,t,ro):'',show('stats')?vitalsPanel(uid,t,ro):'',show('honors')?honorsPanel(uid,t,ro):'',show('honors')?rkSheetPanel(uid):''];
+  const c1=[show('prof')?identityPanel(uid,t,ro):'',show('stats')?vitalsPanel(uid,t,ro):'',show('honors')?honorsPanel(uid,t,ro):'',show('honors')?rkSheetPanel(uid):'',show('honors')?agPanel(uid,t,ro):''];
   const c2=[show('stats')?skillsPanel(uid,t,ro):'',show('feat')?featuresPanel(uid,t,ro):'',show('bag')?itemsPanel(uid,t,ro):''];
   const n1=c1.filter(Boolean).length,n2=c2.filter(Boolean).length;
   return h`${trainerPicker()}
@@ -9288,6 +9289,149 @@ function awardHistory(){
       <p class="sub">Revoking removes the award from the record. It does not take back a badge, ribbon or level already applied.</p>`
       :h`<p class="sub">Nothing awarded yet.</p>`}</section>`;
 }
+
+/* ---------- Talent agencies and sponsors (vault: Talent Agencies, Brands and Sponsors) ----------
+   The trainer sheet keeps an agency (t.agency), the agent's name (t.agent), a standing 0-5 that only the GM sets (t.agSt),
+   contract notes (t.agNote) and a list of sponsor deals (t.sponsors). The GM Desk explains the rules and lists every agency
+   and sponsor, with the GM-only truth about the suspicious ones. */
+const AG_STAND=[['0','0 · Dropped'],['1','1 · Signed'],['2','2 · Client'],['3','3 · Rising'],['4','4 · Featured'],['5','5 · Headliner']];
+const AG_PERKS=[
+  'The agency takes calls and handles fans, so you are not mobbed in towns. One paid booking a week (an appearance, exhibition or showcase).',
+  'Negotiation: when a sponsor offer comes, the agent rolls once; on a success, more money or one fewer string. A publicist can handle your interviews.',
+  'The agency’s signature perk. One bad headline a session is softened before it hits the rankings. Bookings pay double.',
+  'One sponsor offer a season of your choice from the agency’s network. One free ferry, coach or Center stay each journey. The agency pays half your healing after sanctioned matches.',
+  'The agency’s elite perk. One scandal a season goes away, and one closed door a season opens. The cut drops by 2 points.'];
+/* [name, base, cut %, who it signs, signature perk (3), elite perk (5), code, agent, GM-only truth] */
+const AGENCIES=[
+  ['Northstar Talent Group','Jubilife',15,'battlers, Conference finalists, TV personalities','One national-sponsor offer a season (Pokétch Company, Jubilife TV, Veilstone Department Store, Crown Exchange Mutual).','A featured Jubilife TV segment and +1 rank on the popularity board.','The brand comes first: never embarrass a Northstar sponsor.','Marisol Vane',''],
+  ['Lumiere & Crane','Hearthome',12,'coordinators, stage stars, Grand Festival champions','+2 on social checks with Contest judges, officials and Hearthome high society; invitations to private galas.','Maison Hearth dresses you for the Grand Festival, and a rehearsal on its stage.','Dignity: a public embarrassment costs 2 standing, not 1.','Theo Hartwell (publicist)',''],
+  ['Coalface Sports Management','Oreburgh',10,'battlers, Rock, Ground and Fighting specialists','Free sparring with Oreburgh Gym trainers; 20% off Rock and Ground gear.','A private session with the Oreburgh Gym Leader; the Mining Co. as a sponsor without its usual strings.','Loyalty to Oreburgh in local disputes.','',''],
+  ['Harborlight Agency','Canalave and Sunyshore',10,'coastal trainers, Water specialists, swimmers','Free coastal ferry passes; fishing-tournament invitations.','A chartered boat for one trip a season.','Never cross the ferry companies.','',''],
+  ['Greenhouse Collective','Floaroma and Solaceon',5,'breeders, gardeners, farm kids','Discounts at Day Cares, berry farms and Poffin houses; a place to sleep in most small towns.','One rare seed, egg or breeding contact a season through the network.','Look after your Pokémon and your people.','“Auntie” Bea Sorrell (manager)',''],
+  ['Frostline Talent','Snowpoint',8,'northern trainers, Ice specialists, rescue heroes','Free Snowline gear; a rescue guide on northern routes.','A research permit or guided entry into one badge-gated northern area.','Never refuse a rescue call.','',''],
+  ['Fen & Fable','Pastoria',7,'marsh guides, Water trainers, folk performers','Training at the Pastoria Gym; a Grand Marsh guide.','A Grand Marsh day permit any time; the Gym’s backing in a public dispute.','Loyalty to the Pastoria Gym and the marsh community.','',''],
+  ['Veilstone Combat Bureau','Veilstone',10,'Fighting-type trainers, martial artists','Once a month, a free training session that improves one Pokémon.','A sparring match against a Veilstone Gym trainer; Kurogane Dojo Wear as a sponsor.','Discipline: two public losses in a row cost 1 standing.','',''],
+  ['Old Forest Talent','Eterna',8,'nature trainers, conservationists, documentary hosts','Permits into protected forests; a paid documentary segment.','A research permit or guided entry into one badge-gated wild area.','Never harm a protected habitat.','',''],
+  ['Exchange Row Partners','Crown City',18,'wealthy clients, heirs, investment-backed challengers','Covers travel and healing costs; entry to the Weathervane Room.','One door a season that money can open.','Act like money: no public brawls, no cheap sponsors.','',''],
+  ['Sinnoh League Athlete Services','Elite Four Island',0,'Conference qualifiers only','Free legal advice, injury support, media training (+2 on interview and press checks).','A meeting with an Elite Four member or League official.','Stay on-message; drop sponsors the League dislikes.','',''],
+  ['Rising Star Academy & Talent','Jubilife',12,'teenage trainers and coordinators','Once a month, coaching that gives +2 on one skill for that month.','A showcase spot at a major Jubilife or Hearthome event.','Do every booking.','',''],
+  ['Pokétch Live Creators','Jubilife',20,'trainers who stream their journeys','Income from views each session, more for exciting sessions.','A featured channel and a Pokétch sponsorship.','Keep the stream going: a dark week costs 1 standing.','',''],
+  ['JTV Talent Office','Jubilife TV',0,'anyone who goes viral','Instant exposure; +1 rank on the popularity board after a televised win.','A regular Jubilife TV segment.','JTV owns the footage of every interview it arranges.','',''],
+  ['Ladder Talent','Battle Resort Fight Area',20,'fighters on the Ladder','Triple appearance fees for exhibition bouts.','A fast-track placement one rung up the Ladder.','Take the fights you are booked for.','Dex Morrow','Some clients disappear from the Ladder and turn up in the illegal Undercard.'],
+  ['Maison Lumiose Artistes','Kalos (Hearthome office)',15,'coordinators, models','International showcases and fashion work.','A Kalos showcase invitation, which takes a coordinator out of Sinnoh’s season.','Exclusivity: no other agency, no Sinnoh-only fashion labels.','',''],
+  ['Candle Hill Casting','Hearthome',10,'stage performers, coordinators','Paid stage work and “performance and sleep wellness” retreats.','A role in the reopened opera house’s Inaugural Season.','Attend every retreat.','','Clients start having the same dream (Team Vesper Dream Clues, Vesper Opera House). Whether the agency knows is up to you.'],
+  ['Halcyon Representation','Jubilife (mail-drop)',10,'struggling trainers','A large advance at signing (from standing 1, not 3).','—','Never read the fine print aloud.','','The contract takes prize money for years and its release fee is unpayable. The address matches Halcyon Metals, the broker in Fuego Ironworks Operations.'],
+  ["Celestic Heritage Speakers", "Celestic Town", 6, "historians, mythology buffs, ruin guides", "Access to the Celestic archives; +2 on history and lore checks with elders and scholars.", "A private viewing of the shrine murals, and a lecture tour across Sinnoh.", "Respect sacred sites.", "", ""],
+  ["Lab Coat Media", "Sandgem Town", 8, "researchers and field scientists who go public", "Loaned field equipment and a student assistant on the road.", "Co-authorship on a published regional survey, and a research permit of the client’s choice.", "No faked data, ever.", "", ""],
+  ["Tidewatch Talent", "Battle Resort Survival Area", 12, "survivalists, wilderness challengers, off-route trainers", "Survival gear and a guided pass into one off-route zone a month.", "A sponsored off-route expedition, with Rangers notified and supplies dropped.", "Never need a rescue: a Ranger rescue costs 1 standing.", "", ""],
+  ["Galar Bridge Sports", "Galar (Jubilife office)", 15, "stadium battlers who want the big-crowd style", "Invitations to stadium exhibition matches; +1 Hype at the start of televised battles (if you use Hype).", "A guest match in a Galar stadium in the off-season.", "Exclusivity: no other battle agency.", "", ""],
+  ["Squallville Weatherwise", "Squallville", 8, "weather presenters, storm chasers, Water and Flying trainers", "The next day’s weather a day early (the GM tells you); storm-rated gear.", "A regular weather segment on Jubilife TV.", "Never fake a forecast.", "", ""],
+  ["Majolica Makers Guild", "Majolica Town", 10, "artisans, designer trainers, shell and kit designers", "Custom ball shells and kit work at half price; a logo designed free.", "A signature merchandise line in shops across Sinnoh.", "Credit the makers.", "", ""],
+  ["Daybreak Harbor & Line", "Daybreak Town", 6, "anglers, fishing champions, sailors", "Fishing Kit upgrades and a boat whenever the client is on the coast.", "Hosting the Daybreak fishing derby, and first cast at it.", "Respect the catch limits.", "", ""],
+  ["Starfall Records", "Jubilife", 15, "singers, musical performers, coordinators with a voice", "Studio time and a spot opening for touring acts.", "A headline concert in Hearthome or Jubilife.", "No lip-sync scandals.", "", ""],
+  ["Ranger Liaison Office", "Rangers’ union, Jubilife", 0, "trainers who do rescue and conservation work in public", "Priority route plans at Ranger stations; Ranger support on filed trips.", "An honorary Ranger badge, which opens some protected areas.", "Follow Ranger orders in the field.", "", ""],
+  ["Nightjar Management", "Veilstone", 15, "battlers who need money fast", "Cash for every booking, paid that night.", "“Guaranteed” wins in exhibition bouts.", "Lose when you’re told to.", "", "A match-fixing ring that places bets through Crown Gaming House. Clients are told to throw exhibition matches; the guaranteed wins are opponents being paid to lose."]
+];
+/* [name, base, offers, catch, GM-only truth] */
+const SPONSORS=[
+  ['Pokétch Company','Jubilife','The newest Pokétch, apps, a stipend','Beta-test glitchy apps in public',''],
+  ['Jubilife TV','Jubilife','Travel money and airtime','A camera crew on your biggest days',''],
+  ['Veilstone Department Store','Veilstone','A store card and gear discounts','Weekend autograph signings',''],
+  ['Crown Exchange Mutual','Crown City','Covers healing and injury costs','Adjusters review your battles; reckless play voids the policy',''],
+  ['Oreburgh Mining Co.','Oreburgh','Escape Ropes, cave gear, mine access','Safety days; seen as on their side in labor disputes',''],
+  ['Canalave Shipwrights’ Guild','Canalave','Coastal ferry passes','Christen new boats',''],
+  ['Fuego Ironworks Cooperative','Fuego Ironworks','Custom gear and repairs','Wear their heavy kit, even in the heat','The Cooperative is honest; its sealed night-shift contract is Vesper’s.'],
+  ['Sunyshore Solar Cooperative','Sunyshore','Pokémon Center vouchers, charging packs','Talk up solar in a city that argues about it',''],
+  ['Snowpoint Thermal Outfitters','Snowpoint','Free Snowline gear','A commercial shot in a real blizzard',''],
+  ['The Poffin House','Chocovine','Free Poffins and Contest snacks','Tastings and a Poffin named after you',''],
+  ['Arrowroot Mill Ovens','Arrowroot','Baked goods and Berry blends','Your Pokémon’s face on the packaging',''],
+  ['Floaroma Honey Collective','Floaroma','Honey and Sweet Scent supplies','Take their side against Valley Windworks',''],
+  ['Alamos Lake-Aged Cheese','Alamos','Cash and cheese','A cheese-wheel patch on your kit',''],
+  ['Lilypad Springs Resort','Lilypad','Free stays at the hot springs','Spa promo shoots',''],
+  ['Sage Town Spice Merchants','Sage Town','Spice blends for Pokémon food','Cooking demos at the Sage Contest hall',''],
+  ['Seventh Gate Athletics','Jubilife','Kit, gear and replica sales','Wear it everywhere',''],
+  ['Petal & Thread','Floaroma','Stage outfits for rising coordinators','Wear the label on stage',''],
+  ['Volt Line','Sunyshore','Flashy sportswear','Be flashy, every time',''],
+  ['BioLeaf Rest','Sage Town','A sleep tonic and a stipend','Drink it on camera before big matches','BioLeaf is innocent; the Vesper Institute is its clinical-trial partner and takes a royalty.'],
+  ['The Hush Tea Room','Emeragrove','Calming tea and a small stipend','Appear at a Hearthome tasting','The tea room is innocent; its biggest buyer is a Hearthome account tied to the Vesper Opera House.'],
+  ['Aurelian Heritage Trust','Hearthome','Grants for “trainers who honor Sinnoh’s history”','Appear at Heritage Evenings at the opera house','A real charity, owned from above by Compass Meridian Trust.'],
+  ['Vesper Institute Foundation','Jubilife','“Rest and Recovery” scholarships','Take part in a sleep study','Clean on paper; the study puts you in the Institute’s records.'],
+  ['Battle Resort Promotions','Battle Resort','Big appearance fees','Exhibition bouts with looser rest rules','A recruiting path into the illegal Undercard.'],
+  ['Crown Gaming House','Crown City','Huge money','League rules ban gambling-house patches','Taking it quietly is a scandal waiting to happen.'],
+  ["Coil & Current", "Jubilife", "Batteries, chargers and a new Pokétch charger", "Unboxing videos", ""],
+  ["Staravia Air", "Jubilife", "Flights between Jubilife, Sunyshore and Snowpoint", "Fly with the logo showing; delays are your problem", ""],
+  ["Sinnoh Rail & Coach", "Jubilife", "A season rail and coach pass", "Ride the new lines on opening day, cameras present", ""],
+  ["Amity Square Pet Supplies", "Hearthome", "Pokémon food, toys and grooming kits", "Your Pokémon in their ads", ""],
+  ["Berry Bright Juice", "Pastoria", "Juice crates and Berry drinks", "Drink it after every televised win", ""],
+  ["Gracidea Florists", "Emeragrove", "Flowers for contests and Gym walkouts", "A bouquet thrown to the crowd at every win", ""],
+  ["Chocovine Cocoa Works", "Chocovine", "Chocolate, cocoa and travel snacks", "A Pokémon-shaped chocolate in your likeness", ""],
+  ["Pastoria Rainworks", "Pastoria", "Umbrellas and rain gear", "Be seen in the rain", ""],
+  ["Lakecrest Grand Hotel", "Valor Lakefront", "Rooms during the Grand Festival", "Attend the hotel’s gala dinner", ""],
+  ["Dandelion Seed Vault", "Dandelion Island", "Rare seeds and Berry stock", "A season of volunteer work at the vault", ""],
+  ["Anvil Strength Co.", "Battle Resort", "Training gear and weights", "Train in public at their gyms", ""],
+  ["Jubilife Gamesworks", "Jubilife", "A cut of a video game with you in it", "They own your likeness for the game", ""],
+  ["Coronet Outfitters", "Eterna", "Hiking gear and packs", "Field-test new gear on hard routes", ""],
+  ["Maison Hearth", "Hearthome", "Couture for contests and galas", "Wear only Maison Hearth on stage", ""],
+  ["Route Rack", "Everywhere", "Free basics and travel clothes", "Tacky ads in every store window", ""],
+  ["Moonhaven", "Canalave", "Night-sky couture", "Wear it to night events", "Customers say the designer dreams the patterns. A red herring, or not."],
+  ["Iron Island Assay House", "Iron Island", "Steel gear and ore souvenirs", "Visit the island’s mining days", "Sells pale, faintly ringing ore to a buyer nobody asks about (see Vesper Finances and Shell Companies)."],
+  ["Calloway Technical Ceramics", "Majolica", "Porcelain prizes and trophies", "Hand them out at Majolica events", "Makes bulk porcelain half-masks for Mazzi & Daughters: the Company’s masks."],
+  ["Lumen Data Works", "Jubilife", "Free cloud storage for Pokédex data and battle footage", "Your data stays on their servers", "Hosts Vesper’s Register; the sync node’s cover. A client’s footage is on the same servers."],
+  ["Valley Windworks Energy", "Valley Windworks", "Pokémon Center vouchers and clean-power ads", "Speak at energy events; feud with the Floaroma Honey Collective", "Block 7 is leased to Marrow & Vane Instruments, Vesper’s “atmospheric observation” front."]
+];
+const agOf=t=>{const k=dexKey(t&&t.agency);return k?AGENCIES.find(a=>dexKey(a[0])===k)||null:null;};
+function agPanel(uid,t,ro){
+  const a=agOf(t),st=clamp(Math.round(num(t.agSt))||0,0,5),signed=String(t.agency||'').trim();
+  const sp=Array.isArray(t.sponsors)?t.sponsors:[];
+  const perk=(i)=>{const n=i+1,on=signed&&st>=n;
+    const extra=a&&n===3?' Signature: '+a[4]:a&&n===5?' Elite: '+a[5]:'';
+    return h`<li class="${on?'':'sub'}"><b>${AG_STAND[n][1]}</b>${on?'':' (locked)'} ${AG_PERKS[i]}${extra}</li>`;};
+  return h`<section class="panel"><div class="ph"><h2>Agency & sponsors</h2>${signed?h`<span class="pill">Standing ${st}</span>`:h`<span class="pill">Independent</span>`}</div>
+    <datalist id="dl-agencies">${AGENCIES.map(x=>h`<option value="${x[0]}">`)}</datalist>
+    <datalist id="dl-sponsors">${SPONSORS.map(x=>h`<option value="${x[0]}">`)}</datalist>
+    <div class="fgrid">${fText('Agency','t',uid,'agency',t,{ro,list:'dl-agencies',ph:'None yet'})}${fText('Agent or manager','t',uid,'agent',t,{ro,ph:a&&a[7]?a[7]:''})}
+      ${fSel('Standing (set by the GM)','t',uid,'agSt',t,AG_STAND,{ro:ro||!S.me.admin})}</div>
+    ${a?h`<p class="sub">${a[0]}, ${a[1]}. Signs ${a[3]}. Cut ${a[2]?a[2]+'%':'none'}. <b>Code:</b> ${a[6]}</p>`:signed?h`<p class="sub">A custom agency. Write its terms in the notes.</p>`:h`<p class="sub">No agency. Offers come after public wins and viral moments; the GM tells you when one calls.</p>`}
+    ${signed?h`<ul class="reful agperks">${AG_PERKS.map((x,i)=>perk(i))}</ul>`:''}
+    ${fArea('Contract notes','t',uid,'agNote',t,{ro,rows:2,ph:'Terms you agreed, favors owed, what the agent promised'})}
+    <h3 class="refg">Sponsors</h3>
+    ${sp.length?h`<div class="list">${sp.map((x,i)=>h`<div class="item"><div class="irow two">${fText('Sponsor','t',uid,'sponsors.'+i+'.name',t,{ro,list:'dl-sponsors'})}${rowBtns('t',uid,'sponsors',i,sp.length,ro)}</div>
+      <div class="fgrid">${fText('They give','t',uid,'sponsors.'+i+'.offer',t,{ro})}${fText('You owe','t',uid,'sponsors.'+i+'.ask',t,{ro})}${fText('Until','t',uid,'sponsors.'+i+'.until',t,{ro,ph:'End of the season'})}</div></div>`)}</div>`:h`<p class="sub">No sponsors yet.</p>`}
+    ${sp.length>2?h`<p class="sub">Only two sponsor patches fit on a League kit.</p>`:''}
+    ${ro||sp.length>=6?'':h`<div><button class="btn sm" data-act="add" ${bp('t',uid,'sponsors')} data-tpl="sponsor">Add sponsor</button></div>`}
+  </section>`;
+}
+const AG_OFFERS=['Halcyon Representation: a generous advance, today only','Pokétch Live Creators: “your journey would stream great”','JTV Talent Office, free, after a highlight aired','Ladder Talent: an exhibition bout at the Battle Resort','Rising Star Academy, through a parent or mentor','Northstar Talent Group, after a big crowd win','Lumiere & Crane (coordinators; otherwise Northstar)','Coalface Sports Management, if the trainer battled in Oreburgh','Harborlight Agency, on the coast','Greenhouse Collective, through a Day Care or farm contact','Frostline Talent, after anything heroic in the north','Fen & Fable, after anything in Pastoria or the Grand Marsh','Veilstone Combat Bureau, after a clean physical win','Old Forest Talent, after anything with wild Pokémon or research','Exchange Row Partners, through a rich patron','Maison Lumiose Artistes (coordinators; otherwise Northstar)','Candle Hill Casting, after a stage performance','Two agencies at once: roll twice; they compete','A rival’s agent tries to poach the trainer','Sinnoh League Athlete Services (Conference qualifiers; otherwise roll again)'];
+function agDesk(){
+  const ids=tids(),r=num(S.ui.agRoll);
+  return h`<section class="panel"><div class="ph"><h2>Agencies and sponsors</h2><span class="pill gm">GM only</span></div>
+    <p class="sub">How representation and sponsorship work in the campaign. The full notes are in the vault (Talent Agencies, Brands and Sponsors). Each trainer's agency, standing and sponsors are on their sheet under Honors &amp; career; only you can set standing.</p>
+    ${ids.length?h`<div class="list">${ids.map(uid=>{const t=S.trainers[uid];return h`<div class="item"><div class="irow two"><span><b>${tName(t)}</b> <span class="sub">${String(t.agency||'').trim()||'Independent'}${(t.sponsors||[]).length?' · '+(t.sponsors||[]).map(x=>x.name).filter(Boolean).join(', '):''}</span></span>${fSel('Standing','t',uid,'agSt',t,AG_STAND,{})}</div></div>`;})}</div>`:''}
+    ${refSec('ag_how','How signing works',h`<ul class="reful">
+      <li>Nobody starts signed. Agencies call after a public win (a badge before a big crowd, a ribbon, a Conference place) or a viral moment on Jubilife TV. The big and the shady call first; small, honest agencies wait to be asked.</li>
+      <li>An offer is a scene: the agent makes a pitch and names the terms. The trainer can sign, negotiate (one social roll for one concession), ask for time, or say no.</li>
+      <li>Signing starts at standing 1. Write the agency on the sheet and set the standing here.</li>
+      <li><b>Representatives:</b> an agent finds and negotiates deals; a publicist manages image and interviews; a manager runs the schedule. Rookies have none; stars have all three.</li></ul>`)}
+    ${refSec('ag_stand','Standing: how it changes',h`<dl class="refdl">
+      <dt>+1</dt><dd>A badge, ribbon or big public win; a month of every obligation met; a headline that makes the agency look good; a favor the agency asked for.</dd>
+      <dt>−1</dt><dd>A missed obligation; a public embarrassment; refusing a deal the agent brought.</dd>
+      <dt>−2</dt><dd>A scandal; working with a rival agency; breaking the agency's code.</dd>
+      <dt>0</dt><dd>Dropped: all perks lost, a breakup headline runs, and some contracts charge a release fee.</dd>
+      <dt>Limit</dt><dd>Standing rises at most once per session.</dd></dl>`)}
+    ${refSec('ag_perks','Perks by standing',h`<dl class="refdl">${AG_PERKS.map((x,i)=>h`<dt>${AG_STAND[i+1][1]}</dt><dd>${x}</dd>`)}</dl>`)}
+    ${refSec('ag_cost','The drawbacks',h`<ul class="reful">
+      <li><b>The cut:</b> a share of sponsor and prize money, from 5% to 20%.</li>
+      <li><b>Obligations:</b> about one booking a week, more at higher standing. They take time from travel and training.</li>
+      <li><b>The code:</b> one rule a client must not break, worth −2 standing.</li>
+      <li><b>Agendas and image:</b> agents push the deals that pay them; publicists decide how the trainer is presented.</li>
+      <li><b>Leaving:</b> a release fee, a lost sponsor or a public feud.</li></ul>`)}
+    ${refSec('ag_list','The agencies ('+AGENCIES.length+')',h`<dl class="refdl">${AGENCIES.map(a=>h`<dt>${a[0]}</dt><dd><span class="sub">${a[1]} · cut ${a[2]?a[2]+'%':'none'} · signs ${a[3]}${a[7]?' · '+a[7]:''}</span><br><b>Signature (3):</b> ${a[4]} <b>Elite (5):</b> ${a[5]} <b>Code:</b> ${a[6]}${a[8]?h`<br><span class="pill gm">Truth</span> ${a[8]}`:''}</dd>`)}</dl>`)}
+    ${refSec('ag_spons','Sponsors ('+SPONSORS.length+')',h`<ul class="reful"><li>Offers come after a first badge or ribbon (local sponsors) and after a big public win (national names). Every deal has a catch: plan one moment where it clashes with what the trainer wants.</li><li>Two patches at most on a League kit. Contracts run one season, Opening Ceremony to Opening Ceremony. Sponsors walk after bad losses, scandals or a trainer who won't promote them.</li></ul>
+      <dl class="refdl">${SPONSORS.map(x=>h`<dt>${x[0]}</dt><dd><span class="sub">${x[1]}</span> · <b>Gives:</b> ${x[2]} · <b>Asks:</b> ${x[3]}${x[4]?h`<br><span class="pill gm">Truth</span> ${x[4]}`:''}</dd>`)}</dl>`)}
+    <div class="row"><button class="btn sm" data-act="ag_roll">Roll an agency offer (d20)</button>${r?h`<span><b class="mono">${r}</b> · ${AG_OFFERS[r-1]}</span>`:''}</div>
+  </section>`;
+}
+
 function gmTab(){
   const ids=tids();
   const top=ids.map(u=>[u,badgeCount(S.trainers[u])]).sort((a,b)=>b[1]-a[1])[0];
@@ -9306,7 +9450,7 @@ function gmTab(){
   ${awardForm()}${awardHistory()}
   ${megaDesk()}
   ${giveDesk()}
-  ${evoDesk()}${evoLogDesk()}${ptaDesk()}${encDesk()}${ccDesk()}
+  ${evoDesk()}${evoLogDesk()}${ptaDesk()}${encDesk()}${ccDesk()}${agDesk()}
   <section class="panel"><div class="ph"><h2>Party snapshot</h2></div>
     <p>${top?h`Highest badge count: <b class="mono">${top[1]}</b> (${tName(S.trainers[top[0]])}).`:'No trainers yet.'}</p>
     <p class="sub">Loyalty and NPC secrets are stored where only editors can read them. Players never receive that data.</p></section>
@@ -11399,6 +11543,7 @@ function act(b,e){
   if(d.act&&d.act.indexOf('tm_')===0){tmAct(b);return;}
   if(d.act&&d.act.indexOf('br_')===0){brAct(b);return;}
   if(d.act==='zn_load'){znLoad();return;}
+  if(d.act==='ag_roll'){S.ui.agRoll=1+Math.floor(Math.random()*20);render();return;}
   if(d.act==='fs_load'){fsLoad();return;}
   if(d.act==='zn_zone'){if(S.me.admin&&clTrip()){const t=JSON.parse(JSON.stringify(clTrip()));t.zone=d.v;edit('cd','conditions','trip',t);render();}return;}
   if(d.act&&d.act.indexOf('sp_')===0){shAct(b);return;}
