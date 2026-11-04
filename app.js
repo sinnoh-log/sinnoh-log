@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-03 · TM, TR and HM numbers';
+const BUILD='2026-11-03 · Fishing at every place with water';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -4811,7 +4811,7 @@ function encEff(T,c,z){
   const fish=[],act=[];
   (Array.isArray(T.em)?T.em:[]).forEach(m=>{
     if(!m||!encModOn(m,c,z))return;
-    act.push(m);
+    if(!(Array.isArray(m.fish)&&!(m.fx||[]).length&&m.rt==null&&!m.only&&!m.nn))act.push(m);
     if(m.rt!=null)rt*=Math.max(0,num(m.rt));
     if(Array.isArray(m.nn)&&m.nn.length===2)nn=[num(m.nn[0]),num(m.nn[1])];
     if(Array.isArray(m.fish))fish.push({id:m.id,lb:m.lb,list:m.fish,tx:m.tx||''});
@@ -5354,6 +5354,9 @@ function encDesk(){
     <div class="mgd"><b>Semi-route and off-route tables</b>
       <p class="sub">Each wild route gets a "Semi-route" and, where the land is still wild, an "Off-route" table beside its main one: stronger, warier Pokémon drawn from the route's terrain (forest, coast, marsh, mountain, cave, snow and so on). Your main tables are not touched. Roll them from the route's page like any other table.</p>
       <div class="row">${znMissing()?h`<button class="btn sm" data-act="zn_load">Add ${znMissing()} zone tables</button>`:h`<span class="sub">Every route has its zone tables.</span>`}</div></div>
+    <div class="mgd"><b>Fishing</b>
+      <p class="sub">Every town, landmark and route with water (${Object.keys(FS_PLACES).length} places) gets a <b>Cast a line</b> button on its main table, with a catch list for its kind of water: sea, lake, river, stream, marsh, pond, hot springs, ice hole or cave pool. A place that already has a fishing option is left alone, and you can edit any list afterwards under Conditions and situations. The place pages tell the players where fishing is possible.</p>
+      <div class="row">${fsMissingIds().length?h`<button class="btn sm" data-act="fs_load">Add fishing to ${fsMissingIds().length} places</button>`:h`<span class="sub">Every place with water has fishing.</span>`}</div></div>
     ${wishes.length?h`<div class="encwishes"><h3>Wished Pokémon</h3><p class="sub">Where each Pokémon a player wants turns up, with its usual chance there.</p>
       ${wishes.map(x=>h`<div class="fld"><button class="btn sm ${wo[x.i]?'primary':''}" data-act="en_wo" data-i="${x.i}" aria-expanded="${String(!!wo[x.i])}">${x.name||ENC_WISH[x.i].d} · ${x.list.length} Pokémon</button>${wo[x.i]?encWishList(x):''}</div>`)}</div>`:''}
   </section>`;
@@ -10775,6 +10778,77 @@ function znLoad(){
 }
 function znMissing(){return Object.keys(ZN_ROUTES).reduce((a,id)=>{const ex=Array.isArray(encGp(id).ex)?encGp(id).ex:[];return a+(ZN_ROUTES[id][1]&&!ex.some(e=>e&&e.nm==='Semi-route')?1:0)+(ZN_ROUTES[id][2]&&!ex.some(e=>e&&e.nm==='Off-route')?1:0);},0);}
 
+
+/* ---------- Fishing: a "Cast a line" option at every place with water ----------
+   Each water kind has its own catch list [species, weight, rarity]. The GM Desk adds a fishing option to the main table of
+   every place listed in FS_PLACES that has no fishing option yet (kept in gm/place_<id> like the rest, so players never see
+   the list). The place page tells the players that fishing is possible there, and needs a Fishing Kit. */
+const FS_POOL={
+  sea:[['Magikarp',22,'C'],['Tentacool',18,'C'],['Finneon',14,'C'],['Remoraid',10,'U'],['Shellos',10,'C'],['Horsea',6,'U'],['Mantyke',5,'U'],['Chinchou',4,'U'],['Qwilfish',3,'U'],['Lumineon',3,'U'],['Octillery',2,'U'],['Tentacruel',2,'U'],['Gyarados',1,'R']],
+  lake:[['Magikarp',30,'C'],['Goldeen',20,'C'],['Barboach',16,'C'],['Psyduck',8,'C'],['Wooper',6,'C'],['Seaking',6,'U'],['Whiscash',4,'U'],['Shellos',4,'U'],['Gyarados',2,'R']],
+  river:[['Magikarp',28,'C'],['Goldeen',22,'C'],['Barboach',14,'C'],['Wooper',8,'C'],['Psyduck',6,'C'],['Seaking',6,'U'],['Remoraid',4,'U'],['Whiscash',3,'U'],['Gyarados',2,'R']],
+  stream:[['Magikarp',30,'C'],['Goldeen',26,'C'],['Barboach',12,'C'],['Wooper',10,'C'],['Psyduck',8,'C'],['Seaking',4,'U']],
+  marsh:[['Barboach',22,'C'],['Magikarp',20,'C'],['Wooper',18,'C'],['Goldeen',10,'C'],['Quagsire',8,'U'],['Whiscash',6,'U'],['Shellos',6,'C'],['Gyarados',2,'R']],
+  pond:[['Magikarp',35,'C'],['Goldeen',22,'C'],['Wooper',12,'C'],['Psyduck',10,'C'],['Barboach',10,'C'],['Marill',5,'C'],['Seaking',4,'U']],
+  hot:[['Magikarp',25,'C'],['Goldeen',20,'C'],['Psyduck',18,'C'],['Wooper',12,'C'],['Barboach',10,'C'],['Marill',8,'C'],['Golduck',3,'U']],
+  ice:[['Magikarp',30,'C'],['Goldeen',20,'C'],['Barboach',14,'C'],['Seaking',10,'U'],['Whiscash',8,'U'],['Gyarados',3,'R']],
+  cave:[['Magikarp',30,'C'],['Barboach',20,'C'],['Goldeen',18,'C'],['Whiscash',8,'U'],['Seaking',6,'U'],['Gyarados',2,'R']]
+};
+const FS_LB={sea:'Sea',lake:'Lake',river:'River',stream:'Stream',marsh:'Marsh',pond:'Pond',hot:'Hot springs',ice:'Ice hole',cave:'Cave pool'};
+const FS_WORD={sea:'sea',lake:'lake',river:'river',stream:'stream',marsh:'marsh',pond:'pond',hot:'hot-spring pool',ice:'ice-hole',cave:'underground pool'};
+const FS_PLACES={
+  'snowpoint-city':['sea'],'lilypad-town':['hot'],'sandalstraw-town':['sea','river'],'iron-island':['sea'],'battle-resort-fight-area':['sea'],
+  'battle-resort-survival-area':['marsh','sea'],'resort-area':['sea'],'squallville':['sea'],'veilstone-city':['sea'],'dandelion-island':['sea'],
+  'champions-port':['sea'],'elite-four-island':['sea'],'chocovine-town':['sea'],'michina-town':['pond'],'crown-city':['sea','lake'],
+  'canalave-city':['sea'],'alamos-town':['lake'],'majolica-town':['pond'],'brussel-town':['river'],'arrowroot-town':['river'],'camellia-town':['sea'],
+  'sunyshore-city':['sea'],'neighborly-town':['lake','sea'],'daybreak-town':['sea'],'pastoria-city':['marsh','sea'],'sage-town':['sea'],'greenstation-town':['marsh'],
+  'acuity-lakefront':['ice'],'fullmoon-island':['sea','pond'],'newmoon-island':['sea'],'lucario-kingdom':['sea'],'battle-resort-port':['sea'],
+  'lily-of-the-valley-conference':['sea'],'206-bridge':['river'],'valley-windworks':['pond'],'mt-coronet-and-spear-pillar':['cave'],
+  'gracidea-flower-garden':['stream'],'grand-marsh':['marsh'],'safari-zone':['marsh'],'valor-lakefront-and-grand-festival':['lake'],
+  'verity-lakefront':['lake'],'sandgem-port':['sea'],'south-sinnoh-port':['sea'],
+  'route-201':['pond'],'route-202':['stream'],'route-205':['river'],'route-206':['river'],'route-208':['river'],'route-212':['marsh'],'route-213':['sea'],
+  'route-214':['lake'],'route-217':['ice'],'route-218':['sea'],'route-219':['sea'],'route-220':['sea'],'route-221':['marsh','sea'],'route-222':['sea'],
+  'route-224':['lake'],'route-225':['sea'],'route-226':['sea'],'route-227':['cave'],'route-230':['river'],'route-231':['lake','sea'],'route-232':['sea'],
+  'route-233':['sea','river'],'route-234':['sea'],'route-235':['lake'],'route-237':['pond'],'route-238':['stream'],'route-239':['stream'],'route-241':['pond'],
+  'route-242':['marsh'],'battle-resort-route-225':['stream'],'battle-resort-route-226':['marsh','sea'],'battle-resort-route-227':['stream'],
+  'battle-resort-route-228':['stream','sea'],'battle-resort-route-229':['sea']
+};
+/* extra catches and notes for particular places */
+const FS_EXTRA={'mt-coronet-and-spear-pillar':{cave:[['Feebas',6,'R']]}};
+const FS_NOTE={
+  'newmoon-island':'Everything within five kilometers of the coast is the League’s Closed Water. Fishing here is illegal, and Rangers patrol it.',
+  'grand-marsh':'Fishing only from the boardwalks, with a day permit from the marsh office.',
+  'safari-zone':'Fishing is allowed only at the marked wetland pools, under the Safari Zone’s rules.',
+  'acuity-lakefront':'Ice fishing: cut a hole through the ice, or fish the open water at the edge.',
+  'route-217':'Ice fishing through the frozen lake. The ice groans at night.',
+  'mt-coronet-and-spear-pillar':'The underground lake inside the mountain. A few spots hold Feebas, and they shift from year to year.',
+  'route-227':'The warm, foggy pools in the middle of the tunnel.',
+  'lilypad-town':'The open pools that never freeze. Ask before casting into a bathing pool.'
+};
+const fsHas=T=>(Array.isArray(T&&T.em)?T.em:[]).some(m=>m&&Array.isArray(m.fish));
+function fsMods(id){
+  return (FS_PLACES[id]||[]).map(k=>{
+    const ex=(FS_EXTRA[id]&&FS_EXTRA[id][k])||[];
+    const list=FS_POOL[k].concat(ex).map(([s,w,bk])=>({s,w,bk}));
+    return {id:'fish-'+k,lb:'Fishing · '+FS_LB[k],fish:list,fx:[],tx:'Needs a Fishing Kit. Cast a line to roll a catch.'+(FS_NOTE[id]?' '+FS_NOTE[id]:'')};
+  });
+}
+const fsMissingIds=()=>Object.keys(FS_PLACES).filter(id=>PD_BY[id]&&!fsHas(encGp(id)));
+function fsLoad(){
+  if(!S.me.admin)return;
+  const ids=fsMissingIds();
+  ids.forEach(id=>{const g=encGp(id),em=Array.isArray(g.em)?g.em.slice():[];edit('gp',id,'em',em.concat(fsMods(id)));});
+  toast(ids.length?'Added fishing to '+ids.length+' places.':'Every place with water already has fishing.',true);
+  render();
+}
+/* the place pages tell the players where they can fish */
+Object.keys(FS_PLACES).forEach(id=>{
+  const f=PD_BY[id],k=FS_PLACES[id];if(!f)return;
+  const w=k.map(x=>FS_WORD[x]);
+  const what=(w.length>1?w.slice(0,-1).join(', ')+' and '+w[w.length-1]:w[0]);
+  f.facts.push(['Fishing',id==='newmoon-island'?'Possible, but the coast is the League’s Closed Water: fishing there is illegal.':what.charAt(0).toUpperCase()+what.slice(1)+' fishing. Bring a Fishing Kit.']);
+});
+
 /* rings round towns keep a steady on-screen size whatever the zoom */
 function sizeHot(){
   const svg=$('svg.hot');
@@ -11325,6 +11399,7 @@ function act(b,e){
   if(d.act&&d.act.indexOf('tm_')===0){tmAct(b);return;}
   if(d.act&&d.act.indexOf('br_')===0){brAct(b);return;}
   if(d.act==='zn_load'){znLoad();return;}
+  if(d.act==='fs_load'){fsLoad();return;}
   if(d.act==='zn_zone'){if(S.me.admin&&clTrip()){const t=JSON.parse(JSON.stringify(clTrip()));t.zone=d.v;edit('cd','conditions','trip',t);render();}return;}
   if(d.act&&d.act.indexOf('sp_')===0){shAct(b);return;}
   if(d.act&&d.act.indexOf('rb_')===0){ribAct(b);return;}
