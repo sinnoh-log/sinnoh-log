@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-04 · Berry foraging';
+const BUILD='2026-11-04 · League Cards';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -8568,31 +8568,61 @@ function bm3Act(b,e){
 const idHash=u=>{let n=7;String(u).split('').forEach(c=>{n=(n*31+c.charCodeAt(0))%1000003;});return n;};
 const idNo=u=>{const n=idHash(u);return 'No. '+String(n%10000).padStart(4,'0')+'-'+String(Math.floor(n/10)%10000).padStart(4,'0');};
 const ID_STAT=[['atk','ATK'],['def','DEF'],['spa','SPA'],['spd','SPD'],['spe','SPE']];
+/* ---------- the League Card (overview): the trainer's official challenger card, front and back ---------- */
+const LC_ACC=[['#E58FB0','Rose'],['#7FD69A','Leaf green'],['#8FC7E5','Ice blue'],['#F2C230','Gold'],['#F0904A','Ember orange'],['#B79CF2','Violet'],['#5ED0C8','Teal'],['#E85A5A','Red'],['#D9D4DC','Silver']];
+const lcAcc=(uid,t)=>{const c=String(t.kitCol||'');return LC_ACC.some(x=>x[0]===c)?c:LC_ACC[idHash(uid)%LC_ACC.length][0];};
+const lcNo=t=>{const n=String(t.kitNo==null?'':t.kitNo).replace(/\D/g,'').slice(0,3);return n?n.padStart(3,'0'):'---';};
+const lcTier=n=>n>=7?'VANGUARD':n>=5?'WARDEN':n>=2?'PATHFINDER':'ROOKIE';
+function lcStats(uid,t){
+  let pos=0,w=0,l=0,ce=0,cr=0;
+  try{const g=rkWith('gym',()=>rkRows().find(x=>x.id===uid));if(g){pos=g.pos;const r=g.rec||{};w=num(r.w);l=num(r.l);}
+    const c=rkWith('con',()=>rkRows().find(x=>x.id===uid));if(c){const cc=c.con||{};ce=num(cc.e);cr=num(cc.r);}}catch(e){}
+  const halls=ribHalls();
+  return {pos,w,l,ce,rib:Math.max(ribCount(t,halls),cr),need:ribNeedEff(halls)};
+}
 function trainerCard(uid){
   const t=S.trainers[uid];
   const mons=partyOf(uid);
   const bg=t.badges||{};
   const back=!!S.ui.flip[uid];
-  const st=t.stats||{};
-  return h`<article class="panel tcard idcard idh${idHash(uid)%6}">
-    <div class="idhead"><span>SINNOH LEAGUE · TRAINER ID</span><span>${idNo(uid)}</span></div>
-    ${back?h`<div class="idback">
-      <div class="idstats">${[['hp','HP',num(t.hp&&t.hp.max)]].concat(ID_STAT.map(([k,l])=>[k,l,num(st[k])])).map(([k,l,v])=>h`<div class="idst"><i>${l}</i><b>${v}</b></div>`)}</div>
-      <div class="row sp"><span class="sub">Hometown</span><b>${t.hometown||'Not set'}</b></div>
-      <div class="row sp"><span class="sub">Class</span><b>${[t.cls,t.adv].filter(Boolean).join(' · ')||'Not chosen'}</b></div>
-      <div class="row sp"><span class="sub">Contest ribbons</span><b>${ribBrief(t)}</b></div>
-      <div class="idcode" aria-hidden="true"></div>
-    </div>`:h`<div class="idfront">
-    <button class="pbtn" data-act="view" data-uid="${uid}" data-tab="trainer" aria-label="Open sheet for ${tName(t)}">${pimg(t.img,tName(t),'tall',t.imgc)}</button>
-    <div><h3>${tName(t)}</h3>
-      <p class="sub">${[t.cls,t.adv].filter(Boolean).join(' · ')||'Class not chosen'} · Level ${num(t.level)||1}</p>
-      <p class="sub">Played by ${nm(uid)}</p></div></div>
-    <div class="hpline">${hpBar(t.hp)}<span class="mono">${num(t.hp&&t.hp.cur)}/${num(t.hp&&t.hp.max)}</span></div>
-    <div class="row sp"><span class="dots" role="img" aria-label="${badgeCount(t)} of 8 badges">${BADGES.map(b=>h`<span class="dot ${bg[b[0]]?'on':''}" ${raw('style="--bc:'+BADGE_COL[b[0]]+'"')} title="${b[1]} Badge"></span>`)}</span><span class="mono sub">${badgeCount(t)}/8</span></div>
-    <div class="row sp"><span class="sub">Contest ribbons</span><span class="mono sub">${ribBrief(t)}</span></div>
-    <ul class="team">${mons.length?mons.map(m=>h`<li>${monIcon(m)}<b>${mName(m)}</b>${genPill(m.gender)}${megaOn(m)?h`<span class="pill mega">Mega</span>`:''}${typeChips(m)}</li>`):h`<li class="sub">No Pokémon on hand</li>`}</ul>`}
-    <footer><button class="btn sm" data-act="idflip" data-uid="${uid}" aria-pressed="${String(back)}">${back?'Flip to front':'Flip card'}</button><button class="btn sm" data-act="view" data-uid="${uid}" data-tab="trainer">Sheet</button><button class="btn sm" data-act="view" data-uid="${uid}" data-tab="pokemon">Pokémon</button></footer>
+  const nb=badgeCount(t),st=lcStats(uid,t),no=lcNo(t),acc=lcAcc(uid,t);
+  const lead=mons[0];
+  const sp=(t.sponsors||[]).map(x=>x&&x.name).filter(Boolean);
+  const lbl=(k,v)=>h`<div class="lcf"><span>${k}</span><b>${v}</b></div>`;
+  return h`<article class="panel tcard lcard" ${raw('style="--acc:'+acc+'"')} aria-label="League Card for ${tName(t)}"><div class="lcin">
+    ${back?h`<div class="lchead"><div><b class="lcnm">${tName(t)}</b><span class="lcsm">${no!=='---'?'No. '+no+' · ':''}${[t.cls,t.adv].filter(Boolean).join(' · ')||'Challenger'}</span></div>${no!=='---'?h`<b class="lcbig">${no}</b>`:''}</div>
+      <div class="lcback">
+        <div class="lcboxes">${[['Battles',st.w+st.l],['Wins',st.w],['Contests',st.ce],['Rank',st.pos?'#'+st.pos:'—']].map(([k,v])=>h`<div><span>${k}</span><b>${v}</b></div>`)}</div>
+        <div class="lcsec"><span class="lck">Badge band</span><div class="lcband">${BADGES.map(b=>h`<i class="${bg[b[0]]?'on':''}" ${raw('style="--bc:'+BADGE_COL[b[0]]+'"')} title="${b[1]} Badge${bg[b[0]]?'':' (not yet)'}"></i>`)}</div></div>
+        <div class="lcsec"><span class="lck">Team</span><div class="lcteam">${mons.length?mons.map(m=>h`<span>${mName(m)}</span>`):h`<span class="lcempty">No Pokémon on hand</span>`}</div></div>
+        <div class="lcgrid">${lbl('Endorsed by',t.endorser||'Not yet')}${lbl('Agency',String(t.agency||'').trim()||'Independent')}${lbl('Sponsors',sp.length?sp.slice(0,3).join(', '):'None yet')}${lbl('Signature play',t.sigPlay||'Not yet')}</div>
+        ${t.quote?h`<p class="lcq">“${t.quote}”</p>`:''}
+      </div>
+      <div class="lcfoot"><span>Sinnoh League · Official challenger card</span><span>Season ${num(S.meta.season)||1}${no!=='---'?' · '+no+' / 999':''}</span></div>`
+    :h`<div class="lchead"><span class="lcbrand"><svg width="18" height="21" viewBox="0 0 26 30" aria-hidden="true"><path d="M13 1 L25 6 V15 C25 22 19 27 13 29 C7 27 1 22 1 15 V6 Z" fill="none" stroke="currentColor" stroke-width="2.4"></path><path d="M13 8 L18 15 L13 22 L8 15 Z" fill="var(--acc)"></path></svg>SINNOH LEAGUE</span><span class="lcsm">SEASON ${num(S.meta.season)||1} · ${lcTier(nb)}</span></div>
+      <div class="lcphoto"><button class="pbtn" data-act="view" data-uid="${uid}" data-tab="trainer" aria-label="Open sheet for ${tName(t)}">${pimg(t.img,tName(t),'tall',t.imgc)}</button>
+        ${no!=='---'?h`<b class="lcno" aria-label="League number ${no}">${no}</b>`:''}
+        <div class="lctags">${t.cls?h`<span class="on">${String(t.cls).toUpperCase()}</span>`:''}<span>CHALLENGER</span></div></div>
+      <div class="lcstripe"></div>
+      <div class="lcbody">
+        <div class="row sp lcname"><h3>${tName(t)}</h3><span class="sub">${t.hometown||''}</span></div>
+        <div class="lcstats">${[['Badges',nb+' / 8'],['Ribbons',st.rib+' / '+st.need],['Rank',st.pos?'#'+st.pos:'—']].map(([k,v])=>h`<div><span>${k}</span><b>${v}</b></div>`)}</div>
+        <div class="lcpartner"><span class="lck">Partner</span>${lead?h`${monIcon(lead)}<b>${mName(lead)}</b>${typeChips(lead)}`:h`<span class="sub">None yet</span>`}</div>
+        <div class="hpline">${hpBar(t.hp)}<span class="mono">${num(t.hp&&t.hp.cur)}/${num(t.hp&&t.hp.max)} HP</span></div>
+      </div>`}
+    </div>
+    <footer><button class="btn sm" data-act="idflip" data-uid="${uid}" aria-pressed="${String(back)}">${back?'Flip to front':'Flip card'}</button><button class="btn sm" data-act="view" data-uid="${uid}" data-tab="trainer">Sheet</button></footer>
   </article>`;
+}
+/* kit and card details, on the sheet under Honors & career */
+function kitPanel(uid,t,ro){
+  return h`<section class="panel"><div class="ph"><h2>League kit & card</h2><span class="pill">No. ${lcNo(t)}</span></div>
+    <div class="fgrid">${fText('League number (001–999)','t',uid,'kitNo',t,{ro,ph:'e.g. 012'})}
+      ${fSel('Accent color','t',uid,'kitCol',t,LC_ACC,{ro,blank:'Pick one'})}
+      ${fText('Endorsed by','t',uid,'endorser',t,{ro,ph:'Who backed your entry'})}
+      ${fText('Signature play','t',uid,'sigPlay',t,{ro,ph:'A move fans know you for'})}
+      ${fText('Card quote','t',uid,'quote',t,{ro,cls:'wide',ph:'A line from an interview'})}</div>
+    <p class="sub">These fill in the League Card on the Overview. The number and accent are on your kit too.</p></section>`;
 }
 function feedItems(){
   const out=[];
@@ -8869,7 +8899,7 @@ function trainerTab(){
   if(!t)return h`${trainerPicker()}${emptyTrainer()}`;
   const ro=!canEditT(uid);
   const tab=sheetTabNow(),show=g=>tab==='all'||tab===g;
-  const c1=[show('prof')?identityPanel(uid,t,ro):'',show('stats')?vitalsPanel(uid,t,ro):'',show('honors')?honorsPanel(uid,t,ro):'',show('honors')?rkSheetPanel(uid):'',show('honors')?agPanel(uid,t,ro):''];
+  const c1=[show('prof')?identityPanel(uid,t,ro):'',show('stats')?vitalsPanel(uid,t,ro):'',show('honors')?honorsPanel(uid,t,ro):'',show('honors')?rkSheetPanel(uid):'',show('honors')?kitPanel(uid,t,ro):'',show('honors')?agPanel(uid,t,ro):''];
   const c2=[show('stats')?skillsPanel(uid,t,ro):'',show('feat')?featuresPanel(uid,t,ro):'',show('bag')?itemsPanel(uid,t,ro):''];
   const n1=c1.filter(Boolean).length,n2=c2.filter(Boolean).length;
   return h`${trainerPicker()}
@@ -9442,6 +9472,7 @@ function gmTab(){
       ${fText('Subtitle','meta','table','subtitle',S.meta,{cls:'wide'})}
       ${fText('Game Master name','meta','table','gm',S.meta)}
       ${fNum('Current session','meta','table','session',S.meta,{min:1})}
+      ${fNum('League season','meta','table','season',S.meta,{min:1})}
       ${fArea('Pinned note for the party','meta','table','pinned',S.meta,{rows:3,cls:'wide',ph:'Shown at the top of the Overview'})}
     </div>
     <p class="sub">The banner is changed from the Overview page, the map from the Map page, and NPCs with portraits are added on the People page. Their secret notes are only visible to you.</p></section>
