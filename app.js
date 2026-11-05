@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-04 · More agencies and sponsors';
+const BUILD='2026-11-04 · Berry foraging';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -10993,6 +10993,74 @@ Object.keys(FS_PLACES).forEach(id=>{
   f.facts.push(['Fishing',id==='newmoon-island'?'Possible, but the coast is the League’s Closed Water: fishing there is illegal.':what.charAt(0).toUpperCase()+what.slice(1)+' fishing. Bring a Fishing Kit.']);
 });
 
+
+/* ---------- Berry foraging on the routes ----------
+   Each route's terrain (ZN_ROUTES) decides which berries grow there; the season on the Today bar decides which are
+   ripe. Rows: [berry, weight, tier C/U/R, seasons (p spring, s summer, a autumn, w winter)]. A Nature check sets how
+   much is found (Poor, Good, Great); autumn is harvest time (+1) and winter is lean (−1). Tiers follow the
+   Botanist's lists in the Player's Handbook: common, uncommon (Fruit Seeker), rare (Rare Berry Seeker). */
+const FG_POOL={
+  forest:[['Oran',10,'C','psa'],['Pecha',8,'C','ps'],['Cheri',7,'C','ps'],['Razz',5,'C','ps'],['Chesto',6,'C','saw'],['Bluk',6,'C','sa'],['Persim',6,'C','a'],['Rawst',5,'C','psa'],['Aspear',3,'C','aw'],['Sitrus',3,'U','a'],['Mago',2,'U','a'],['Lum',1,'U','sa'],['Leppa',1,'R','a']],
+  grass:[['Oran',10,'C','psa'],['Razz',8,'C','ps'],['Bluk',6,'C','sa'],['Nanab',6,'C','s'],['Pecha',6,'C','ps'],['Pinap',5,'C','s'],['Wepear',5,'C','sa'],['Cheri',5,'C','ps'],['Aspear',3,'C','aw'],['Sitrus',2,'U','a'],['Pomeg',2,'U','a'],['Qualot',1,'U','s'],['Lansat',1,'R','a']],
+  flower:[['Pecha',10,'C','ps'],['Cheri',8,'C','ps'],['Razz',7,'C','ps'],['Pinap',6,'C','s'],['Nanab',5,'C','s'],['Qualot',3,'U','ps'],['Hondew',2,'U','s'],['Lum',2,'U','ps'],['Grepa',2,'U','sa'],['Petaya',1,'R','s']],
+  coast:[['Oran',8,'C','psa'],['Rawst',6,'C','sa'],['Watmel',6,'C','s'],['Pinap',5,'C','s'],['Nomel',5,'C','sa'],['Aspear',3,'C','aw'],['Wiki',3,'U','sa'],['Kelpsy',3,'U','sa'],['Passho',2,'U','sa'],['Wacan',2,'U','s'],['Starf',1,'R','s']],
+  marsh:[['Rawst',8,'C','psa'],['Pecha',6,'C','ps'],['Rabuta',6,'C','sa'],['Cornn',5,'C','sa'],['Wepear',5,'C','sa'],['Chesto',3,'C','aw'],['Kebia',3,'U','sa'],['Rindo',3,'U','ps'],['Passho',2,'U','s'],['Payapa',1,'U','a'],['Lansat',1,'R','a']],
+  mountain:[['Aspear',8,'C','aw'],['Chesto',7,'C','saw'],['Cheri',6,'C','ps'],['Persim',6,'C','a'],['Durin',4,'C','a'],['Magost',4,'C','sa'],['Shuca',2,'U','sa'],['Charti',2,'U','sa'],['Tamato',2,'U','a'],['Ganlon',1,'R','a']],
+  cave:[['Chesto',8,'C','psaw'],['Rawst',5,'C','psaw'],['Magost',4,'C','psaw'],['Babiri',2,'U','psaw'],['Kasib',2,'U','psaw'],['Charti',2,'U','psaw'],['Leppa',1,'R','psaw']],
+  snow:[['Aspear',10,'C','saw'],['Chesto',5,'C','aw'],['Persim',4,'C','a'],['Nomel',4,'C','sa'],['Oran',4,'C','s'],['Spelon',3,'C','sa'],['Cheri',3,'C','s'],['Yache',3,'U','aw'],['Belue',2,'C','sa'],['Kee',1,'R','w']],
+  volcanic:[['Rawst',10,'C','psaw'],['Cheri',6,'C','ps'],['Spelon',6,'C','sa'],['Occa',3,'U','psaw'],['Tamato',3,'U','sa'],['Figy',3,'U','sa'],['Liechi',1,'R','sa']],
+  lake:[['Oran',8,'C','psa'],['Pecha',6,'C','ps'],['Wepear',6,'C','sa'],['Rawst',5,'C','psa'],['Razz',4,'C','ps'],['Nanab',4,'C','s'],['Watmel',3,'C','s'],['Aspear',3,'C','aw'],['Kelpsy',3,'U','sa'],['Passho',2,'U','s'],['Lum',1,'U','s']],
+  ghost:[['Chesto',8,'C','psaw'],['Persim',6,'C','a'],['Bluk',6,'C','sa'],['Kasib',3,'U','aw'],['Colbur',2,'U','aw'],['Custap',1,'R','a']],
+  moor:[['Oran',6,'C','psa'],['Razz',6,'C','ps'],['Bluk',6,'C','sa'],['Persim',4,'C','a'],['Aspear',3,'C','aw'],['Pomeg',3,'U','a'],['Hondew',3,'U','sa'],['Aguav',3,'U','sa'],['Salac',1,'R','sa']],
+  power:[['Cheri',8,'C','ps'],['Oran',6,'C','psa'],['Pinap',5,'C','s'],['Aspear',3,'C','aw'],['Wacan',3,'U','sa'],['Shuca',2,'U','sa'],['Micle',1,'R','sa']]
+};
+const FG_SEASON={spring:'p',summer:'s',autumn:'a',winter:'w'};
+const FG_TIER={C:'Common',U:'Uncommon',R:'Rare'};
+/* what grows on a route this season: [{b, w, t}] merged across its terrains, the first terrain counting most */
+function fgPool(id,season){
+  const r=ZN_ROUTES[id];if(!r)return [];
+  const k=FG_SEASON[season]||'s',by=new Map();
+  r[0].forEach((bm,i)=>{const m=[1,0.6,0.4][i]||0.3;(FG_POOL[bm]||[]).forEach(([b,w,t,ss])=>{if(ss.indexOf(k)<0)return;const o=by.get(b);if(o)o.w+=w*m;else by.set(b,{b,w:w*m,t});});});
+  return [...by.values()].sort((a,b)=>b.w-a.w);
+}
+const fgD=n=>1+Math.floor(Math.random()*n);
+/* q: 'poor' (failed Nature check), 'good' (success), 'great' (beat it by 5 or more) */
+function fgRoll(id,season,q){
+  const all=fgPool(id,season);
+  const pool=q==='great'?all:q==='good'?all.filter(x=>x.t!=='R'):all.filter(x=>x.t==='C');
+  let n=q==='great'?fgD(3)+1:q==='good'?fgD(3):(Math.random()<0.5?1:0);
+  if(season==='autumn'&&q!=='poor')n+=1;
+  if(season==='winter')n=Math.max(0,n-1);
+  const got=new Map();
+  for(let i=0;i<n&&pool.length;i++){const pick=encPickW(pool.map(x=>Object.assign({},x)));if(pick)got.set(pick.b,(got.get(pick.b)||0)+1);}
+  return {q,season,list:[...got.entries()].map(([b,c])=>({b,c,t:(all.find(x=>x.b===b)||{}).t||'C'}))};
+}
+function fgPanel(f){
+  if(!ZN_ROUTES[f.id])return '';
+  const c=cdGet(),all=fgPool(f.id,c.s),u=S.ui.fg=S.ui.fg||{};
+  const res=u.id===f.id?u.res:null,mine=S.trainers[S.me.id]&&canEditT(S.me.id);
+  const names=t=>all.filter(x=>x.t===t).map(x=>x.b);
+  return h`<section class="panel"><div class="ph"><h2>Berry foraging</h2><span class="pill">${CD_LAB[c.s]}</span></div>
+    ${all.length?h`<p class="sub">Ripe here this ${CD_LAB[c.s].toLowerCase()}: <b>${names('C').join(', ')||'nothing common'}</b>${names('U').length?h`. Less often: ${names('U').join(', ')}`:''}${names('R').length?'. Now and then, something rare.':'.'}</p>`
+      :h`<p class="sub">Nothing ripens here in ${CD_LAB[c.s].toLowerCase()}.</p>`}
+    <p class="sub">Spend an hour and make a Nature check. A failed check finds little; a success finds a few; beating the target by 5 or more finds more, and maybe something uncommon or rare. Autumn is harvest time (one extra berry); winter is lean (one fewer). Botanists: Berry Finder, Fruit Seeker and Rare Berry Seeker let you name the berry instead (Player's Handbook).</p>
+    <div class="row"><button class="btn sm" data-act="fg_roll" data-id="${f.id}" data-q="poor" ${all.length?'':raw('disabled')}>Forage · failed check</button><button class="btn sm" data-act="fg_roll" data-id="${f.id}" data-q="good" ${all.length?'':raw('disabled')}>Forage · success</button><button class="btn sm primary" data-act="fg_roll" data-id="${f.id}" data-q="great" ${all.length?'':raw('disabled')}>Forage · great success</button></div>
+    ${res?h`<div class="ctres" role="status" aria-live="polite">${res.list.length?h`<span class="k">FOUND</span><div class="row">${res.list.map(x=>h`<span class="pill ${x.t==='R'?'leg':''}">${x.c} × ${x.b} Berry${x.t!=='C'?' · '+FG_TIER[x.t]:''}</span>`)}</div>
+        ${mine&&!u.added?h`<div class="row"><button class="btn sm" data-act="fg_bag">Put them in my bag</button></div>`:u.added?h`<p class="sub">In your bag.</p>`:''}`
+      :h`<span class="k">NOTHING</span> <span class="sub">An hour of searching, and only leaves.</span>`}</div>`:''}
+  </section>`;
+}
+function fgAct(b){
+  const d=b.dataset,u=S.ui.fg=S.ui.fg||{};
+  if(d.act==='fg_roll'){u.id=d.id;u.res=fgRoll(d.id,cdGet().s,d.q);u.added=false;render();return;}
+  if(d.act==='fg_bag'){
+    const uid=S.me.id,t=S.trainers[uid];if(!t||!canEditT(uid)||!u.res||u.added)return;
+    const items=(t.items||[]).map(x=>Object.assign({},x));
+    u.res.list.forEach(x=>{const nm=x.b+' Berry',it=items.find(y=>dexKey(y.name)===dexKey(nm));if(it)it.qty=num(it.qty===''||it.qty==null?1:it.qty)+x.c;else items.push({name:nm,qty:x.c,note:'Foraged'});});
+    edit('t',uid,'items',items);u.added=true;toast('Added to your bag.',true);render();
+  }
+}
+
 /* rings round towns keep a steady on-screen size whatever the zoom */
 function sizeHot(){
   const svg=$('svg.hot');
@@ -11241,6 +11309,7 @@ function placeTab(){
     </section>
     ${admin?h`<section class="panel"><div class="ph"><h2>GM notes</h2><span class="pill gm">GM only</span></div>
       ${fArea('','gp',f.id,'notes',gp,{rows:5,ph:'Secrets, hooks and what is really here. Players never receive this.'})}</section>`:''}
+    ${fgPanel(f)}
     ${shPlacePanel(f)}
     ${admin?encPanel(f):''}`;
 }
@@ -11543,6 +11612,7 @@ function act(b,e){
   if(d.act&&d.act.indexOf('tm_')===0){tmAct(b);return;}
   if(d.act&&d.act.indexOf('br_')===0){brAct(b);return;}
   if(d.act==='zn_load'){znLoad();return;}
+  if(d.act&&d.act.indexOf('fg_')===0){fgAct(b);return;}
   if(d.act==='ag_roll'){S.ui.agRoll=1+Math.floor(Math.random()*20);render();return;}
   if(d.act==='fs_load'){fsLoad();return;}
   if(d.act==='zn_zone'){if(S.me.admin&&clTrip()){const t=JSON.parse(JSON.stringify(clTrip()));t.zone=d.v;edit('cd','conditions','trip',t);render();}return;}
