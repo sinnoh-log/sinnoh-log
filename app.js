@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-04 · League Cards';
+const BUILD='2026-11-05 · Rivals in the field';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -6705,6 +6705,76 @@ function ntNew(){
   S.ui.nt.open[id]=true;
   render();
 }
+/* ----- NPC packs: a JSON file of trainers with teams (format sinnoh-npc-pack). Each becomes an NPC trainer;
+   one with a board and RP also joins the Gym or Contest rankings as a rival, linked to its NPC by nt.
+   Pack rows: {name, role, cat, place, level, notes, secret, board:'gym'|'con', rp, label,
+               team:[{sp, nick, mv:[move names], item, notes}]}. Species and moves are filled from the handbook data. */
+async function ntImportPack(file){
+  if(!S.me.admin||!file)return;
+  let d=null;
+  try{d=JSON.parse(await file.text());}catch(e){}
+  if(!d||d.format!=='sinnoh-npc-pack'||!Array.isArray(d.npcs)){toast('That is not an NPC pack. Choose sinnoh-circuit-rivals.json.');return;}
+  toast('Adding '+d.npcs.length+' NPC trainers…',true);
+  if(PTA.idx)await ptaLists();
+  const L=PTA.lists;
+  const have=new Set(ntIds().map(id=>ntName(NTS()[id]).toLowerCase()));
+  const add={gym:[],con:[]};
+  const t0=Date.now(),miss=[];
+  let made=0,skip=0,noDex=0;
+  for(let i=0;i<d.npcs.length;i++){
+    const p=d.npcs[i]||{};
+    const name=String(p.name||'').trim();
+    if(!name)continue;
+    if(have.has(name.toLowerCase())){skip++;continue;}
+    have.add(name.toLowerCase());
+    const team=[];
+    for(const m of (Array.isArray(p.team)?p.team:[])){
+      const sp=String(m.sp||'').trim();
+      if(!sp)continue;
+      const pr=ptaResolve(sp);
+      let rec=null;
+      if(pr)rec=ptaRec(pr)||await ptaChunk(ptaLetter(ptaKey(pr))).then(()=>ptaRec(pr));
+      const si=rec?null:speciesInfo(sp);
+      if(!rec)noDex++;
+      const base=foeFromRec(rec,si,sp);
+      const nat=new Map((base.mv||[]).map(x=>[dexKey(x.name),x]));
+      const mv=(Array.isArray(m.mv)?m.mv:[]).map(n=>{
+        const k=dexKey(n),a=nat.get(k);
+        if(a)return Object.assign({},a,{used:0});
+        const def=L&&L.moveMap.get(k);
+        if(def)return {name:def.n,freq:def.f||'At-Will',kind:def.k||'Physical',range:def.r||'',type:def.t||'Normal',dice:def.d||'',text:def.x||'',used:0};
+        miss.push(sp+' ('+n+')');
+        return {name:String(n),freq:'At-Will',kind:'Physical',range:'',type:'Normal',dice:'',text:'',used:0};
+      });
+      const mon=Object.assign({id:newMonId(),nick:String(m.nick||''),bonus:zeroStats(),notes:String(m.notes||''),item:String(m.item||''),up:'',down:'',natureName:'',sh:{name:false,pic:false,types:false,item:false}},base);
+      if(mv.length)mon.mv=mv;
+      mon.mega=ntMegaAuto(mon);
+      team.push(mon);
+    }
+    const id=S.db.collection('gm').doc().id;
+    const cat=NPC_CATS.concat(NPC_CAT_GM).some(x=>x[0]===p.cat)?p.cat:'';
+    newDoc('gt',id,{name,role:String(p.role||''),cat,place:String(p.place||''),notes:String(p.notes||''),secret:String(p.secret||''),cls:'',adv:'',
+      level:Math.max(1,Math.round(num(p.level))||1),hp:{cur:20,max:20},stats:{atk:2,def:2,spa:2,spd:2,spe:2},talents:{},features:[],items:[],megaUsed:false,team,
+      rev:{on:false,role:false,place:false,notes:false,pic:false,cls:false,stats:false,items:false},img:'',order:t0+i,createdAt:t0+i});
+    made++;
+    const b=p.board==='con'?'con':p.board==='gym'?'gym':'';
+    if(b&&p.rp!=null&&p.rp!==''){
+      const cur=(S.cond&&S.cond[RK_C[b].d])||{};
+      if(!(Array.isArray(cur.npc)?cur.npc:[]).some(x=>String(x.n||'').toLowerCase()===name.toLowerCase()))
+        add[b].push({k:rkKey(),n:name,p:Math.round(num(p.rp)),s:RK_C[b].labels.indexOf(p.label)>=0?p.label:'',h:String(p.place||'').trim(),nt:id});
+    }
+  }
+  ['gym','con'].forEach(b=>{
+    if(!add[b].length)return;
+    const dk=RK_C[b].d,cur=(S.cond&&S.cond[dk])||{};
+    edit('cd','conditions',dk,Object.assign({},cur,{npc:(Array.isArray(cur.npc)?cur.npc:[]).concat(add[b])}));
+  });
+  const folded=rkFold('gym')+rkFold('con');
+  const nr=add.gym.length+add.con.length;
+  toast('Added '+made+' NPC trainer'+(made===1?'':'s')+(nr?', '+nr+' of them as rivals in the rankings'+(folded?' (taking the place of '+folded+' field trainer'+(folded===1?'':'s')+')':''):'')+(skip?'. Skipped '+skip+' already here':'')
+    +(noDex?'. '+noDex+' Pokémon were not in the handbook data, so check their numbers':'')+(miss.length?'. Fill in by hand: '+miss.slice(0,6).join(', ')+(miss.length>6?' and '+(miss.length-6)+' more':''):'')+'.',true);
+  render();
+}
 /* NPCs made before the trainer sheet existed get its fields the first time they are opened */
 function ntEnsure(id){
   const nt=NTS()[id];
@@ -7017,7 +7087,7 @@ function npcTab(){
   }[sort];
   const ids=all.filter(id=>{const t=NTS()[id];return cfPass(cat,ntCat(t))&&(!q||[ntName(t),t.role,t.place,t.notes].some(x=>String(x||'').toLowerCase().includes(q)));}).sort(cmp);
   const groups=cfGroups(ids,id=>ntCat(NTS()[id]),grp,true);
-  return h`<section class="panel"><div class="ph"><h2>NPC trainers</h2><span class="pill gm">GM only</span><div class="acts"><button class="btn primary sm" data-act="nt_new">New NPC trainer</button></div></div>
+  return h`<section class="panel"><div class="ph"><h2>NPC trainers</h2><span class="pill gm">GM only</span><div class="acts"><button class="btn sm" data-act="nt_pack">Import NPC pack</button><button class="btn primary sm" data-act="nt_new">New NPC trainer</button></div></div>
     <p class="sub">Create a trainer, give them Pokémon, and add them to a battle. Everything here stays in a document only you can read. The players see an NPC only after you tick <b>Show this NPC to the table</b>, and then only what you ticked, including for each Pokémon. In a battle the Pokémon start hidden as “Foe A”, “Foe B”. Each NPC has a <b>Category</b> (auto-guessed from the role until you pick one). Villain faction is a category only you can see; the table never learns it.</p>
     ${all.length?h`${cfTools('n',all.map(id=>ntCat(NTS()[id])))}
       <div class="tools"><label class="fld"><span class="fl">Search</span><input type="search" data-u="q.npc" value="${S.ui.q.npc||''}" placeholder="Name, role, place, notes"></label></div>`:''}</section>
@@ -7068,6 +7138,7 @@ function ntAct(b){
   if(!S.me.admin)return;
   switch(d.act){
     case 'nt_new':ntNew();break;
+    case 'nt_pack':{const fp=$('#ntpackfile');if(fp)fp.click();break;}
     case 'nt_open':S.ui.nt.open[d.id]=!S.ui.nt.open[d.id];if(S.ui.nt.open[d.id])ntEnsure(d.id);render();break;
     case 'nt_more':S.ui.nt.more[d.id]=!S.ui.nt.more[d.id];render();break;
     case 'nt_tal':{
@@ -10224,6 +10295,30 @@ function rkGenField(seed,n){
   rkFieldMemo[key]=list;
   return list;
 }
+/* rivals who are not in the field yet take over the field trainer whose starting points are closest to theirs, so the board
+   keeps its size (300 stays 300). Skips field trainers the party has met, written notes on, or recorded results for. */
+function rkFold(b){
+  const C=RK_C[b],bb=(S.cond&&S.cond[C.b])||{},dd=(S.cond&&S.cond[C.d])||{};
+  if(!bb.seed)return 0;
+  const was=S.ui.rk.c;S.ui.rk.c=b;
+  const field=rkGenField(num(bb.seed),num(bb.n)||300);
+  S.ui.rk.c=was;
+  const npc=(Array.isArray(dd.npc)?dd.npc:[]).slice(),gone=Object.assign({},bb.gone||{});
+  const busy=new Set(Object.keys(gone).map(Number));
+  npc.forEach(r=>{if(r.b!=null)busy.add(num(r.b));});
+  Object.keys(bb.met||{}).concat(Object.keys(dd.card||{})).forEach(k=>{if(/^b\d+$/.test(k))busy.add(+k.slice(1));});
+  (Array.isArray(dd.log)?dd.log:[]).forEach(e=>{if(/^b\d+$/.test(e.u||''))busy.add(+e.u.slice(1));});
+  (Array.isArray(dd.bt)?dd.bt:[]).forEach(x=>[x.a,x.b].forEach(v=>{if(/^b\d+$/.test(v||''))busy.add(+String(v).slice(1));}));
+  let n=0;
+  npc.map((r,j)=>[r,j]).filter(([r])=>r.b==null).sort((x,y)=>num(y[0].p)-num(x[0].p)).forEach(([r,j])=>{
+    let best=-1,bd=Infinity;
+    field.forEach(g=>{if(busy.has(g.i))return;const dl=Math.abs(num(g.P0)-num(r.p));if(dl<bd){bd=dl;best=g.i;}});
+    if(best<0)return;
+    busy.add(best);gone[best]=true;npc[j]=Object.assign({},r,{b:best});n++;
+  });
+  if(n){edit('cd','conditions',C.d,Object.assign({},dd,{npc}));edit('cd','conditions',C.b,Object.assign({},bb,{gone}));}
+  return n;
+}
 function rkGenRival(seed,r){
   const hk=rkStrHash(r.k),R=k=>rkHash(seed^0x5bd1e995,hk,k),P0=num(r.p);
   return Object.assign({sid:100000+(hk&0xffff)},rkTraits(R,P0,P0<50));
@@ -10655,7 +10750,7 @@ function rkTab(){
       <label class="fld"><span class="fl">Last season’s ${C.unit}</span><input type="number" step="1" data-u="rk.np" value="${u.np}" placeholder="0" data-nr></label>
       <label class="fld"><span class="fl">Home or note</span><input type="text" data-u="rk.nh" value="${u.nh}" placeholder="Veilstone" data-nr></label>
       <label class="fld"><span class="fl">${C.labWord}</span><select data-u="rk.ns" data-nr><option value="">None yet</option>${C.labels.map(l=>h`<option ${l===u.ns?raw('selected'):''}>${l}</option>`)}</select></label></div>
-    <div class="row"><button class="btn sm" data-act="rk_nadd">Add the rival</button>${rkNpcs().some(n=>C.sample.some(s=>s.n===n.n))?'':h`<button class="btn sm ghost" data-act="rk_sample">Add five sample rivals</button>`}</div>
+    <div class="row"><button class="btn sm" data-act="rk_nadd">Add the rival</button>${rkB().seed&&rkNpcs().some(n=>n.b==null)?h`<button class="btn sm ghost" data-act="rk_fold" title="Each rival replaces the field trainer with the closest points, so the board keeps its size">Put rivals in the field</button>`:''}${rkNpcs().some(n=>C.sample.some(s=>s.n===n.n))?'':h`<button class="btn sm ghost" data-act="rk_sample">Add five sample rivals</button>`}</div>
   </section>`:''}`;
 }
 function rkAct(b){
@@ -10708,13 +10803,14 @@ function rkAct(b){
       if(!n){toast('Give the rival a name.');break;}
       rkSave({npc:rkNpcs().concat([{k:rkKey(),n,p:Math.round(num(u.np)),s:u.ns||'',h:String(u.nh||'').trim()}])});
       u.nn='';u.np='';u.ns='';u.nh='';render();break;}
+    case 'rk_fold':{const f=rkFold(rkC()===RK_C.con?'con':'gym');toast(f?f+' rival'+(f===1?' takes':'s take')+' the place of field trainers. The board keeps its size.':'Every rival is already in the field.',true);render();break;}
     case 'rk_ndel':{
       const n=rkNpcs().find(x=>x.k===d.k);
       rkSave({npc:rkNpcs().filter(x=>x.k!==d.k),log:rkLog().filter(e=>e.u!=='n_'+d.k)});
       if(n&&n.b!=null&&bb.gone){const g=Object.assign({},bb.gone);delete g[n.b];const m=Object.assign({},bb.met||{});if(m['n_'+d.k]){delete m['n_'+d.k];m['b'+n.b]=true;}rkSaveB({gone:g,met:m});}
       render();break;}
     case 'rk_sample':rkSave({npc:rkNpcs().concat(rkC().sample.filter(s=>!rkNpcs().some(n=>n.n===s.n)).map(s=>Object.assign({k:rkKey()},s)))});render();break;
-    case 'rk_bgfill':rkSaveB({seed:1+Math.floor(Math.random()*2e9),n:num(d.n)||300,wk:W,met:Object.fromEntries(Object.entries(bb.met||{}).filter(([k])=>k.indexOf('b')!==0)),gone:{}});render();break;
+    case 'rk_bgfill':{{const EN=rkEngine();rkSave({npc:rkNpcs().map(r=>{const o=Object.assign({},r);if(o.b!=null){const x=EN.E['n_'+r.k];if(x)o.p=Math.max(0,Math.round(x.pts));delete o.b;}return o;})});}rkSaveB({seed:1+Math.floor(Math.random()*2e9),n:num(d.n)||300,wk:W,met:Object.fromEntries(Object.entries(bb.met||{}).filter(([k])=>k.indexOf('b')!==0)),gone:{}});const f=rkFold(rkC()===RK_C.con?'con':'gym');if(f)toast(f+' rival'+(f===1?' takes':'s take')+' the place of field trainers.',true);render();break;}
     case 'rk_bgclear':
       if(S.ui.confirm!=='rk_bgclear'){S.ui.confirm='rk_bgclear';toast('Press Remove the field again to remove all background trainers.');break;}
       S.ui.confirm=null;rkSaveB({seed:0,n:0,met:Object.fromEntries(Object.entries(bb.met||{}).filter(([k])=>k.indexOf('b')!==0)),gone:{}});render();break;
@@ -11999,6 +12095,12 @@ document.addEventListener('change',async e=>{
     const f=t.files&&t.files[0];
     try{t.value='';}catch(err){}
     if(f&&S.me.admin)encImport(f);
+    return;
+  }
+  if(t&&t.id==='ntpackfile'){
+    const f=t.files&&t.files[0];
+    try{t.value='';}catch(err){}
+    if(f&&S.me.admin)ntImportPack(f);
     return;
   }
   if(t&&t.id==='ptafile'){

@@ -661,3 +661,6 @@ Renaming a ribbon keeps everything trainers have already ticked. Removing a ribb
 | `firestore.rules` | The access rules you paste into Firebase. |
 | `vendor/` | Google's Firebase browser library, unmodified, plus the three fonts in `vendor/fonts`, so the site does not depend on an outside CDN. |
 | `.nojekyll` | Tells GitHub Pages to serve the files as they are. Harmless if it did not upload. |
+
+## NPC packs (2026-11-05)
+NPC trainers → **Import NPC pack** reads a `sinnoh-npc-pack` JSON file (for example `sinnoh-circuit-rivals.json`). Each entry becomes a GM-only NPC trainer with its team, moves filled from the handbook data. Entries with a `board` and `rp` also join the Gym (or Contest) rankings as rivals. Importing the same pack twice skips names that already exist. Keep pack files out of this public repo.
