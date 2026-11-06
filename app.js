@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-05 · Rival growth and scouting';
+const BUILD='2026-11-05 · Passives in attack rolls';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -358,6 +358,7 @@ function edit(sc,id,path,v){
   save(sc,id,{[top]:nv});
   if(sc==='sg')shPubSoon();
   if(sc==='gt'&&(top==='name'||top==='place'))ntSyncRank(id);
+  if(sc==='t'&&top==='badges')ntBadgeChanged();
 }
 function newDoc(sc,id,doc){putLocal(sc,id,doc);save(sc,id,doc,{create:true});}
 async function removeDoc(sc,id){
@@ -2150,16 +2151,123 @@ const kindStat=k=>k==='Special'?{acc:'spa',dmg:'spa',def:'spd',ab:'SpA',dab:'SpD
    tTypes (null when the target's types are not known)  tDef (null when unknown)  tStage (null when unknown)
    eff ('auto' or a code)  accBonus  dmgBonus  adv  onlyDmg  crit
    Nothing here touches the database. */
+/* ---------- passives in attack rolls ----------
+   Ability passives from the PTA3 Pokédex's Ability Passive List that change an attack roll: damage boosts, type changes,
+   immunities, absorption and damage reductions. Ones that depend on something the site can't see (weather, who acted
+   first, a foe that just joined) are tick boxes on the roll. A target's passives count only when the roller can see
+   them: the GM always can; a player's roll against a hidden foe gets them when the GM presses Apply. */
+const PS_REC=['bravebird','doubleedge','flareblitz','headsmash','takedown','volttackle','woodhammer','wildcharge','headcharge','submission','wavecrash','lightofruin','highjumpkick','jumpkick','chloroblast','steelbeam','mindblown','struggle'];
+const PS_WIND=['aircutter','blizzard','fairywind','gust','heatwave','hurricane','icywind','petalblizzard','twister','whirlwind'];
+const PS_GRP={punch:['Punches',/punch|uppercut|hammer arm|meteor mash/i],bite:['Fangs',/bite|fang|crunch|jaw lock|fishious/i],slash:['Slashing',/slash|claw|cut|blade|razor|x-scissor|night slash|leaf blade|sacred sword/i],pulse:['Pulse',/pulse|aura sphere|dark pulse|dragon pulse|origin pulse/i],sound:['Sound',/song|sing|roar|growl|screech|hyper voice|boomburst|bug buzz|echoed voice|round|snore|uproar|perish song|disarming voice|overdrive|sparkling aria|clanging/i]};
+function psInGrp(g,name){
+  const k=dexKey(name),G=PS_GRP[g];
+  const L=PX.d&&PX.d.lists&&PX.d.lists[G[0]];
+  if(Array.isArray(L)&&L.length)return L.some(x=>dexKey(x)===k);
+  return G[1].test(String(name||''));
+}
+const PS_TCH={aerilate:'Flying',pixilate:'Fairy',refrigerate:'Ice',galvanize:'Electric'};
+/* tick boxes: [key, passive, side, label] */
+const PS_SIT=[
+  ['analytic','analytic','a','Analytic: the target already acted this round (+4)'],
+  ['stakeout','stakeout','a','Stakeout: the target just joined (+4)'],
+  ['sheerforce','sheerforce','a','Sheer Force: drop the move’s added effects (+4)'],
+  ['solarpower','solarpower','a','Solar Power: Sunny weather (+4)'],
+  ['sandforce','sandforce','a','Sand Force: Sandstorming weather (+4 Rock and Ground)'],
+  ['hustle','hustle','a','Hustle: has not missed yet this encounter (−2 Accuracy)'],
+  ['sandveil','sandveil','d','Sand Veil: Sandstorming weather (−1 Accuracy against it)'],
+  ['snowcloak','snowcloak','d','Snow Cloak: Hailing weather (−1 Accuracy against it)'],
+  ['tangledfeet','tangledfeet','d','Tangled Feet: it is Confused (−1 Accuracy against it)']
+];
+const psTog=u=>{const o={};Object.keys(u||{}).forEach(k=>{if(k.indexOf('ps_')===0&&u[k])o[k.slice(3)]=true;});return o;};
+const psKeys=list=>new Set((list||[]).map(p=>dexKey(p&&(p.name||p.n))).filter(Boolean));
+/* the tick boxes that matter for this attacker (and target, when its passives are known) */
+function psSitFor(aPs,tPs){
+  const A=psKeys(aPs),T=psKeys(tPs);
+  return PS_SIT.filter(x=>(x[2]==='a'?A:T).has(x[1]));
+}
+/* o: {mv, type, k, rng, aTypes, aPs, tPs (null = unknown), aHp, tHp, tog} → changes to make to the roll */
+function psAtkMods(o){
+  const A=psKeys(o.aPs),T=o.tPs?psKeys(o.tPs):new Set(),tog=o.tog||{};
+  const mvName=String(o.mv&&o.mv.name||''),mk=dexKey(mvName),melee=/melee/i.test(o.rng||''),ranged=!melee&&/ranged|ft/i.test(o.rng||'');
+  const r={type:o.type,acc:0,dmg:0,notes:[],tech:false,ignoreT:A.has('moldbreaker')};
+  const low=o.aHp&&num(o.aHp.max)>0&&num(o.aHp.cur)<20;
+  const say=(n,t)=>r.notes.push(n+' '+t);
+  /* type changes first: they decide same-type and effectiveness */
+  if(r.type==='Normal')for(const k in PS_TCH)if(A.has(k)){r.type=PS_TCH[k];say(cap1(k),'(Normal → '+r.type+')');break;}
+  if(A.has('liquidvoice')&&psInGrp('sound',mvName)&&r.type!=='Water'){r.type='Water';say('Liquid Voice','(sound → Water)');}
+  if(A.has('normalize')&&r.type!=='Normal'){r.type='Normal';say('Normalize','(→ Normal)');}
+  const t=r.type,same=(o.aTypes||[]).indexOf(t)>=0;
+  /* accuracy */
+  if(A.has('compoundeyes')&&ranged){r.acc+=1;say('Compound Eyes','+1 Acc');}
+  if(A.has('hustle')&&tog.hustle){r.acc-=2;say('Hustle','−2 Acc');}
+  if(A.has('skilllink')&&/scatter/i.test((o.rng||'')+' '+(o.mv&&o.mv.text||''))){r.acc+=2;say('Skill Link','+2 Acc');}
+  if(!r.ignoreT)[['sandveil','Sand Veil'],['snowcloak','Snow Cloak'],['tangledfeet','Tangled Feet']].forEach(([k,n])=>{if(T.has(k)&&tog[k]){r.acc-=1;say(n,'−1 Acc');}});
+  if(o.k==='Effect')return r;
+  /* damage */
+  const add=(n,v)=>{r.dmg+=v;say(n,(v>0?'+':'−')+Math.abs(v));};
+  if(A.has('adaptability')&&same)add('Adaptability',4);
+  [['blaze','Fire','Blaze'],['torrent','Water','Torrent'],['overgrow','Grass','Overgrow'],['swarm','Bug','Swarm']].forEach(([k,ty,n])=>{if(A.has(k)&&low&&t===ty)add(n,4);});
+  if(A.has('angershell')&&low)add('Anger Shell',4);
+  if(A.has('ironfist')&&psInGrp('punch',mvName))add('Iron Fist',4);
+  if(A.has('strongjaw')&&psInGrp('bite',mvName))add('Strong Jaw',4);
+  if(A.has('megalauncher')&&psInGrp('pulse',mvName))add('Mega Launcher',4);
+  if((A.has('sharpness')||A.has('toughclaws'))&&psInGrp('slash',mvName))add(A.has('sharpness')?'Sharpness':'Tough Claws',4);
+  if(A.has('punkrock')&&psInGrp('sound',mvName))add('Punk Rock',4);
+  if(A.has('steelworker')&&t==='Steel')add('Steelworker',4);
+  if(A.has('rockypayload')&&t==='Rock')add('Rocky Payload',4);
+  if(A.has('waterbubble')&&t==='Water')add('Water Bubble',4);
+  if(A.has('reckless')&&PS_REC.indexOf(mk)>=0)add('Reckless',4);
+  if(A.has('analytic')&&tog.analytic)add('Analytic',4);
+  if(A.has('stakeout')&&tog.stakeout)add('Stakeout',4);
+  if(A.has('sheerforce')&&tog.sheerforce)add('Sheer Force',4);
+  if(A.has('solarpower')&&tog.solarpower)add('Solar Power',4);
+  if(A.has('sandforce')&&tog.sandforce&&(t==='Rock'||t==='Ground'))add('Sand Force',4);
+  if(A.has('technician')){r.tech=true;r.notes.push('Technician (1s and 2s count as 3)');}
+  r.tinted=A.has('tintedlens');r.sniper=A.has('sniper');
+  return r;
+}
+/* the target's side: immunity, absorption, a resist step, flat reductions, halving */
+function psDefMods(o,t,eff){
+  const T=psKeys(o.tPs),r={imm:'',absorb:'',step:0,dmg:0,half:[],dbl:[],notes:[]};
+  if(!o.tPs||!T.size)return r;
+  const mvName=String(o.mv&&o.mv.name||''),melee=/melee/i.test(o.rng||''),sound=psInGrp('sound',mvName);
+  const im=(k,n,cond)=>{if(!r.imm&&T.has(k)&&cond)r.imm=n;};
+  im('flashfire','Flash Fire',t==='Fire');im('wellbakedbody','Well-Baked Body',t==='Fire');
+  im('sapsipper','Sap Sipper',t==='Grass');im('dryskin','Dry Skin',t==='Water');
+  im('motordrive','Motor Drive',t==='Electric');im('lightningrod','Lightning Rod',t==='Electric');im('stormdrain','Storm Drain',t==='Water');
+  im('levitate','Levitate',t==='Ground');im('soundproof','Soundproof',sound);
+  if(!r.imm){
+    if(T.has('voltabsorb')&&t==='Electric')r.absorb='Volt Absorb';
+    else if(T.has('waterabsorb')&&t==='Water')r.absorb='Water Absorb';
+    else if(T.has('eartheater')&&t==='Ground')r.absorb='Earth Eater';
+  }
+  if(T.has('heatproof')&&t==='Fire'){r.step-=1;r.notes.push('Heatproof −1 die');}
+  if(T.has('purifyingsalt')&&t==='Ghost'){r.step-=1;r.notes.push('Purifying Salt −1 die');}
+  const sub=(n,v)=>{r.dmg-=v;r.notes.push(n+' −'+v);};
+  if(T.has('thickfat')&&(t==='Fire'||t==='Ice'))sub('Thick Fat',4);
+  if(T.has('waterbubble')&&t==='Fire')sub('Water Bubble',4);
+  if(T.has('punkrock')&&sound)sub('Punk Rock',4);
+  if(T.has('multiscale')&&o.tHp&&num(o.tHp.max)>0&&num(o.tHp.cur)>=num(o.tHp.max))sub('Multiscale',4);
+  if((T.has('filter')||T.has('solidrock'))&&eff&&(eff.c==='s'||eff.c==='x'))sub(T.has('filter')?'Filter':'Solid Rock',4);
+  if(T.has('fluffy')&&melee)r.half.push('Fluffy');
+  if(T.has('fluffy')&&t==='Fire')r.dbl.push('Fluffy');
+  if(T.has('furcoat')&&o.k==='Physical')r.half.push('Fur Coat');
+  return r;
+}
+const cap1=k=>({aerilate:'Aerilate',pixilate:'Pixilate',refrigerate:'Refrigerate',galvanize:'Galvanize'})[k]||k;
 function atkCalc(o){
   const mv=o.mv||{};
   const k=KINDS.indexOf(mv.kind)>=0?mv.kind:'Physical';
   const ks=kindStat(k);
-  const out={k,mv:mv.name||'Move',type:mv.type||''};
+  const P=psAtkMods({mv,type:mv.type||'',k,rng:mv.range||'',aTypes:o.aTypes,aPs:o.aPs,tPs:o.tPs,aHp:o.aHp,tog:o.tog});
+  const tPs=P.ignoreT?null:o.tPs;
+  const out={k,mv:mv.name||'Move',type:P.type||mv.type||'',ps:P.notes.slice(),pd:!!o.tPs||P.ignoreT,mb:P.ignoreT,rng:mv.range||''};
+  if(P.ignoreT&&o.tPs&&psKeys(o.tPs).size)out.ps.push('Mold Breaker (ignores the target’s passives)');
   let crit=!!o.crit;
   if(!o.onlyDmg){
     const r=d20adv(o.adv);
     const mm=mod(o.aAcc);
-    const bonus=num(o.accBonus);
+    const bonus=num(o.accBonus)+P.acc;
     const tot=r.v+mm+bonus;
     out.ac={tot,d:r.v,all:r.all,mod:mm,bonus,adv:o.adv==='adv'||o.adv==='dis'?o.adv:'normal',ab:ks.ab};
     crit=r.v===20;
@@ -2169,23 +2277,36 @@ function atkCalc(o){
   const dc=parseDice(mv.dice);
   if(!dc)return out;
   const plain=k==='Effect';
+  const ty=out.type;
   let eff=EFF_CODES.n;
   if(!plain){
     if(o.eff&&o.eff!=='auto'&&EFF_CODES[o.eff])eff=EFF_CODES[o.eff];
-    else if(o.tTypes)eff=effOf(mv.type,o.tTypes);
+    else if(o.tTypes){
+      eff=effOf(ty,o.tTypes);
+      if(eff.c==='i'&&psKeys(o.aPs).has('scrappy')&&(ty==='Normal'||ty==='Fighting')&&o.tTypes.indexOf('Ghost')>=0){eff=effOf(ty,o.tTypes.filter(x=>x!=='Ghost'));out.ps.push('Scrappy (hits Ghost)');}
+    }
   }
+  const D=plain?psDefMods({},ty,eff):psDefMods({mv,rng:mv.range||'',k,tPs,tHp:o.tHp},ty,eff);
   out.ef=eff.c;
   if(eff.c==='i'){out.dm={tot:0,imm:true,base:dc.n,s:dc.s,rolled:[],n:0,ef:'i'};return out;}
+  if(D.imm){out.ps.push(D.imm+' (immune)');out.dm={tot:0,imm:true,psImm:D.imm,base:dc.n,s:dc.s,rolled:[],n:0,ef:eff.c};return out;}
   const stageD=plain?0:num(o.aStage)-num(o.tStage);
-  const n=Math.max(0,dc.n+(plain?0:eff.d)+stageD);
+  const n=Math.max(0,dc.n+(plain?0:eff.d+D.step)+stageD);
   const rolled=[];
-  for(let i=0;i<n;i++)rolled.push(crit?dc.s:rnd(dc.s));
+  for(let i=0;i<n;i++){let v=crit?dc.s:rnd(dc.s);if(P.tech&&v<3)v=3;rolled.push(v);}
   const sum=rolled.reduce((a,b)=>a+b,0);
-  const stab=!plain&&mv.type&&(o.aTypes||[]).indexOf(mv.type)>=0?4:0;
+  const stab=!plain&&ty&&(o.aTypes||[]).indexOf(ty)>=0?4:0;
   const stat=plain||!ks.dmg?0:mod(o.aDmg);
+  let psd=plain?0:P.dmg;
+  if(!plain&&P.tinted&&(eff.c==='r'||eff.c==='h')){psd+=4;out.ps.push('Tinted Lens +4');}
+  if(!plain&&P.sniper&&crit){psd+=8;out.ps.push('Sniper +8');}
+  if(!plain){psd+=D.dmg;out.ps.push(...D.notes);}
   const extra=num(o.dmgBonus);
-  const tot=Math.max(0,sum+dc.f+stat+stab+extra);
-  out.dm={tot,base:dc.n,n,s:dc.s,rolled,eff:eff.d,stageD,fixed:dc.f,stat,stab,extra,ef:eff.c,ab:ks.ab};
+  let tot=Math.max(0,sum+dc.f+stat+stab+extra+psd);
+  if(!plain){D.dbl.forEach(n=>{tot*=2;out.ps.push(n+' ×2');});D.half.forEach(n=>{tot=Math.floor(tot/2);out.ps.push(n+' ½');});}
+  let heal=0;
+  if(!plain&&D.absorb){heal=Math.floor(tot/2);out.ps.push(D.absorb+': heals '+heal+' instead');tot=0;}
+  out.dm={tot,base:dc.n,n,s:dc.s,rolled,eff:eff.d,stageD,fixed:dc.f,stat,stab,extra,psd,heal,absorb:D.absorb,ef:eff.c,ab:ks.ab};
   return out;
 }
 const dieWord=n=>Math.abs(n)+(Math.abs(n)===1?' die':' dice');
@@ -2201,7 +2322,7 @@ function acText(c){
 function dmText(c){
   const m=c.dm;
   if(!m)return '';
-  if(m.imm)return EFF_LBL.i+': no damage.';
+  if(m.imm)return (m.psImm?m.psImm+': immune':EFF_LBL.i)+': no damage.';
   const bits=[];
   if(m.eff)bits.push((m.eff>0?'+':'−')+dieWord(m.eff)+' '+EFF_LBL[m.ef].toLowerCase());
   if(m.stageD)bits.push((m.stageD>0?'+':'−')+dieWord(m.stageD)+' from stages');
@@ -2212,7 +2333,8 @@ function dmText(c){
   if(m.stat)add.push('+'+m.stat+' '+m.ab);
   if(m.stab)add.push('+4 same-type');
   if(m.extra)add.push(sgn(m.extra));
-  return s+(add.length?' '+add.join(' '):'')+' = '+m.tot;
+  if(m.psd)add.push(sgn(m.psd)+' passives');
+  return s+(add.length?' '+add.join(' '):'')+' = '+m.tot+(c.ps&&c.ps.length?' · '+c.ps.join(', '):'');
 }
 
 /* ----- the roll log ----- */
@@ -2242,7 +2364,8 @@ function logRoll(e,local){
 }
 /* the box and the log get the same facts. A foe's attack shows only its totals, never the foe's own numbers. */
 function atkEntry(c,who,tgt,foe){
-  const e={kind:'atk',label:c.mv,type:c.type,pk:who||'',tgt:tgt&&tgt.cid||'',tn:tgt&&tgt.name||''};
+  const e={kind:'atk',label:c.mv,type:c.type,mk:c.k,mr:c.rng||'',pd:!!c.pd,mb:!!c.mb,pk:who||'',tgt:tgt&&tgt.cid||'',tn:tgt&&tgt.name||''};
+  if(c.dm&&c.dm.heal)e.heal=c.dm.heal;
   if(c.ac)e.ac=c.ac.tot;
   if(c.crit)e.crit=true;
   if(c.hit!=null)e.hit=!!c.hit;
@@ -2296,6 +2419,17 @@ function btTargets(exceptRef){
     return v?{cid,name:v.name+(v.side==='a'?' ('+v.owner+')':'')}:null;
   }).filter(Boolean);
 }
+/* the passives line on a roll form: which apply on their own, and tick boxes for the situational ones */
+function mrPsLine(scope,att,tgt,x){
+  const aPs=att?(att.passives||att.ps||[]):[],tPs=tgt?(tgt.passives||tgt.ps||[]):null;
+  const sit=psSitFor(aPs,tPs),u=scope==='mr'?S.ui.mr:S.ui.bt,tog=psTog(u);
+  const auto=psKeys(aPs);
+  const known=['adaptability','blaze','torrent','overgrow','swarm','angershell','ironfist','strongjaw','megalauncher','sharpness','toughclaws','punkrock','steelworker','rockypayload','waterbubble','reckless','technician','tintedlens','sniper','compoundeyes','skilllink','aerilate','pixilate','refrigerate','galvanize','liquidvoice','normalize','scrappy','moldbreaker'];
+  const on=aPs.filter(p=>known.indexOf(dexKey(p.name||p.n))>=0).map(p=>p.name||p.n);
+  if(!on.length&&!sit.length)return '';
+  return h`<div class="psline">${on.length?h`<p class="sub">Passives counted when they apply: <b>${on.join(', ')}</b>.${tPs?' The target’s passives count too.':' A hidden foe’s passives are applied when the GM presses Apply.'}</p>`:''}
+    ${sit.length?h`<div class="row evchips">${sit.map(([k,,,l])=>h`<label class="chip chkc"><input type="checkbox" data-u="${scope}.ps_${k}" data-nr ${tog[k]?raw('checked'):''}><span>${l}</span></label>`)}</div>`:''}</div>`;
+}
 function moveForm(uid,pid,i,x){
   const key=mrKey(uid,pid,i);
   const f=S.ui.mr;
@@ -2311,6 +2445,7 @@ function moveForm(uid,pid,i,x){
       <label class="fld"><span class="fl">Accuracy bonus</span><input type="number" inputmode="numeric" data-u="mr.acc" data-nr value="${f.acc||''}" placeholder="0"></label>
       <label class="fld"><span class="fl">Damage bonus</span><input type="number" inputmode="numeric" data-u="mr.dmg" data-nr value="${f.dmg||''}" placeholder="0"></label>
     </div>
+    ${mrPsLine('mr',getLocal('p',uid+'/'+pid),info&&info.side==='a'?info.m:null,x)}
     ${plain?'':h`<p class="sub">${known?'Automatic uses '+info.name+'’s types, which the GM has shown.':(f.tgt?'This target’s types are hidden, so pick the advantage yourself once the GM tells you.':'Automatic treats it as neutral unless you pick a target whose types are shown.')}</p>`}
     <div class="row"><div class="seg" role="group" aria-label="Roll mode">${[['normal','Normal'],['adv','Advantage'],['dis','Disadvantage']].map(([v,l])=>h`<button data-act="adv" data-v="${v}" aria-pressed="${String(S.ui.adv===v)}">${l}</button>`)}</div>
       <label class="row"><input type="checkbox" data-u="mr.crit" data-nr ${f.crit?raw('checked'):''}><span>Critical hit (damage only)</span></label></div>
@@ -2334,7 +2469,8 @@ function moveRoll(uid,pid,i,onlyDmg){
   const c=atkCalc({
     mv:x,aTypes:effTypes(m),aAcc:k==='Effect'?spdOf(m):effStat(m,ks.acc),aDmg:ks.dmg?effStat(m,ks.dmg):0,aStage:ks.dmg?stg(m,ks.dmg):0,
     tTypes:info?info.types:null,tDef:info&&info.stat?(k==='Effect'?info.stat.spe:info.stat[ks.def]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
-    eff:f.eff||'auto',accBonus:num(f.acc),dmgBonus:num(f.dmg),adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:!!onlyDmg&&!!f.crit
+    eff:f.eff||'auto',accBonus:num(f.acc),dmgBonus:num(f.dmg),adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:!!onlyDmg&&!!f.crit,
+    aPs:m.passives,aHp:m.hp,tPs:info&&info.side==='a'?(info.m.passives||[]):null,tHp:info&&info.side==='a'?info.hp:null,tog:psTog(f)
   });
   if(!c.ac&&!c.dm){toast('That move has no damage listed, so there is nothing to roll. Use Roll attack for the accuracy check.');return;}
   const who=mName(m);
@@ -2871,10 +3007,25 @@ function applyRoll(src,id){
   if(i<0)return;
   const r=list[i];
   if(r.ap||r.dm==null||!r.tgt||!btC(r.tgt))return;
-  btHp(r.tgt,-num(r.dm));
+  /* a player's roll against a hidden foe: the foe's own passives are applied now, on the GM's side */
+  let dm=num(r.dm),heal=num(r.heal);const notes=[];
+  const tf=!r.pd&&!r.mb?foeOf(r.tgt):null;
+  if(tf&&dm>0){
+    const D=psDefMods({mv:{name:r.label},rng:r.mr||'',k:r.mk||'Physical',tPs:tf.ps||[],tHp:tf.hp},r.type||'',EFF_CODES[r.ef]||EFF_CODES.n);
+    if(D.imm){dm=0;notes.push(D.imm+': immune');}
+    else{
+      if(D.dmg){dm=Math.max(0,dm+D.dmg);notes.push(...D.notes.filter(x=>!/die$/.test(x)));}
+      D.dbl.forEach(n=>{dm*=2;notes.push(n+' ×2');});
+      D.half.forEach(n=>{dm=Math.floor(dm/2);notes.push(n+' ½');});
+      if(D.absorb){heal=Math.floor(dm/2);dm=0;notes.push(D.absorb+': heals '+heal);}
+      if(D.step)notes.push(D.notes.filter(x=>/die$/.test(x)).join(', ')+' (take one die off by hand)');
+    }
+  }
+  if(dm)btHp(r.tgt,-dm);
+  if(heal)btHp(r.tgt,heal);
   const arr=list.map((x,j)=>j===i?Object.assign({},x,{ap:true}):x);
   if(src==='gm')edit('bt','battle','rolls',arr);else edit('t',src,'rolls',arr);
-  toast((r.tn||'The target')+' takes '+r.dm+'.',true);
+  toast((r.tn||'The target')+(heal?' heals '+heal:' takes '+dm)+'.'+(notes.length?' '+notes.join(', ')+'.':''),true);
   render();
 }
 
@@ -2891,7 +3042,8 @@ function foeRoll(cid,i,onlyDmg){
   const c=atkCalc({
     mv:x,aTypes:foeTypes(f),aAcc:k==='Effect'?fSpd(f):fStat(f,ks.acc),aDmg:ks.dmg?fStat(f,ks.dmg):0,aStage:ks.dmg?stg(f,ks.dmg):0,
     tTypes:info?info.types:null,tDef:info&&info.stat?(k==='Effect'?info.stat.spe:info.stat[ks.def]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
-    eff:u.eff||'auto',adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:false
+    eff:u.eff||'auto',adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:false,
+    aPs:f.ps,aHp:f.hp,tPs:info?(info.side==='a'?(info.m.passives||[]):((info.f&&info.f.ps)||[])):null,tHp:info?(info.side==='a'?info.hp:(info.f&&info.f.hp)):null,tog:psTog(u)
   });
   if(!c.ac&&!c.dm){toast('That move has no damage listed. Use Roll attack for the accuracy check.');return;}
   const {e,local}=atkEntry(c,foePub(f).n,info?{cid:u.tgt,name:info.name}:null,true);
@@ -3083,6 +3235,7 @@ function btFoeBody(cid,v,idx){
     <div class="list"><div class="ph"><h3>Moves</h3><button class="btn sm" data-act="add" ${bp('gb','battle',P+'mv')} data-tpl="move">Add move</button></div>
       <div class="mrgrid fopt"><label class="fld"><span class="fl">Target</span><select data-u="bt.tgt"><option value="">No target</option>${allies.map(a=>h`<option value="${a.cid}" ${S.ui.bt.tgt===a.cid?raw('selected'):''}>${a.name} (${a.owner})</option>`)}</select></label>
         <label class="fld"><span class="fl">Type advantage</span><select data-u="bt.eff">${EFF_PICK.map(([k,l])=>h`<option value="${k}" ${(S.ui.bt.eff||'auto')===k?raw('selected'):''}>${l}</option>`)}</select></label></div>
+      ${mrPsLine('bt',f,S.ui.bt.tgt&&btC(S.ui.bt.tgt)?((x=>x?(x.side==='a'?x.m:x.f):null)(btInfo(S.ui.bt.tgt,true))):null,null)}
       <div class="row"><div class="seg" role="group" aria-label="Roll mode">${[['normal','Normal'],['adv','Advantage'],['dis','Disadvantage']].map(([k,l])=>h`<button data-act="adv" data-v="${k}" aria-pressed="${String(S.ui.adv===k)}">${l}</button>`)}</div>
         <label class="row"><input type="checkbox" data-act="b_secret" ${S.ui.secret?raw('checked'):''}><span>Roll in secret (not shared)</span></label></div>
       ${mvs.length?mvs.map((x,i)=>h`<div class="move"><div class="mv1">${fText('Move','gb','battle',P+'mv.'+i+'.name',S.battleGm,{list:'dl-moves'})}${fText('Uses','gb','battle',P+'mv.'+i+'.freq',S.battleGm,{})}<span></span>${rowBtns('gb','battle',P+'mv',i,mvs.length,false)}</div>
@@ -7105,7 +7258,7 @@ function ntStageLoad(id,sid,quiet){
   return true;
 }
 /* after a week: every NPC whose rival has passed the next mark moves up (never down) */
-function ntGrowAll(){
+function ntGrowAll(why,wk){
   const out=[];
   ntIds().forEach(id=>{
     const nt=NTS()[id],st=ntStages(nt);
@@ -7113,9 +7266,34 @@ function ntGrowAll(){
     const bd=ntBadges(id);if(bd==null)return;
     const cur=st.find(x=>x.id===nt.grown)||st[0];
     const next=st.filter(x=>num(x.bd)<=bd&&num(x.bd)>num(cur.bd)).pop();
-    if(next&&ntStageLoad(id,next.id,true))out.push(ntName(nt));
+    if(next&&ntStageLoad(id,next.id,true)){
+      edit('gt',id,'glog',(Array.isArray(nt.glog)?nt.glog:[]).concat([{why:why||'week',wk:num(wk),from:cur.id,to:next.id}]).slice(-20));
+      out.push(ntName(nt));
+    }
   });
   return out;
+}
+/* undoing a week puts back the teams that grew in the weeks being undone (growth from a player's badge stays) */
+function ntUngrow(w){
+  const out=[];
+  ntIds().forEach(id=>{
+    const nt=NTS()[id],g=Array.isArray(nt.glog)?nt.glog:[];
+    const undo=g.filter(x=>x.why==='week'&&num(x.wk)>w);
+    if(!undo.length)return;
+    if(ntStageLoad(id,undo[0].from,true)){edit('gt',id,'glog',g.filter(x=>!(x.why==='week'&&num(x.wk)>w)));out.push(ntName(nt));}
+  });
+  return out;
+}
+/* a player's badges changed: rivals paced to the players may have reached their next team */
+let ntBadgeT=0;
+function ntBadgeChanged(){
+  clearTimeout(ntBadgeT);
+  ntBadgeT=setTimeout(()=>{
+    if(!S.me.admin)return;
+    const W=num(((S.cond&&S.cond[RK_C.gym.b])||{}).wk);
+    const gr=rkWith('gym',()=>ntGrowAll('badge',W));
+    if(gr.length){toast('New badge, new rival teams: '+gr.join(', ')+'.',true);render();}
+  },800);
 }
 function ntGrowPanel(id,nt){
   const st=ntStages(nt),bd=ntBadges(id),u=S.ui.nt;
@@ -7159,11 +7337,24 @@ function ntScout(ntId,sp){
     if(!(bb.met||{})[id])edit('cd','conditions',C.b,Object.assign({},bb,{met:Object.assign({},bb.met||{},{[id]:true})}));
   });
 }
+function ntPaceRow(id,r){
+  const pcs=entriesOf(S.trainers).filter(t=>t.name);
+  const sel=(f,opts,v)=>h`<select data-ntpace="${r.k}" data-f="${f}">${opts.map(([k,l])=>h`<option value="${k}" ${String(k)===String(v)?raw('selected'):''}>${l}</option>`)}</select>`;
+  const pw=r.pw&&(r.pw==='party'||S.trainers[r.pw])?r.pw:'';
+  const bd=rkPaceBd(r);
+  return h`<div class="row ntpace">
+    <label class="fld inl"><span class="fl">Grows with</span>${sel('pw',[['','Their own season'],['party','The party (average badges)']].concat(pcs.map(t=>[t.id,tName(t)])),pw)}</label>
+    ${pw?h`<label class="fld inl"><span class="fl">Pace</span>${sel('po',[[1,'One badge ahead'],[0,'Even'],[-1,'One badge behind']],clamp(Math.round(num(r.po)),-1,1))}</label>`:''}
+    ${pw&&pw!=='party'?h`<label class="fld inl"><span class="fl">Points</span>${sel('pt',[[0,'Their own'],[1,'Stay just above '+tName(S.trainers[pw])],[-1,'Stay just below '+tName(S.trainers[pw])]],num(r.pt))}</label>`:''}
+    ${pw&&bd!=null?h`<span class="sub">Shows ${bd} badge${bd===1?'':'s'} on the board.</span>`:''}
+  </div>`;
+}
 function ntRankPanel(id,nt){
   const L=ntRanks(id),on=new Set(L.map(x=>x.b)),u=S.ui.nt;
   return h`<div class="mgate"><span class="fl">Rankings</span>
     ${L.length?h`<ul class="mini-list">${L.map(({b,l,r})=>{const x=ntRankInfo(b,r),C=RK_C[b];return h`<li><div class="row sp"><span><b>${l}</b> ${x?h`<span class="pill">#${x.pos}</span> <span class="mono">${x.pts} ${C.unit}</span>${b==='gym'?h` <span class="sub">${x.bd} badge${x.bd===1?'':'s'}</span>`:''}`:''}
         <label class="fld inl"><span class="fl">${C.labWord}</span><select data-ntlab="${id}" data-b="${b}" data-k="${r.k}"><option value="">None yet</option>${C.labels.map(v=>h`<option ${v===r.s?raw('selected'):''}>${v}</option>`)}</select></label></span>
+        ${b==='gym'?ntPaceRow(id,r):''}
         <span class="row"><button class="btn sm" data-act="nt_rkgo" data-b="${b}" data-k="${r.k}">Open in rankings</button><button class="btn sm ghost" data-act="nt_rkrm" data-b="${b}" data-k="${r.k}">Take off the board</button></span></div></li>`;})}</ul>
       <p class="sub">The name and hometown follow this sheet: rename the NPC and the rankings change with it.</p>`:h`<p class="sub">Not on the rankings. Add them and they battle (or enter contests) every week with the field.</p>`}
     ${NT_BOARDS.filter(([b])=>!on.has(b)).map(([b,l])=>h`<div class="row"><label class="fld inl"><span class="fl">Starting ${RK_C[b].unit}</span><input type="number" min="0" max="450" data-u="nt.rp_${b}_${id}" data-nr value="${u['rp_'+b+'_'+id]==null?'':u['rp_'+b+'_'+id]}" placeholder="0"></label><button class="btn sm" data-act="nt_rkadd" data-id="${id}" data-b="${b}">Add to the ${l}</button></div>`)}
@@ -10502,11 +10693,25 @@ function rkRecAdd(REC,id,opp,win,kind,wk){
   r.seq.push({o:opp,win,kind,wk});
   const hh=r.h2h[opp]||(r.h2h[opp]=[0,0]);hh[win?0:1]++;
 }
+/* ----- rivals paced to the players (Gym board): r.pw = '' (their own season) | 'party' (the party's average badges) | a
+   player's id; r.po = -1 behind, 0 even, 1 ahead. Their badge count on the board follows that pace, so their team grows
+   with the players. r.pt = 1 just above / -1 just below: each week their points are pulled toward that player's. ----- */
+const RK_TETHER=12;
+function rkPaceBase(pw){
+  if(pw==='party'){const ps=entriesOf(S.trainers).filter(t=>t.name);return ps.length?Math.floor(ps.reduce((a,t)=>a+badgeCount(t),0)/ps.length):0;}
+  const t=S.trainers[pw];return t?badgeCount(t):null;
+}
+function rkPaceBd(r){
+  if(!r||!r.pw)return null;
+  const b=rkPaceBase(r.pw);
+  return b==null?null:clamp(b+clamp(Math.round(num(r.po)),-1,1),0,8);
+}
 const rkEngMemo={};
 function rkEngine(){
   const C=rkC(),gymC=C===RK_C.gym,b=rkB(),W=num(b.wk),seed=num(b.seed)||7,n=b.seed?(num(b.n)||300):0;
   const log=rkLog(),bt=rkBattles(),npcs=rkNpcs(),gone=b.gone||{};
-  const key=[C.d,seed,n,W,JSON.stringify(npcs.map(x=>[x.k,x.b,x.p])),JSON.stringify(gone),log.length,log.length?log[log.length-1].k:'',bt.length,bt.length?bt[bt.length-1].k:'',JSON.stringify(rkGymSet())].join('|');
+  const paced=gymC?npcs.filter(x=>x.pw).map(x=>[x.k,rkPaceBd(x),x.pt&&S.trainers[x.pw]?x.pw:'',num(x.pt)]):[];
+  const key=[C.d,seed,n,W,JSON.stringify(npcs.map(x=>[x.k,x.b,x.p])),JSON.stringify(paced),JSON.stringify(gone),log.length,log.length?log[log.length-1].k:'',bt.length,bt.length?bt[bt.length-1].k:'',JSON.stringify(rkGymSet())].join('|');
   if(rkEngMemo[C.d]&&rkEngMemo[C.d].key===key)return rkEngMemo[C.d].out;
   const field=n?rkGenField(seed,n):[];
   const E={},REC={},CON={};
@@ -10582,9 +10787,15 @@ function rkEngine(){
       });
     }
     endOfWeek(w);
+    paced.forEach(([k,,pid,pt])=>{
+      const e=E['n_'+k];if(!e||!pid||!pt)return;
+      const pp=rkPtsAt(log.filter(x=>x.u===pid),w),d=pp+pt*RK_TETHER-pts(e);
+      if(Math.abs(d)>=1)add(e,w,Math.round(d*0.5));
+    });
   }
   const out={W,E:{},REC,CON,UP};
   ents.forEach(e=>{out.E[e.id]={pts:Math.round(pts(e)),prev:W?rkPtsAt(e.res,W-1):Math.round(pts(e)),badges:nb(e)};});
+  paced.forEach(([k,bd])=>{const o=out.E['n_'+k];if(o&&bd!=null)o.badges=bd;});
   rkEngMemo[C.d]={key,out};
   return out;
 }
@@ -10992,9 +11203,9 @@ function rkAct(b){
       rkSaveB({wk:W+1});
       rkSaveB({hist:hist.concat([rkSnap(W+1)]).slice(-80)});
       const dr=rkDraftHeads(W+1);if(dr.length)rkSave({heads:rkHeads().concat(dr).slice(-200)});
-      const gr=rkC()===RK_C.gym?ntGrowAll():[];
+      const gr=rkC()===RK_C.gym?ntGrowAll('week',W+1):[];
       toast('Week '+(W+1)+': the results are in.'+(gr.length?' New teams: '+gr.join(', ')+'.':''),true);render();break;}
-    case 'rk_unweek':{const w=Math.max(0,W-1);rkSaveB({wk:w,hist:(Array.isArray(bb.hist)?bb.hist:[]).filter(e=>num(e.w)<=w)});if(rkHeads().some(x=>num(x.wk)>w))rkSave({heads:rkHeads().filter(x=>num(x.wk)<=w)});render();break;}
+    case 'rk_unweek':{const w=Math.max(0,W-1);if(rkC()===RK_C.gym){const ug=ntUngrow(w);if(ug.length)toast('Week undone. Teams put back: '+ug.join(', ')+'.',true);}rkSaveB({wk:w,hist:(Array.isArray(bb.hist)?bb.hist:[]).filter(e=>num(e.w)<=w)});if(rkHeads().some(x=>num(x.wk)>w))rkSave({heads:rkHeads().filter(x=>num(x.wk)<=w)});render();break;}
     case 'rk_hpub':rkSave({heads:rkHeads().map(x=>x.k===d.k?Object.assign({},x,{pub:true,at:Date.now()}):x)});render();break;
     case 'rk_hpuball':{const at=Date.now();rkSave({heads:rkHeads().map((x,i)=>x.pub?x:Object.assign({},x,{pub:true,at:at+i}))});render();break;}
     case 'rk_hdel':rkSave({heads:rkHeads().filter(x=>x.k!==d.k)});render();break;
@@ -11019,6 +11230,7 @@ function rkChange(t){
   if(d.rkgym!=null&&d.f){const cur=(S.cond&&S.cond.rk)||{},g=Object.assign({},cur.gym||{});g[d.rkgym]=Object.assign({},g[d.rkgym]||{},{[d.f]:String(t.value||'').trim()});edit('cd','conditions','rk',Object.assign({},cur,{gym:g}));render();return true;}
   if(d.rkcard!=null&&d.f){const cards=Object.assign({},rkCards());cards[d.rkcard]=Object.assign({},cards[d.rkcard]||{},{[d.f]:String(t.value||'').trim()});rkSave({card:cards});if(d.f==='mood')rkListRefresh();return true;}
   if(d.rklab!=null){rkSave({lab:Object.assign({},rkD().lab||{},{[d.rklab]:t.value})});render();return true;}
+  if(d.ntpace!=null&&d.f){const v=d.f==='pw'?t.value:num(t.value);rkWith('gym',()=>rkSave({npc:rkNpcs().map(n=>{if(n.k!==d.ntpace)return n;const o=Object.assign({},n,{[d.f]:v});if(d.f==='pw'&&(!v||v==='party'))o.pt=0;return o;})}));ntBadgeChanged();render();return true;}
   if(d.ntlab!=null){const b=d.b==='con'?'con':'gym';rkWith(b,()=>rkSave({npc:rkNpcs().map(n=>n.k===d.k?Object.assign({},n,{s:t.value}):n)}));render();return true;}
   if(d.rknlab!=null){rkSave({npc:rkNpcs().map(n=>n.k===d.rknlab?Object.assign({},n,{s:t.value}):n)});render();return true;}
   return false;
