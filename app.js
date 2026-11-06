@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-05 · Map window';
+const BUILD='2026-11-05 · Animated field conditions';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -2255,11 +2255,214 @@ function psDefMods(o,t,eff){
   return r;
 }
 const cap1=k=>({aerilate:'Aerilate',pixilate:'Pixilate',refrigerate:'Refrigerate',galvanize:'Galvanize'})[k]||k;
+/* ---------- field conditions: Terrain, Weather and Zones (PTA 3.5 Players Handbook, Field Conditions) ----------
+   Each is a circle 60 ft across (6 squares out from the square it was made on), or the whole battlefield when there's no
+   map spot. They last two minutes (20 rounds of 6 seconds). A new one of the same kind of condition replaces an older one
+   whose circle it reaches. Kept on the shared battle document, so everyone sees them; only the GM adds and removes them.
+   battle.fc [{id, k, x, y (null = whole field), rd (round made), by (who made it, a name)}] */
+const FC_R=6,FC_LIFE=20;
+const FC_K={
+  electric:{c:'t',n:'Electric Terrain',col:'#e6b800',up:{Electric:4},note:'Anyone on the ground is immune to Drowsy and Entranced.'},
+  flowery:{c:'t',n:'Flowery Terrain',col:'#e86aa8',up:{Fairy:4,Grass:4},turn:'Fairy- and Grass-types get Defense▲ or SpDefense▲ at the start of their turn.'},
+  grassy:{c:'t',n:'Grassy Terrain',col:'#3fae6a',up:{Grass:4},after:{heal:[1,8]},turn:'Anyone who acts here recovers 1d8 HP after acting.'},
+  misty:{c:'t',n:'Misty Terrain',col:'#c28ae8',up:{Fairy:4},dragon:true,note:'Dragon-type attacks are resisted here, and no one can be given afflictions.'},
+  muddy:{c:'t',n:'Muddy Terrain',col:'#8a6a45',up:{Ground:4,Electric:-8}},
+  psychic:{c:'t',n:'Psychic Terrain',col:'#b05fd0',up:{Psychic:4},note:'Anyone on the ground takes no damage from Reaction moves or Priority moves used out of turn order.'},
+  wet:{c:'t',n:'Wet Terrain',col:'#3aa6d8',up:{Water:4,Fire:-8},note:'Flopper and Beached are ignored while acting here.'},
+  hail:{c:'w',n:'Hailing Weather',col:'#8fc3e8',up:{Ice:4},after:{dmg:[2,4],ex:['Ice']},turn:'Anyone who acts here takes 2d4 after acting unless they are Ice-type.'},
+  hazy:{c:'w',n:'Hazy Weather',col:'#9a938a',hazy:true,turn:'Anyone who acts here loses all Stat ▲/▼. Attacks made in or into it get no Accuracy bonuses.'},
+  mistyw:{c:'w',n:'Misty Weather',col:'#d6b6f2',up:{Fairy:4,Ghost:4},note:'No one here can be given ▼.'},
+  pyro:{c:'w',n:'Pyroclastic Weather',col:'#d94b3d',up:{Fire:4},after:{dmg:[2,4],ex:['Fire']},turn:'Anyone who acts here takes 2d4 after acting unless they are Fire-type.'},
+  rain:{c:'w',n:'Raining Weather',col:'#2f6fd6',up:{Water:4,Fire:-8}},
+  sand:{c:'w',n:'Sandstorming Weather',col:'#c79a5a',up:{Rock:4},after:{dmg:[2,4],ex:['Ground','Rock','Steel']},turn:'Anyone who acts here takes 2d4 after acting unless they are Ground-, Rock- or Steel-type.'},
+  snow:{c:'w',n:'Snowy Weather',col:'#bcd4e6',up:{Ice:4},turn:'Ice-types get Defense▲ or SpDefense▲ at the start of their turn.'},
+  sunny:{c:'w',n:'Sunny Weather',col:'#f08a24',up:{Fire:4,Water:-8}},
+  gusty:{c:'w',n:'Gusty Weather',col:'#5fb3a1',up:{Flying:4},turn:'Flying-types and their adjacent allies get Speed▲ at the start of their turn.'},
+  gravity:{c:'z',n:'Gravitized Zone',col:'#555b66',acc:1,grav:true,note:'No one can leave the ground; Ground-type immunities count as resisted.'},
+  ionic:{c:'z',n:'Ionic Zone',col:'#d9b400',ionic:true,note:'Normal-type moves are Electric-type.'},
+  magical:{c:'z',n:'Magical Zone',col:'#8a4fd0',note:'Held items lose their abilities and medicine items do nothing (Mega Stones still work).'},
+  tricky:{c:'z',n:'Tricky Zone',col:'#2e9e5b',note:'Turn order is reversed. Priority moves used out of order make the user act last.'},
+  wonderful:{c:'z',n:'Wonderful Zone',col:'#d4a017',swap:true,note:'Defense and Special Defense are swapped.'}
+};
+const FC_CAT={t:'Terrain',w:'Weather',z:'Zone'};
+const fcList=()=>(Array.isArray(BT().fc)?BT().fc:[]).filter(x=>x&&FC_K[x.k]);
+/* where a combatant stands on the map the viewer can see: {x,y,fp} or null */
+function fcPos(cid){
+  const cfg=bmAvail()?bmCfg():null;
+  if(!cfg)return null;
+  const t=bmTokens(cfg).find(k=>k.cid===cid);
+  return t&&t.placed?{x:t.x,y:t.y,fp:t.fp}:null;
+}
+function fcCovers(f,p){
+  if(f.x==null||f.y==null)return true;
+  if(!p)return false;
+  const cx=num(f.x)+0.5,cy=num(f.y)+0.5,tx=p.x+p.fp/2,ty=p.y+p.fp/2;
+  return Math.hypot(tx-cx,ty-cy)<=FC_R+0.01;
+}
+/* the condition keys that reach a combatant */
+function fcAt(cid){
+  const L=fcList();
+  if(!L.length||!cid)return [];
+  const p=fcPos(cid);
+  return L.filter(f=>fcCovers(f,p)).map(f=>f.k);
+}
+function fcAdd(k,center){
+  if(!S.me.admin||!FC_K[k])return;
+  const b=BT(),rd=num(b.round)||1;
+  let x=null,y=null,by='';
+  if(center){const p=fcPos(center),v=btInfo(center,true);if(p){x=p.x+Math.floor(p.fp/2);y=p.y+Math.floor(p.fp/2);}by=v?v.name:'';}
+  const cat=FC_K[k].c;
+  const keep=fcList().filter(f=>{
+    if(FC_K[f.k].c!==cat)return true;
+    if(f.x==null||x==null)return false;
+    return Math.hypot(num(f.x)-x,num(f.y)-y)>FC_R*2;
+  });
+  const gone=fcList().length-keep.length;
+  edit('bt','battle','fc',keep.concat([{id:'fc'+Date.now().toString(36),k,x,y,rd,by}]));
+  toast(FC_K[k].n+(x==null?' covers the whole battlefield':' is up around '+(by||'that spot'))+' until the end of round '+(rd+FC_LIFE)+'.'+(gone?' It replaced the older '+FC_CAT[cat].toLowerCase()+'.':''),true);
+  render();
+}
+function fcRemove(id){if(S.me.admin){edit('bt','battle','fc',fcList().filter(f=>f.id!==id));render();}}
+/* two minutes are up: called when the round moves on */
+function fcExpire(round){
+  if(!S.me.admin)return;
+  const L=fcList(),keep=L.filter(f=>num(round)<=num(f.rd)+FC_LIFE);
+  if(keep.length!==L.length){edit('bt','battle','fc',keep);toast((L.length-keep.length)+' field condition'+(L.length-keep.length===1?' has':'s have')+' worn off.',true);}
+}
+/* what reaches the combatant who is acting now: reminders, and the after-acting HP changes as a button for the GM */
+function fcTurnNotes(cid){
+  const ks=fcAt(cid);if(!ks.length)return [];
+  const v=btInfo(cid,!!S.me.admin),types=(v&&v.types)||[];
+  const out=[];
+  ks.forEach(k=>{
+    const K=FC_K[k];
+    if(K.after&&K.after.ex&&types.some(t=>K.after.ex.indexOf(t)>=0))return;
+    if(K.turn)out.push({k,txt:K.n+': '+K.turn,act:K.after?(K.after.dmg?'dmg':'heal'):''});
+  });
+  return out;
+}
+function fcApplyAfter(cid,k){
+  if(!S.me.admin)return;
+  const K=FC_K[k];if(!K||!K.after)return;
+  const [n,d]=K.after.dmg||K.after.heal;
+  let t=0;const rs=[];for(let i=0;i<n;i++){const r=rnd(d);rs.push(r);t+=r;}
+  const v=btInfo(cid,true);
+  btHp(cid,K.after.dmg?-t:t);
+  toast((v?v.name:'It')+(K.after.dmg?' takes ':' recovers ')+t+' ('+n+'d'+d+': '+rs.join(', ')+') from '+K.n+'.',true);
+  render();
+}
+function fcPanel(){
+  const b=BT(),gm=!!S.me.admin,L=fcList(),u=S.ui.bt;
+  if(!gm&&!L.length)return '';
+  if(!b.on&&!L.length)return '';
+  const rd=num(b.round)||1;
+  const placed=bmAvail()&&bmCfg()?bmTokens(bmCfg()).filter(t=>t.placed&&(t.side==='a'||t.side==='f')):[];
+  const cur=b.on&&b.turn?b.turn:'';
+  const notes=cur?fcTurnNotes(cur):[];
+  return h`<section class="panel fcp"><div class="ph"><h2>Field conditions</h2><span class="sub">${L.length?L.length+' active':'None'}</span></div>
+    ${L.length?h`<ul class="fclist">${L.map(f=>{const K=FC_K[f.k],left=num(f.rd)+FC_LIFE-rd;return h`<li><span class="fcdot" style="background:${K.col}"></span><span><b>${K.n}</b> <span class="sub">${FC_CAT[K.c]} · ${f.x==null?'whole battlefield':'around '+(f.by||'column '+(num(f.x)+1)+', row '+(num(f.y)+1))} · ${left>0?left+' round'+(left===1?'':'s')+' left':'ends this round'}</span>${K.up?h`<br><span class="sub">${Object.keys(K.up).map(t=>t+' attacks '+(K.up[t]>0?'+':'−')+Math.abs(K.up[t])).join(', ')}</span>`:''}${K.note?h`<br><span class="sub">${K.note}</span>`:''}</span>${gm?h`<button class="btn sm ghost" data-act="fc_rm" data-id="${f.id}">Remove</button>`:''}</li>`;})}</ul>`:''}
+    ${notes.length?h`<div class="fcnow"><b>${(btInfo(cur,gm)||{}).name||'Now acting'}</b>${notes.map(n=>h`<div class="row sp"><span class="sub">${n.txt}</span>${gm&&n.act?h`<button class="btn sm" data-act="fc_after" data-cid="${cur}" data-k="${n.k}">${n.act==='dmg'?'Roll and apply damage':'Roll and heal'}</button>`:''}</div>`)}</div>`:''}
+    ${L.length?h`<label class="row"><input type="checkbox" data-u="bt.fcAnim" ${S.ui.bt.fcAnim!==false?raw('checked'):''}><span>Animate on the map (this device)</span></label>`:''}
+    ${gm?h`<div class="row fcadd"><label class="fld"><span class="fl">Add</span><select data-u="bt.fck">${['t','w','z'].map(c=>h`<optgroup label="${FC_CAT[c]}">${Object.keys(FC_K).filter(k=>FC_K[k].c===c).map(k=>h`<option value="${k}" ${u.fck===k?raw('selected'):''}>${FC_K[k].n}</option>`)}</optgroup>`)}</select></label>
+      <label class="fld"><span class="fl">Centred on</span><select data-u="bt.fcc"><option value="">The whole battlefield</option>${placed.map(t=>h`<option value="${t.cid}" ${u.fcc===t.cid?raw('selected'):''}>${t.v.name}${t.side==='f'?' (foe)':''}</option>`)}</select></label>
+      <button class="btn sm primary" data-act="fc_add">Add</button></div>
+      <p class="sub">A condition made by a move is a circle 60 ft across around whoever used it; place their token on the map first to centre it there. Attacks made inside it get its bonuses on their own, and it wears off after 20 rounds.</p>`:''}
+  </section>`;
+}
+/* the circles on the map */
+/* ----- the circles on the map, animated: each condition gets its own moving pattern (rain falling, sand blowing, sparks
+   flickering…) clipped to its circle. SVG animation, so it costs little and needs no script. Turned off by the "Animate"
+   box on the Field conditions panel, or by the device's reduced-motion setting. ----- */
+function fcAnimOn(){
+  if(S.ui.bt&&S.ui.bt.fcAnim===false)return false;
+  try{if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return false;}catch(e){}
+  return true;
+}
+/* pattern tiles: P = two squares. mv(dx,dy,dur) slides the tile; seamless because it moves by whole tiles */
+function fcFx(k,id,g,A,box){
+  const P=g*2,f=n=>(+n).toFixed(2);
+  const mv=(dx,dy,d)=>A?'<animateTransform attributeName="patternTransform" type="translate" from="0 0" to="'+f(dx)+' '+f(dy)+'" dur="'+d+'s" repeatCount="indefinite"/>':'';
+  const pat=(inner,anim,w,hh)=>'<pattern id="'+id+'" patternUnits="userSpaceOnUse" width="'+f(w||P)+'" height="'+f(hh||P)+'">'+inner+anim+'</pattern>';
+  const blink=(d,b)=>A?'<animate attributeName="opacity" values="0;1;0" dur="'+d+'s" begin="'+(b||0)+'s" repeatCount="indefinite"/>':'';
+  const dots=(n,rr,col,op)=>{let o='';for(let i=0;i<n;i++){const x=((i*37)%97)/97*P,y=((i*61)%89)/89*P;o+='<circle cx="'+f(x)+'" cy="'+f(y)+'" r="'+f(rr*(0.7+((i*13)%7)/10))+'" fill="'+col+'" opacity="'+op+'"/>';}return o;};
+  const cx=box.cx,cy=box.cy,R=box.r;
+  let defs='',top='';
+  switch(k){
+    case 'rain':{let o='';for(let i=0;i<6;i++){const x=i/6*P+((i*17)%11)/11*g*0.2,y=((i*41)%23)/23*P;o+='<line x1="'+f(x)+'" y1="'+f(y)+'" x2="'+f(x-g*0.15)+'" y2="'+f(y+g*0.55)+'" stroke="#9fc4ff" stroke-width="'+f(g*0.05)+'" stroke-linecap="round" opacity=".85"/>';}
+      defs=pat(o+o.replace(/y1="([\d.]+)"/g,(m,v)=>'y1="'+f(+v-P)+'"').replace(/y2="([\d.]+)"/g,(m,v)=>'y2="'+f(+v-P)+'"'),mv(0,P,0.55));break;}
+    case 'hail':defs=pat(dots(7,g*0.075,'#5d9bd6',0.95)+dots(4,g*0.05,'#9cc6ec',0.95),mv(0,P,0.9));break;
+    case 'snow':defs=pat(dots(9,g*0.07,'#ffffff',1).replace(/opacity="1"/g,'opacity="1" stroke="#8fb3d1" stroke-width="'+f(g*0.02)+'"'),mv(P,P*2,7));break;
+    case 'sand':{let o='';for(let i=0;i<8;i++){const x=((i*29)%31)/31*P,y=((i*43)%37)/37*P;o+='<line x1="'+f(x)+'" y1="'+f(y)+'" x2="'+f(x+g*0.35)+'" y2="'+f(y+g*0.05)+'" stroke="#d9b07a" stroke-width="'+f(g*0.05)+'" stroke-linecap="round" opacity=".8"/>';}
+      defs=pat(o+dots(6,g*0.03,'#b98b52',0.8),mv(P,0,0.7));break;}
+    case 'gusty':{let o='';for(let i=0;i<2;i++){const y=(i+0.5)/2*P,x=((i*23)%19)/19*P*0.5;o+='<path d="M'+f(x)+' '+f(y)+' q'+f(g*0.4)+' '+f(-g*0.18)+' '+f(g*0.8)+' 0 t'+f(g*0.8)+' 0" fill="none" stroke="#2f8f78" stroke-width="'+f(g*0.045)+'" stroke-linecap="round" opacity=".5"/>';}
+      defs=pat(o,mv(P,0,1.4));break;}
+    case 'pyro':defs=pat(dots(6,g*0.05,'#ffb347',0.95)+dots(4,g*0.035,'#ff5a36',0.9),mv(0,-P,2.2));break;
+    case 'hazy':defs=pat('<ellipse cx="'+f(P*0.3)+'" cy="'+f(P*0.4)+'" rx="'+f(P*0.35)+'" ry="'+f(P*0.18)+'" fill="#a39b90" opacity=".35"/><ellipse cx="'+f(P*0.8)+'" cy="'+f(P*0.85)+'" rx="'+f(P*0.3)+'" ry="'+f(P*0.14)+'" fill="#8f877c" opacity=".3"/>',mv(P,0,14));break;
+    case 'mistyw':case 'misty':defs=pat('<ellipse cx="'+f(P*0.25)+'" cy="'+f(P*0.3)+'" rx="'+f(P*0.3)+'" ry="'+f(P*0.16)+'" fill="#f3e3ff" opacity=".55"/><ellipse cx="'+f(P*0.75)+'" cy="'+f(P*0.78)+'" rx="'+f(P*0.32)+'" ry="'+f(P*0.15)+'" fill="#ffd9f1" opacity=".45"/>',mv(P,0,k==='misty'?16:11));break;
+    case 'sunny':{
+      defs='<radialGradient id="'+id+'g"><stop offset="0" stop-color="#fff3b0" stop-opacity=".55"/><stop offset="1" stop-color="#f08a24" stop-opacity="0"/></radialGradient>';
+      let rays='';for(let i=0;i<12;i++){const t=i/12*Math.PI*2;rays+='<line x1="'+f(cx+Math.cos(t)*R*0.2)+'" y1="'+f(cy+Math.sin(t)*R*0.2)+'" x2="'+f(cx+Math.cos(t)*R)+'" y2="'+f(cy+Math.sin(t)*R)+'" stroke="#ffd166" stroke-width="'+f(g*0.25)+'" stroke-linecap="round" opacity=".35"/>';}
+      top='<circle cx="'+f(cx)+'" cy="'+f(cy)+'" r="'+f(R)+'" fill="url(#'+id+'g)"/><g>'+rays+(A?'<animateTransform attributeName="transform" type="rotate" from="0 '+f(cx)+' '+f(cy)+'" to="360 '+f(cx)+' '+f(cy)+'" dur="40s" repeatCount="indefinite"/>':'')+'</g>';
+      return {defs,top,fill:''};}
+    case 'electric':{const z=(x,y)=>'<path d="M'+f(x)+' '+f(y)+' l'+f(g*0.18)+' '+f(g*0.2)+' l'+f(-g*0.12)+' '+f(g*0.05)+' l'+f(g*0.2)+' '+f(g*0.25)+'" fill="none" stroke="#d39e00" stroke-width="'+f(g*0.07)+'" stroke-linejoin="round"/>';
+      defs=pat('<g>'+z(P*0.15,P*0.1)+z(P*0.6,P*0.55)+blink(0.9,0)+'</g><g>'+z(P*0.55,P*0.05)+z(P*0.1,P*0.6)+blink(0.9,0.45)+'</g>','');break;}
+    case 'grassy':{let o='';for(let i=0;i<5;i++){const x=((i*31)%29)/29*P,y=((i*47)%41)/41*P+g*0.3;o+='<path d="M'+f(x)+' '+f(y)+' q'+f(-g*0.05)+' '+f(-g*0.25)+' '+f(-g*0.12)+' '+f(-g*0.35)+' M'+f(x)+' '+f(y)+' q'+f(g*0.02)+' '+f(-g*0.25)+' '+f(g*0.1)+' '+f(-g*0.38)+'" fill="none" stroke="#3f9a52" stroke-width="'+f(g*0.05)+'" stroke-linecap="round"/>';}
+      defs=pat(o,A?'<animateTransform attributeName="patternTransform" type="skewX" values="-6;6;-6" dur="3.2s" repeatCount="indefinite"/>':'');break;}
+    case 'flowery':{let o='';for(let i=0;i<5;i++){const x=((i*31)%29)/29*P,y=((i*47)%41)/41*P;o+='<ellipse cx="'+f(x)+'" cy="'+f(y)+'" rx="'+f(g*0.09)+'" ry="'+f(g*0.05)+'" fill="'+(i%2?'#ff9fcf':'#ffe08a')+'" transform="rotate('+(i*40)+' '+f(x)+' '+f(y)+')" opacity=".9"/>';}
+      defs=pat(o,mv(P,P,9));break;}
+    case 'muddy':defs=pat('<ellipse cx="'+f(P*0.3)+'" cy="'+f(P*0.35)+'" rx="'+f(g*0.35)+'" ry="'+f(g*0.2)+'" fill="#6b4a2b" opacity=".45"/><ellipse cx="'+f(P*0.75)+'" cy="'+f(P*0.8)+'" rx="'+f(g*0.28)+'" ry="'+f(g*0.16)+'" fill="#7a5532" opacity=".4"/><circle cx="'+f(P*0.32)+'" cy="'+f(P*0.33)+'" r="'+f(g*0.06)+'" fill="#a07a50">'+(A?'<animate attributeName="r" values="0;'+f(g*0.08)+';0" dur="2.6s" repeatCount="indefinite"/>':'')+'</circle>','');break;
+    case 'wet':defs=pat('<circle cx="'+f(P*0.3)+'" cy="'+f(P*0.35)+'" r="'+f(g*0.3)+'" fill="none" stroke="#2f8fd0" stroke-width="'+f(g*0.04)+'">'+(A?'<animate attributeName="r" values="0;'+f(g*0.45)+'" dur="2.2s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0" dur="2.2s" repeatCount="indefinite"/>':'')+'</circle><circle cx="'+f(P*0.78)+'" cy="'+f(P*0.8)+'" r="'+f(g*0.3)+'" fill="none" stroke="#2f8fd0" stroke-width="'+f(g*0.04)+'">'+(A?'<animate attributeName="r" values="0;'+f(g*0.45)+'" dur="2.2s" begin="1.1s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0" dur="2.2s" begin="1.1s" repeatCount="indefinite"/>':'')+'</circle>','');break;
+    case 'psychic':case 'gravity':{
+      let o='';for(let i=0;i<3;i++){const d=3,b=i*d/3,up=k==='psychic';o+='<circle cx="'+f(cx)+'" cy="'+f(cy)+'" r="'+f(up?R*0.1:R)+'" fill="none" stroke="'+(up?'#e6a6ff':'#cfd3da')+'" stroke-width="'+f(g*0.08)+'" opacity="0">'+(A?'<animate attributeName="r" values="'+(up?f(R*0.1)+';'+f(R):f(R)+';'+f(R*0.1))+'" dur="'+d+'s" begin="'+b+'s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;.8;0" dur="'+d+'s" begin="'+b+'s" repeatCount="indefinite"/>':'')+'</circle>';}
+      if(!A)o='<circle cx="'+f(cx)+'" cy="'+f(cy)+'" r="'+f(R*0.6)+'" fill="none" stroke="'+(k==='psychic'?'#e6a6ff':'#cfd3da')+'" stroke-width="'+f(g*0.08)+'" opacity=".6"/>';
+      return {defs:'',top:o,fill:''};}
+    case 'ionic':{const z=(x,y)=>'<path d="M'+f(x)+' '+f(y)+' l'+f(g*0.15)+' '+f(g*0.15)+' l'+f(-g*0.1)+' '+f(g*0.04)+' l'+f(g*0.15)+' '+f(g*0.18)+'" fill="none" stroke="#c99700" stroke-width="'+f(g*0.06)+'"/>';
+      defs=pat('<g>'+z(P*0.2,P*0.2)+blink(0.6,0)+'</g><g>'+z(P*0.65,P*0.6)+blink(0.6,0.3)+'</g>','');break;}
+    case 'magical':case 'wonderful':{const col=k==='magical'?'#9b5de5':'#d4a017';let o='';[[0.2,0.25,0],[0.7,0.3,0.5],[0.45,0.75,1],[0.85,0.85,1.5]].forEach(([x,y,b])=>{o+='<path d="M'+f(P*x)+' '+f(P*y-g*0.12)+' L'+f(P*x+g*0.04)+' '+f(P*y)+' L'+f(P*x)+' '+f(P*y+g*0.12)+' L'+f(P*x-g*0.04)+' '+f(P*y)+'Z" fill="'+col+'">'+blink(2,b)+'</path>';});
+      defs=pat(o,'');break;}
+    case 'tricky':{
+      const o='<circle cx="'+f(cx)+'" cy="'+f(cy)+'" r="'+f(R*0.85)+'" fill="none" stroke="#7fe0a8" stroke-width="'+f(g*0.1)+'" stroke-dasharray="'+f(g*0.6)+' '+f(g*0.4)+'" opacity=".7">'+(A?'<animateTransform attributeName="transform" type="rotate" from="0 '+f(cx)+' '+f(cy)+'" to="-360 '+f(cx)+' '+f(cy)+'" dur="12s" repeatCount="indefinite"/>':'')+'</circle>';
+      return {defs:'',top:o,fill:''};}
+  }
+  return {defs,top,fill:defs?'url(#'+id+')':''};
+}
+function bmFcSvg(cfg){
+  const L=fcList();if(!L.length)return '';
+  const A=fcAnimOn(),g=cfg.gx;
+  let defs='',s='';
+  L.forEach((f,i)=>{
+    const K=FC_K[f.k],id='fcx'+i+String(f.id||'').replace(/[^a-z0-9]/gi,'');
+    const whole=f.x==null;
+    const cx=whole?cfg.w/2:cfg.ox+(num(f.x)+0.5)*g,cy=whole?cfg.h/2:cfg.oy+(num(f.y)+0.5)*g,r=whole?Math.hypot(cfg.w,cfg.h)/2:(FC_R+0.5)*g;
+    const fx=fcFx(f.k,id,g,A,{cx,cy,r});
+    defs+=fx.defs+'<clipPath id="'+id+'c">'+(whole?'<rect x="0" y="0" width="'+cfg.w+'" height="'+cfg.h+'"/>':'<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'"/>')+'</clipPath>';
+    const shape=whole?'<rect x="0" y="0" width="'+cfg.w+'" height="'+cfg.h+'"':'<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'"';
+    s+=shape+' fill="'+K.col+'" fill-opacity="'+(whole?'.08':'.16')+'"/>';
+    s+='<g clip-path="url(#'+id+'c)">'+(fx.fill?shape+' fill="'+fx.fill+'"/>':'')+(fx.top||'')+'</g>';
+    if(!whole)s+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+K.col+'" stroke-width="'+(g*0.08)+'" stroke-dasharray="'+(g*0.3)+' '+(g*0.2)+'">'+(A?'<animate attributeName="stroke-dashoffset" from="0" to="'+(g*-1)+'" dur="2s" repeatCount="indefinite"/>':'')+'</circle>';
+    const lx=whole?g*3.2:Math.min(Math.max(cx,g*3),cfg.w-g*3),ly=whole?g*0.7+i*g*0.55:Math.max(g*0.6,cy-r+g*0.55);
+    s+='<text x="'+lx+'" y="'+ly+'" text-anchor="middle" font-size="'+(g*0.42)+'" font-weight="700" fill="'+K.col+'" stroke="#fff" stroke-width="'+(g*0.08)+'" paint-order="stroke">'+esc(K.n)+'</text>';
+  });
+  return h`<svg class="bmov bmfc" viewBox="0 0 ${cfg.w} ${cfg.h}" preserveAspectRatio="none" aria-hidden="true"><defs>${raw(defs)}</defs>${raw(s)}</svg>`;
+}
+/* the roll's side: what the conditions around the attacker and the target change */
+function fcMods(aKeys,tKeys){
+  const A=aKeys||[],T=tKeys||[],has=(L,p)=>L.some(k=>FC_K[k][p]);
+  return {A,T,ionic:has(A,'ionic'),acc:(has(A,'acc')||has(T,'acc'))?1:0,hazy:A.indexOf('hazy')>=0||T.indexOf('hazy')>=0,
+    dragon:has(T,'dragon'),grav:has(A,'grav')||has(T,'grav'),swap:has(T,'swap'),
+    tog:{solarpower:A.indexOf('sunny')>=0,sandforce:A.indexOf('sand')>=0,sandveil:T.indexOf('sand')>=0,snowcloak:T.indexOf('hail')>=0}};
+}
+const btCidOf=ref=>{const c=BT().c||{};return Object.keys(c).find(k=>c[k].s==='a'&&c[k].r===ref)||'';};
+/* in a Wonderful Zone the target's Defense and Special Defense trade places */
+const fcSwapDef=(cid,def)=>cid&&(def==='def'||def==='spd')&&fcAt(cid).some(k=>FC_K[k].swap)?(def==='def'?'spd':'def'):def;
 function atkCalc(o){
   const mv=o.mv||{};
   const k=KINDS.indexOf(mv.kind)>=0?mv.kind:'Physical';
   const ks=kindStat(k);
-  const P=psAtkMods({mv,type:mv.type||'',k,rng:mv.range||'',aTypes:o.aTypes,aPs:o.aPs,tPs:o.tPs,aHp:o.aHp,tog:o.tog});
+  const FM=fcMods(o.fcA,o.fcT);
+  const tog=Object.assign({},o.tog||{});Object.keys(FM.tog).forEach(k=>{if(FM.tog[k])tog[k]=true;});
+  const P=psAtkMods({mv,type:mv.type||'',k,rng:mv.range||'',aTypes:o.aTypes,aPs:o.aPs,tPs:o.tPs,aHp:o.aHp,tog});
+  if(FM.ionic&&P.type==='Normal'){P.type='Electric';P.notes.push('Ionic Zone (Normal → Electric)');}
   const tPs=P.ignoreT?null:o.tPs;
   const out={k,mv:mv.name||'Move',type:P.type||mv.type||'',ps:P.notes.slice(),pd:!!o.tPs||P.ignoreT,mb:P.ignoreT,rng:mv.range||''};
   if(P.ignoreT&&o.tPs&&psKeys(o.tPs).size)out.ps.push('Mold Breaker (ignores the target’s passives)');
@@ -2267,7 +2470,9 @@ function atkCalc(o){
   if(!o.onlyDmg){
     const r=d20adv(o.adv);
     const mm=mod(o.aAcc);
-    const bonus=num(o.accBonus)+P.acc;
+    let bonus=num(o.accBonus)+P.acc+FM.acc;
+    if(FM.acc)out.ps.push('Gravitized Zone +1 Acc');
+    if(FM.hazy&&bonus>0){bonus=0;out.ps.push('Hazy Weather (no Accuracy bonuses)');}
     const tot=r.v+mm+bonus;
     out.ac={tot,d:r.v,all:r.all,mod:mm,bonus,adv:o.adv==='adv'||o.adv==='dis'?o.adv:'normal',ab:ks.ab};
     crit=r.v===20;
@@ -2286,7 +2491,12 @@ function atkCalc(o){
       if(eff.c==='i'&&psKeys(o.aPs).has('scrappy')&&(ty==='Normal'||ty==='Fighting')&&o.tTypes.indexOf('Ghost')>=0){eff=effOf(ty,o.tTypes.filter(x=>x!=='Ghost'));out.ps.push('Scrappy (hits Ghost)');}
     }
   }
-  const D=plain?psDefMods({},ty,eff):psDefMods({mv,rng:mv.range||'',k,tPs,tHp:o.tHp},ty,eff);
+  if(!plain&&(!o.eff||o.eff==='auto')&&o.tTypes){
+    if(FM.grav&&ty==='Ground'&&eff.c==='i'){eff=EFF_CODES.r;out.ps.push('Gravitized Zone (immunity counts as resisted)');}
+    if(FM.dragon&&ty==='Dragon'&&eff.c!=='r'&&eff.c!=='h'&&eff.c!=='i'){eff=EFF_CODES.r;out.ps.push('Misty Terrain (Dragon resisted)');}
+  }
+  const tPsF=FM.grav&&tPs?tPs.filter(p=>dexKey(p&&(p.name||p.n))!=='levitate'):tPs;
+  const D=plain?psDefMods({},ty,eff):psDefMods({mv,rng:mv.range||'',k,tPs:tPsF,tHp:o.tHp},ty,eff);
   out.ef=eff.c;
   if(eff.c==='i'){out.dm={tot:0,imm:true,base:dc.n,s:dc.s,rolled:[],n:0,ef:'i'};return out;}
   if(D.imm){out.ps.push(D.imm+' (immune)');out.dm={tot:0,imm:true,psImm:D.imm,base:dc.n,s:dc.s,rolled:[],n:0,ef:eff.c};return out;}
@@ -2301,6 +2511,7 @@ function atkCalc(o){
   if(!plain&&P.tinted&&(eff.c==='r'||eff.c==='h')){psd+=4;out.ps.push('Tinted Lens +4');}
   if(!plain&&P.sniper&&crit){psd+=8;out.ps.push('Sniper +8');}
   if(!plain){psd+=D.dmg;out.ps.push(...D.notes);}
+  if(!plain)FM.A.forEach(k=>{const v=(FC_K[k].up||{})[ty];if(v){psd+=v;out.ps.push(FC_K[k].n+' '+(v>0?'+':'−')+Math.abs(v));}});
   const extra=num(o.dmgBonus);
   let tot=Math.max(0,sum+dc.f+stat+stab+extra+psd);
   if(!plain){D.dbl.forEach(n=>{tot*=2;out.ps.push(n+' ×2');});D.half.forEach(n=>{tot=Math.floor(tot/2);out.ps.push(n+' ½');});}
@@ -2333,7 +2544,7 @@ function dmText(c){
   if(m.stat)add.push('+'+m.stat+' '+m.ab);
   if(m.stab)add.push('+4 same-type');
   if(m.extra)add.push(sgn(m.extra));
-  if(m.psd)add.push(sgn(m.psd)+' passives');
+  if(m.psd)add.push(sgn(m.psd)+' passives and field');
   return s+(add.length?' '+add.join(' '):'')+' = '+m.tot+(c.ps&&c.ps.length?' · '+c.ps.join(', '):'');
 }
 
@@ -2468,9 +2679,10 @@ function moveRoll(uid,pid,i,onlyDmg){
   /* a target's Defense and stages are used only when everyone can see them (a player's Pokémon always can) */
   const c=atkCalc({
     mv:x,aTypes:effTypes(m),aAcc:k==='Effect'?spdOf(m):effStat(m,ks.acc),aDmg:ks.dmg?effStat(m,ks.dmg):0,aStage:ks.dmg?stg(m,ks.dmg):0,
-    tTypes:info?info.types:null,tDef:info&&info.stat?(k==='Effect'?info.stat.spe:info.stat[ks.def]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
+    tTypes:info?info.types:null,tDef:info&&info.stat?(k==='Effect'?info.stat.spe:info.stat[fcSwapDef(f.tgt,ks.def)]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
     eff:f.eff||'auto',accBonus:num(f.acc),dmgBonus:num(f.dmg),adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:!!onlyDmg&&!!f.crit,
-    aPs:m.passives,aHp:m.hp,tPs:info&&info.side==='a'?(info.m.passives||[]):null,tHp:info&&info.side==='a'?info.hp:null,tog:psTog(f)
+    aPs:m.passives,aHp:m.hp,tPs:info&&info.side==='a'?(info.m.passives||[]):null,tHp:info&&info.side==='a'?info.hp:null,tog:psTog(f),
+    fcA:fcAt(btCidOf(uid+'/'+pid)),fcT:f.tgt?fcAt(f.tgt):[]
   });
   if(!c.ac&&!c.dm){toast('That move has no damage listed, so there is nothing to roll. Use Roll attack for the accuracy check.');return;}
   const who=mName(m);
@@ -2800,6 +3012,7 @@ function btNext(){
   if(!cand){toast('Everyone is down.');return;}
   edit('bt','battle','turn',cand);
   edit('bt','battle','round',round);
+  fcExpire(round);
   render();
 }
 function btTurnTo(cid){
@@ -2956,6 +3169,7 @@ function btEnd(){
   edit('bt','battle','order',[]);
   edit('bt','battle','turn','');
   edit('bt','battle','round',0);
+  edit('bt','battle','fc',[]);
   edit('gb','battle','foes',{});
   S.ui.bt.open={};
   endBattleAll();
@@ -3041,9 +3255,10 @@ function foeRoll(cid,i,onlyDmg){
   const info=u.tgt&&btC(u.tgt)?btInfo(u.tgt,true):null;
   const c=atkCalc({
     mv:x,aTypes:foeTypes(f),aAcc:k==='Effect'?fSpd(f):fStat(f,ks.acc),aDmg:ks.dmg?fStat(f,ks.dmg):0,aStage:ks.dmg?stg(f,ks.dmg):0,
-    tTypes:info?info.types:null,tDef:info&&info.stat?(k==='Effect'?info.stat.spe:info.stat[ks.def]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
+    tTypes:info?info.types:null,tDef:info&&info.stat?(k==='Effect'?info.stat.spe:info.stat[fcSwapDef(u.tgt,ks.def)]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
     eff:u.eff||'auto',adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:false,
-    aPs:f.ps,aHp:f.hp,tPs:info?(info.side==='a'?(info.m.passives||[]):((info.f&&info.f.ps)||[])):null,tHp:info?(info.side==='a'?info.hp:(info.f&&info.f.hp)):null,tog:psTog(u)
+    aPs:f.ps,aHp:f.hp,tPs:info?(info.side==='a'?(info.m.passives||[]):((info.f&&info.f.ps)||[])):null,tHp:info?(info.side==='a'?info.hp:(info.f&&info.f.hp)):null,tog:psTog(u),
+    fcA:fcAt(cid),fcT:u.tgt?fcAt(u.tgt):[]
   });
   if(!c.ac&&!c.dm){toast('That move has no damage listed. Use Roll attack for the accuracy check.');return;}
   const {e,local}=atkEntry(c,foePub(f).n,info?{cid:u.tgt,name:info.name}:null,true);
@@ -3277,7 +3492,7 @@ function btAddPanel(){
 /* the Battle page has two views of the same fight: the turn order, and the map */
 function battleTab(){
   const sw=bmSwitch();
-  return h`${sw}${bmAvail()&&S.ui.bt.view==='map'?bmapPanel():battleOrderTab()}`;
+  return h`${sw}${fcPanel()}${bmAvail()&&S.ui.bt.view==='map'?bmapPanel():battleOrderTab()}`;
 }
 function battleOrderTab(){
   const b=BT(),gm=!!S.me.admin;
@@ -7620,7 +7835,41 @@ function bmTokens(cfg){
       out.push({cid,side:'f',v,x:ok?num(e.x):-1,y:ok?num(e.y):-1,placed:ok,fp,mine:gm,vis:gm?(ok&&num(e.vis)>0):true});
     }
   });
+  bmTrainerToks(cfg,out);
   return out;
+}
+/* ----- trainer tokens: every player with a Pokémon in the battle, and every NPC trainer whose Pokémon are foes.
+   A player's spot is kept on their trainer sheet (bpos), like their Pokémon's; an NPC's is kept by the GM (gm/bmap tn)
+   and reaches the table only once the GM shows it, under the name the table knows them by. ----- */
+function bmTrainerToks(cfg,out){
+  const gm=!!S.me.admin,b=BT(),c=b.c||{};
+  const pcs=new Set(),nts=new Set();
+  Object.keys(c).forEach(cid=>{
+    const x=c[cid];
+    if(x.s==='a'){const uid=String(x.r||'').split('/')[0];if(S.trainers[uid])pcs.add(uid);}
+    else if(gm){const f=foeOf(cid);if(f&&f.nt&&NTS()[f.nt])nts.add(f.nt);}
+  });
+  pcs.forEach(uid=>{
+    const t=S.trainers[uid],bp=t.bpos,ok=!!bp&&num(bp.v)===cfg.v&&num(bp.x)>=0&&num(bp.y)>=0;
+    const hp=t.hp&&num(t.hp.max)>0?{cur:num(t.hp.cur),max:num(t.hp.max)}:null;
+    const v={name:tName(t),owner:tName(t),uid,hp,showHp:2,down:!!hp&&hp.cur<=0,status:'',types:[],tr:t,side:'t'};
+    out.push({cid:'tr_'+uid,side:'t',v,x:ok?num(bp.x):-1,y:ok?num(bp.y):-1,placed:ok,fp:1,mine:canEditT(uid),vis:true});
+  });
+  if(gm){
+    const tn=bmG().tn||{};
+    nts.forEach(id=>{
+      const nt=NTS()[id],e=tn[id],ok=!!e&&num(e.x)>=0&&num(e.y)>=0;
+      const v={name:ntName(nt),owner:'NPC trainer',hp:null,showHp:0,down:false,status:'',types:[],nt,side:'n'};
+      out.push({cid:'nt_'+id,side:'n',v,x:ok?num(e.x):-1,y:ok?num(e.y):-1,placed:ok,fp:1,mine:true,vis:ok&&num(e.vis)>0});
+    });
+  }else{
+    const tn=(S.bmap||{}).tn||{};
+    Object.keys(tn).forEach(id=>{
+      const e=tn[id];
+      const v={name:String(e.n||'Trainer'),owner:'Trainer',hp:null,showHp:0,down:false,status:'',types:[],side:'n'};
+      out.push({cid:'nt_'+id,side:'n',v,x:num(e.x),y:num(e.y),placed:true,fp:1,mine:false,vis:true});
+    });
+  }
 }
 const bmPct=(n,d)=>(n/d*100).toFixed(4)+'%';
 function bmShort(s){s=String(s||'');return s.length>14?s.slice(0,13)+'…':s;}
@@ -7630,9 +7879,9 @@ function bmTok(cfg,t){
   const ratio=hp?clamp(num(hp.cur)/mx,0,1):null;
   const b=BT(),sel=S.ui.bm.sel===t.cid;
   const turn=!!b.on&&b.turn===t.cid;
-  const cls=['bmt',t.side==='a'?'ally':'foe',turn?'turn':'',v.down?'down':'',t.vis?'':'hid',sel?'sel':'',t.mine?'mine':''].filter(Boolean).join(' ');
-  const pic=t.side==='a'?monPic(v.m):foePic(v);
-  const label=v.name+(t.side==='a'?', '+v.owner:', foe')+(hp&&v.down?', down':'')+(hp?(v.showHp===1?', about '+Math.round(ratio*100)+' percent health':', '+num(hp.cur)+' of '+mx+' HP'):'')+(t.vis?'':', hidden from players')+', column '+(t.x+1)+', row '+(t.y+1)+(t.mine?'. Drag to move it, or use the arrow keys.':'');
+  const cls=['bmt',t.side==='a'?'ally':t.side==='t'?'ally tr':t.side==='n'?'foe tr':'foe',turn?'turn':'',v.down?'down':'',t.vis?'':'hid',sel?'sel':'',t.mine?'mine':''].filter(Boolean).join(' ');
+  const pic=t.side==='a'?monPic(v.m):t.side==='t'?pimg((v.tr&&v.tr.img)||'',v.name,'thumb'):t.side==='n'?pimg('',v.name,'thumb'):foePic(v);
+  const label=v.name+(t.side==='a'?', '+v.owner:t.side==='t'?', trainer':t.side==='n'?', NPC trainer':', foe')+(hp&&v.down?', down':'')+(hp?(v.showHp===1?', about '+Math.round(ratio*100)+' percent health':', '+num(hp.cur)+' of '+mx+' HP'):'')+(t.vis?'':', hidden from players')+', column '+(t.x+1)+', row '+(t.y+1)+(t.mine?'. Drag to move it, or use the arrow keys.':'');
   return h`<button type="button" class="${cls}" data-bmt="${t.cid}" data-act="bm_sel" data-cid="${t.cid}" aria-pressed="${String(sel)}" aria-label="${label}" title="${v.name}" style="left:${bmPct(cfg.ox+t.x*cfg.gx,cfg.w)};top:${bmPct(cfg.oy+t.y*cfg.gx,cfg.h)};width:${bmPct(t.fp*cfg.gx,cfg.w)};height:${bmPct(t.fp*cfg.gx,cfg.h)};--c:${(cfg.gx/cfg.w*100).toFixed(4)}cqw">
     <span class="bmt-pic">${pic}</span>${ratio!=null?h`<span class="bmt-hp ${hpCls({cur:ratio,max:1})}"><i style="width:${Math.round(ratio*100)}%"></i></span>`:''}${v.status?h`<span class="bmt-st">${String(v.status).slice(0,3).toUpperCase()}</span>`:''}${t.vis?'':h`<span class="bmt-eye" aria-hidden="true">hidden</span>`}<span class="bmt-nm">${bmShort(v.name)}</span></button>`;
 }
@@ -7660,7 +7909,13 @@ function bmSetPos(cid,x,y,o){
       p={x:r.x,y:r.y};
     }
   }
-  if(t.side==='a'){
+  if(t.side==='t'){
+    edit('t',cid.slice(3),'bpos',{x:p.x,y:p.y,v:cfg.v});
+  }else if(t.side==='n'){
+    const id=cid.slice(3),old=(bmG().tn||{})[id]||{};
+    edit('bg','bmap','tn.'+id,{x:p.x,y:p.y,vis:num(old.vis)>0?1:0});
+    bmSync();
+  }else if(t.side==='a'){
     edit('p',btC(cid).r,'bpos',{x:p.x,y:p.y,v:cfg.v});
   }else{
     const old=(bmG().f||{})[cid]||{};
@@ -7669,13 +7924,15 @@ function bmSetPos(cid,x,y,o){
   }
   /* said after the save has started, or "Saving…" would replace it */
   if(msg)toast(msg);
-  if(t.side==='a')bmFogSoon();
+  if(t.side==='a'||t.side==='t')bmFogSoon();
 }
 function bmOff(cid){
   const cfg=bmCfg();
   const t=cfg&&bmTokens(cfg).find(k=>k.cid===cid);
   if(!t||!t.mine)return;
-  if(t.side==='a'){edit('p',btC(cid).r,'bpos',null);bmFogSoon();}
+  if(t.side==='t'){edit('t',cid.slice(3),'bpos',null);bmFogSoon();}
+  else if(t.side==='n'){const tn=Object.assign({},bmG().tn||{});delete tn[cid.slice(3)];edit('bg','bmap','tn',tn);bmSync();}
+  else if(t.side==='a'){edit('p',btC(cid).r,'bpos',null);bmFogSoon();}
   else{
     const f=Object.assign({},bmG().f||{});delete f[cid];
     edit('bg','bmap','f',f);bmSync();
@@ -7684,6 +7941,7 @@ function bmOff(cid){
 }
 function bmFoeVis(cid,on){
   if(!S.me.admin)return;
+  if(String(cid).indexOf('nt_')===0){const id=cid.slice(3);if((bmG().tn||{})[id]){edit('bg','bmap','tn.'+id+'.vis',on?1:0);bmSync();}return;}
   const e=(bmG().f||{})[cid];
   if(!e)return;
   edit('bg','bmap','f.'+cid+'.vis',on?1:0);
@@ -7698,6 +7956,10 @@ function bmSync(){
   let pruned=false;
   Object.keys(f).forEach(cid=>{if(c[cid]&&c[cid].s==='f')keep[cid]=f[cid];else pruned=true;});
   if(pruned)edit('bg','bmap','f',keep);
+  const ntIn=new Set(Object.keys(keep).concat(Object.keys(c).filter(cid=>c[cid].s==='f')).map(cid=>(foeOf(cid)||{}).nt).filter(Boolean));
+  const tnAll=g.tn||{},tnKeep={};let tnPr=false;
+  Object.keys(tnAll).forEach(id=>{if(ntIn.has(id))tnKeep[id]=tnAll[id];else tnPr=true;});
+  if(tnPr)edit('bg','bmap','tn',tnKeep);
   if(!g.live)return;
   const gc=bmCfg();
   /* fog of war: which squares the players can see is worked out here, because only the GM's device knows where the covered ones are */
@@ -7714,6 +7976,15 @@ function bmSync(){
       const fp=bmFoot((foeOf(cid)||{}).sz);
       if(fe&&!bmRowsSeen(fe,num(e.x),num(e.y),fp))return;
       pubF[cid]={x:num(e.x),y:num(e.y),s:fp};
+    }
+  });
+  const pubTn={};
+  Object.keys(tnKeep).forEach(id=>{
+    const e=tnKeep[id];
+    if(num(e.vis)>0&&num(e.x)>=0){
+      if(fe&&!bmRowsSeen(fe,num(e.x),num(e.y),1))return;
+      const p=ntPub(id);
+      pubTn[id]={x:num(e.x),y:num(e.y),n:p&&p.n?String(p.n):'Trainer'};
     }
   });
   /* terrain, markers and shapes reach the table only when the GM has chosen to show them, and not from covered squares */
@@ -7740,7 +8011,7 @@ function bmSync(){
       tpPub[id]=o;
     }
   });
-  const want={on:true,v:g.v,w:num(g.w),h:num(g.h),blank:!!g.blank,gx:Math.max(4,num(g.gx)||50),ox:num(g.ox),oy:num(g.oy),grid:g.grid!==false,name:String(g.name||''),f:pubF,ter,wt:g.wt!==false,mk:mkPub,tp:tpPub,fg:!!fe,fr:fe||[]};
+  const want={on:true,v:g.v,w:num(g.w),h:num(g.h),blank:!!g.blank,gx:Math.max(4,num(g.gx)||50),ox:num(g.ox),oy:num(g.oy),grid:g.grid!==false,name:String(g.name||''),f:pubF,tn:pubTn,ter,wt:g.wt!==false,mk:mkPub,tp:tpPub,fg:!!fe,fr:fe||[]};
   const cur=S.bmap||{};
   Object.keys(want).forEach(k=>{if(JSON.stringify(cur[k])!==JSON.stringify(want[k]))edit('bm','bmap',k,want[k]);});
 }
@@ -8047,13 +8318,14 @@ function bmInfoBar(cfg,toks){
   const t=toks.find(k=>k.cid===u.sel);
   if(!t)return h`<p class="sub bminfo" aria-live="polite">${u.cal===1?'Tap one corner of a grid square.':u.cal===2?'Now tap the opposite corner of the same square.':u.ruler?'Drag across the map to measure.':u.tool==='tpl'?'Tap a square to place the shape.':u.tool==='paint'?'Drag across the map to paint.':u.tool==='fog'?'Drag across the map to uncover or cover squares.':u.tool==='mark'?'Tap a square to drop a marker.':'Tap a token to select it. Drag a token you may move, or tap it and then tap a square.'}</p>`;
   const under=t.placed?bmTerUnder(cfg,t):[];
-  const v=t.v,open=gm||(t.side==='a'&&canEditT(v.uid));
-  return h`<div class="bminfo sel" aria-live="polite"><div class="row sp"><div class="btx"><b>${v.name}</b> <span class="sub">${t.side==='a'?v.owner:'Foe'}${t.placed?' · column '+(t.x+1)+', row '+(t.y+1):' · not on the map yet'}${under.length?' · on '+under.join(' and '):''}</span>
-      <div class="types">${v.types&&v.types.length?chipsOf(v.types):''}${v.status?h`<span class="pill status">${v.status}</span>`:''}${v.down?h`<span class="pill">Down</span>`:''}${t.side==='f'&&gm?h`<span class="pill ${t.vis?'good':'gm'}">${t.vis?'Shown to players':'Hidden from players'}</span>`:''}${t.side==='f'&&gm&&t.vis&&t.placed&&cfg.fg&&!bmRowsSeen(bmFe(cfg),t.x,t.y,t.fp)?h`<span class="pill gm">In the fog: players cannot see it</span>`:''}</div></div>
-      <div class="bhp">${btHpView(v)}</div></div>
+  const v=t.v,open=gm||((t.side==='a'||t.side==='t')&&canEditT(v.uid));
+  return h`<div class="bminfo sel" aria-live="polite"><div class="row sp"><div class="btx"><b>${v.name}</b> <span class="sub">${t.side==='a'?v.owner:t.side==='t'?'Trainer':t.side==='n'?'NPC trainer':'Foe'}${t.placed?' · column '+(t.x+1)+', row '+(t.y+1):' · not on the map yet'}${under.length?' · on '+under.join(' and '):''}</span>
+      <div class="types">${v.types&&v.types.length?chipsOf(v.types):''}${v.status?h`<span class="pill status">${v.status}</span>`:''}${v.down?h`<span class="pill">Down</span>`:''}${(t.side==='f'||t.side==='n')&&gm?h`<span class="pill ${t.vis?'good':'gm'}">${t.vis?'Shown to players':'Hidden from players'}</span>`:''}${t.side==='f'&&gm&&t.vis&&t.placed&&cfg.fg&&!bmRowsSeen(bmFe(cfg),t.x,t.y,t.fp)?h`<span class="pill gm">In the fog: players cannot see it</span>`:''}</div></div>
+      <div class="bhp">${t.side==='n'?'':t.side==='t'?(v.hp?h`<span class="bhpw">${hpBar(v.hp)}<span class="mono">${v.hp.cur}/${v.hp.max}</span></span>`:''):btHpView(v)}</div></div>
     ${t.mine&&!t.placed?h`<p class="sub">Tap a square on the map to put it there.</p>`:''}
+    ${bmReachBar(cfg,t,toks)}
     <div class="row bmbtns">${t.mine&&t.placed?h`<span class="bmnudge" role="group" aria-label="Move one square"><button class="btn sm" data-act="bm_nudge" data-dx="0" data-dy="-1" aria-label="Up one square">↑</button><button class="btn sm" data-act="bm_nudge" data-dx="-1" data-dy="0" aria-label="Left one square">←</button><button class="btn sm" data-act="bm_nudge" data-dx="1" data-dy="0" aria-label="Right one square">→</button><button class="btn sm" data-act="bm_nudge" data-dx="0" data-dy="1" aria-label="Down one square">↓</button></span><button class="btn sm" data-act="bm_off" data-cid="${t.cid}">Take off the map</button>`:''}
-      ${gm&&t.side==='f'&&t.placed?h`<button class="btn sm ${t.vis?'':'primary'}" data-act="bm_vis" data-cid="${t.cid}" data-on="${t.vis?0:1}">${t.vis?'Hide from players':'Show to players'}</button>`:''}
+      ${gm&&(t.side==='f'||t.side==='n')&&t.placed?h`<button class="btn sm ${t.vis?'':'primary'}" data-act="bm_vis" data-cid="${t.cid}" data-on="${t.vis?0:1}">${t.vis?'Hide from players':'Show to players'}</button>`:''}
       ${open?h`<button class="btn sm ghost" data-act="bm_open" data-cid="${t.cid}">Open details</button>`:''}
       <button class="btn sm ghost" data-act="bm_desel">Done</button></div></div>`;
 }
@@ -8061,7 +8333,7 @@ function bmTray(toks){
   const u=S.ui.bm;
   const un=toks.filter(t=>!t.placed&&t.mine);
   if(!un.length)return '';
-  return h`<div class="bmtray"><span class="fl">Not on the map yet</span><div class="row evchips">${un.map(t=>h`<button class="btn sm chk" data-act="bm_sel" data-cid="${t.cid}" data-bmt="${t.cid}" aria-pressed="${String(u.sel===t.cid)}">${t.side==='a'?monIcon(t.v.m):h`<span class="mi-ph unk" aria-hidden="true">?</span>`}${t.v.name}${t.side==='f'?h` <span class="sub">foe</span>`:''}</button>`)}</div>
+  return h`<div class="bmtray"><span class="fl">Not on the map yet</span><div class="row evchips">${un.map(t=>h`<button class="btn sm chk" data-act="bm_sel" data-cid="${t.cid}" data-bmt="${t.cid}" aria-pressed="${String(u.sel===t.cid)}">${t.side==='a'?monIcon(t.v.m):t.side==='t'||t.side==='n'?pimg(t.side==='t'?((t.v.tr&&t.v.tr.img)||''):'',t.v.name,'thumb'):h`<span class="mi-ph unk" aria-hidden="true">?</span>`}${t.v.name}${t.side==='f'?h` <span class="sub">foe</span>`:''}</button>`)}</div>
     ${u.sel&&un.some(t=>t.cid===u.sel)?h`<p class="sub">Tap a square on the map to put it there.</p>`:''}</div>`;
 }
 function bmSetup(cfg){
@@ -8139,7 +8411,7 @@ function bmWinHtml(){
     const toks=bmTokens(cfg),placed=toks.filter(t=>t.placed&&(t.vis||gmView));
     const bg=cfg.blank?h`<div class="bmbg blank" style="aspect-ratio:${cfg.w}/${cfg.h}"></div>`:(cfg.src?h`<img class="bmbg" src="${cfg.src}" alt="" draggable="false" width="${cfg.w}" height="${cfg.h}" style="aspect-ratio:${cfg.w}/${cfg.h}">`:h`<div class="bmbg blank load" style="aspect-ratio:${cfg.w}/${cfg.h}"><span>Loading the map…</span></div>`);
     return h`<div class="bmwin ${gmView?'gmv':'plv'}">${bar}<div class="bmwturn">${bmTurnBar()}</div>
-      <div class="bmwstage"><div class="bmmap bmwmap" id="bmmap" ${gmView?raw('data-act="bm_map"'):''} style="width:min(100vw,calc(100dvh * ${(cfg.w/cfg.h).toFixed(4)}))">${bg}${bmTerSvg(cfg)}${bmGridSvg(cfg)}${bmFogSvg(cfg)}${bmMarkSvg(cfg)}${bmMkList(cfg).map(m=>bmMkEl(cfg,m))}${placed.map(t=>bmTok(cfg,t))}</div></div></div>`;
+      <div class="bmwstage"><div class="bmmap bmwmap" id="bmmap" ${gmView?raw('data-act="bm_map"'):''} style="width:min(100vw,calc(100dvh * ${(cfg.w/cfg.h).toFixed(4)}))">${bg}${bmTerSvg(cfg)}${bmFcSvg(cfg)}${bmGridSvg(cfg)}${bmFogSvg(cfg)}${bmMarkSvg(cfg)}${bmMkList(cfg).map(m=>bmMkEl(cfg,m))}${placed.map(t=>bmTok(cfg,t))}</div></div></div>`;
   }finally{S.me.admin=was;}
 }
 function bmWinAct(d){
@@ -8151,6 +8423,93 @@ function bmWinAct(d){
 }
 window.addEventListener('hashchange',()=>{const m=bmWinMode();if(m!==S.mapWin){S.mapWin=m;document.body.classList.toggle('mapwin',!!m);render();}});
 document.addEventListener('fullscreenchange',()=>{if(S.mapWin)render();});
+/* ----- how far a selected token can go, and how far a chosen move reaches (PTA 3.5: Pokémon move 5 ft per point of Speed,
+   at least 5 ft; trainers 30 ft; a diagonal step is one square; Dash adds 30 ft in a straight line). Rough ground costs two
+   squares; walls stop it. Shown only for tokens you may move. ----- */
+const BM_SPD_PS={chlorophyll:'sunny',swiftswim:'rain',sandrush:'sand',slushrush:'hail'};
+function bmMoveSq(t){
+  if(t.side==='t'||t.side==='n')return 6;
+  const v=t.v,spe=num(v&&v.stat&&v.stat.spe);
+  const ps=t.side==='a'?((v.m&&v.m.passives)||[]):((v.f&&v.f.ps)||[]);
+  const ks=psKeys(ps),wx=fcAt(t.cid);
+  let bonus=0;Object.keys(BM_SPD_PS).forEach(k=>{if(ks.has(k)&&wx.indexOf(BM_SPD_PS[k])>=0)bonus+=2;});
+  return Math.max(1,Math.floor(spe+bonus));
+}
+function bmReach(cfg,t,n){
+  const walls=bmWallsOn(cfg),key=(x,y)=>x+','+y,cost={},q=[[t.x,t.y,0]];
+  cost[key(t.x,t.y)]=0;
+  const rough=(x,y)=>{for(let a=0;a<t.fp;a++)for(let b=0;b<t.fp;b++)if(bmTerAt(cfg,x+a,y+b)==='D')return true;return false;};
+  while(q.length){
+    q.sort((a,b)=>a[2]-b[2]);
+    const [x,y,c]=q.shift();
+    if(c>cost[key(x,y)])continue;
+    for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){
+      if(!dx&&!dy)continue;
+      const nx=x+dx,ny=y+dy;
+      if(nx<0||ny<0||nx+t.fp>cfg.cols||ny+t.fp>cfg.rows)continue;
+      if(walls&&!bmStepOk(cfg,t.fp,x,y,nx,ny))continue;
+      const nc=c+(rough(nx,ny)?2:1);
+      if(nc>n)continue;
+      const k=key(nx,ny);
+      if(cost[k]==null||nc<cost[k]){cost[k]=nc;q.push([nx,ny,nc]);}
+    }
+  }
+  return cost;
+}
+/* a move's reach in squares: Melee 1, "Ranged(25ft…)" 5, Self 0; null when it can't be read */
+function bmRangeSq(txt){
+  const t=String(txt||'');
+  const m=/(\d+)\s*ft/i.exec(t);
+  if(/melee/i.test(t)&&!m)return 1;
+  if(m)return Math.max(1,Math.floor(num(m[1])/5));
+  if(/self/i.test(t))return 0;
+  if(/melee/i.test(t))return 1;
+  return null;
+}
+const bmMovesOf=t=>t.side==='a'?((t.v.m&&t.v.m.moves)||[]):t.side==='f'?((t.v.f&&t.v.f.mv)||[]):[];
+function bmRangeCells(cfg,t,n){
+  const out=[];
+  for(let y=Math.max(0,t.y-n);y<=Math.min(cfg.rows-1,t.y+t.fp-1+n);y++)for(let x=Math.max(0,t.x-n);x<=Math.min(cfg.cols-1,t.x+t.fp-1+n);x++){
+    if(x>=t.x&&x<t.x+t.fp&&y>=t.y&&y<t.y+t.fp)continue;
+    out.push([x,y]);
+  }
+  return out;
+}
+function bmReachSvg(cfg,toks){
+  const u=S.ui.bm,gm=!!S.me.admin;
+  if(!u.sel||bmDrag||u.tool||u.ruler)return '';
+  const t=toks.find(k=>k.cid===u.sel);
+  if(!t||!t.placed||!(t.mine||gm))return '';
+  let sv='';
+  const g=cfg.gx,X=x=>cfg.ox+x*g,Y=y=>cfg.oy+y*g;
+  if(u.mvShow!==false){
+    const n=bmMoveSq(t)+(u.dash?6:0),c=bmReach(cfg,t,n);
+    Object.keys(c).forEach(k=>{const [x,y]=k.split(',').map(Number);if(x===t.x&&y===t.y)return;sv+='<rect x="'+X(x)+'" y="'+Y(y)+'" width="'+(g*t.fp)+'" height="'+(g*t.fp)+'" fill="#2f80ed" fill-opacity=".16" stroke="#2f80ed" stroke-opacity=".35" stroke-width="'+(g*0.03)+'"/>';});
+  }
+  const mv=u.rmv!=null&&u.rmv!==''?bmMovesOf(t)[num(u.rmv)]:null;
+  const rn=mv?bmRangeSq(mv.range):null;
+  if(rn){bmRangeCells(cfg,t,rn).forEach(([x,y])=>{sv+='<rect x="'+X(x)+'" y="'+Y(y)+'" width="'+g+'" height="'+g+'" fill="#eb5757" fill-opacity=".14"/>';});
+    sv+='<rect x="'+X(t.x-rn)+'" y="'+Y(t.y-rn)+'" width="'+g*(t.fp+2*rn)+'" height="'+g*(t.fp+2*rn)+'" fill="none" stroke="#eb5757" stroke-width="'+(g*0.06)+'" stroke-dasharray="'+(g*0.25)+' '+(g*0.15)+'"/>';}
+  return sv?h`<svg class="bmov bmreach" viewBox="0 0 ${cfg.w} ${cfg.h}" preserveAspectRatio="none" aria-hidden="true">${raw(sv)}</svg>`:'';
+}
+/* the controls under a selected token, and who the chosen move can reach */
+function bmReachBar(cfg,t,toks){
+  const u=S.ui.bm,gm=!!S.me.admin;
+  if(!t||!t.placed||!(t.mine||gm))return '';
+  const n=bmMoveSq(t),mvs=bmMovesOf(t);
+  const mv=u.rmv!=null&&u.rmv!==''?mvs[num(u.rmv)]:null,rn=mv?bmRangeSq(mv.range):null;
+  let who='';
+  if(rn){
+    const inR=toks.filter(k=>k!==t&&k.placed&&(k.vis||gm)&&!(k.x>t.x+t.fp-1+rn||k.x+k.fp-1<t.x-rn||k.y>t.y+t.fp-1+rn||k.y+k.fp-1<t.y-rn));
+    who=inR.length?'In range: '+inR.map(k=>k.v.name).join(', ')+'.':'Nobody is in range.';
+  }
+  return h`<div class="bmreachbar"><div class="row">
+      <label class="row"><input type="checkbox" data-u="bm.mvShow" ${u.mvShow!==false?raw('checked'):''}><span>Movement: <b>${n+(u.dash?6:0)} squares</b> (${(n+(u.dash?6:0))*5} ft)</span></label>
+      ${t.side==='a'||t.side==='f'?h`<label class="row"><input type="checkbox" data-u="bm.dash" ${u.dash?raw('checked'):''}><span>Dash (+30 ft, straight line only)</span></label>`:''}</div>
+    ${mvs.length?h`<label class="fld"><span class="fl">Show a move’s range</span><select data-u="bm.rmv"><option value="">None</option>${mvs.map((m,i)=>h`<option value="${i}" ${String(u.rmv)===String(i)?raw('selected'):''}>${m.name||'Move '+(i+1)}${m.range?' · '+m.range:''}</option>`)}</select></label>`:''}
+    ${mv?h`<p class="sub">${rn==null?'This move’s range can’t be read, so check it by hand.':rn===0?'This move targets the user.':who}</p>`:''}
+  </div>`;
+}
 function bmapPanel(){
   const cfg=bmCfg(),gm=!!S.me.admin,u=S.ui.bm;
   if(!cfg){
@@ -8175,7 +8534,7 @@ function bmapPanel(){
     ${bmOpts(cfg,toks)}
     ${u.ruler?h`<p class="sub" id="bmrlnote" aria-live="polite">${bmRulerText(u.rl)||'Drag across the map to measure.'}</p>`:''}
     <div class="bmview ${tool?'tool':''} ${u.cal?'cal':''}" id="bmview" role="region" aria-label="Battle map, scrollable" tabindex="0">
-      <div class="bmmap" id="bmmap" data-act="bm_map" style="width:${z===1?(u.full?'min(100%,calc((100dvh - 160px) * '+(cfg.w/cfg.h).toFixed(4)+'))':'min(100%,'+(72*cfg.w/cfg.h).toFixed(3)+'vh)'):z*100+'%'}">${bg}${bmTerSvg(cfg)}${bmGridSvg(cfg)}${bmFogSvg(cfg)}${bmMarkSvg(cfg)}${mks.map(m=>bmMkEl(cfg,m))}${placed.map(t=>bmTok(cfg,t))}</div></div>
+      <div class="bmmap" id="bmmap" data-act="bm_map" style="width:${z===1?(u.full?'min(100%,calc((100dvh - 160px) * '+(cfg.w/cfg.h).toFixed(4)+'))':'min(100%,'+(72*cfg.w/cfg.h).toFixed(3)+'vh)'):z*100+'%'}">${bg}${bmTerSvg(cfg)}${bmFcSvg(cfg)}${bmGridSvg(cfg)}${bmFogSvg(cfg)}${bmReachSvg(cfg,toks)}${bmMarkSvg(cfg)}${mks.map(m=>bmMkEl(cfg,m))}${placed.map(t=>bmTok(cfg,t))}</div></div>
     ${bmLegend(cfg)}
     ${gm&&cfg.fg?h`<p class="sub bmfogkey">Fog of war is on. Hatched squares are hidden from the players; lighter ones were seen earlier but are out of sight now.</p>`:''}
     ${bmInfoBar(cfg,toks)}
@@ -8194,7 +8553,7 @@ function bmAct(b,e){
       u.zoom=clamp(+d.z||1,1,4);render();break;}
     case 'bm_sel':{
       if(bmMoved)break;
-      u.sel=u.sel===d.cid?'':d.cid;u.msel='';render();break;}
+      u.sel=u.sel===d.cid?'':d.cid;u.msel='';u.rmv='';u.dash=false;render();break;}
     case 'bm_desel':u.sel='';render();break;
     case 'bm_map':{
       if(bmMoved||bmRl)break;
@@ -8216,7 +8575,7 @@ function bmAct(b,e){
       bmSetPos(t.cid,t.x+num(d.dx),t.y+num(d.dy));render();break;}
     case 'bm_off':bmOff(d.cid);render();break;
     case 'bm_vis':bmFoeVis(d.cid,d.on==='1');render();break;
-    case 'bm_open':S.ui.bt.view='order';S.ui.bt.open[d.cid]=true;S.ui.bm.sel=d.cid;render();break;
+    case 'bm_open':{const c=String(d.cid||'');if(c.indexOf('tr_')===0){S.viewUid=c.slice(3);setTab('trainer');break;}if(c.indexOf('nt_')===0){const id=c.slice(3);if(NTS()[id]){S.ui.nt.open[id]=true;S.ui.q.npc=ntName(NTS()[id]);setTab('npc');}break;}S.ui.bt.view='order';S.ui.bt.open[d.cid]=true;S.ui.bm.sel=d.cid;render();break;}
     case 'bm_full':bmFs(!u.full);break;
     case 'bm_ruler':u.ruler=!u.ruler;u.rl=null;u.cal=0;u.calA=null;if(u.ruler)u.tool='';render();break;
     case 'bm_setup':u.setup=!u.setup;render();break;
@@ -8880,7 +9239,7 @@ const BM_FB=[['u','Uncover'],['c','Cover'],['.','Undo']];
 
 /* the squares each of the players' Pokémon can see, by hand and by sight, turned into what the table gets */
 function bmFogSources(cfg){
-  return bmTokens(cfg).filter(t=>t.side==='a'&&t.placed&&!t.v.down);
+  return bmTokens(cfg).filter(t=>(t.side==='a'||t.side==='t')&&t.placed&&!t.v.down);
 }
 function bmFogSig(cfg,src){
   return [cfg.fa?1:0,cfg.fv,cfg.fw?1:0,cfg.cols,cfg.rows,cfg.fz.join('/'),cfg.fa&&cfg.fw?cfg.ter.join('/'):'',src.map(t=>t.cid+':'+t.x+','+t.y+','+t.fp).join(';')].join('|');
@@ -12196,6 +12555,9 @@ function act(b,e){
   if(d.act&&d.act.indexOf('cf_')===0){cfAct(b);return;}
   if(d.act==='idflip'){S.ui.flip[d.uid]=!S.ui.flip[d.uid];render();return;}
   if(d.act==='bmw_open'){bmWinOpen();return;}
+  if(d.act==='fc_add'){fcAdd(S.ui.bt.fck||'sunny',S.ui.bt.fcc||'');return;}
+  if(d.act==='fc_rm'){fcRemove(d.id);return;}
+  if(d.act==='fc_after'){fcApplyAfter(d.cid,d.k);return;}
   if(d.act&&d.act.indexOf('bmw_')===0){bmWinAct(d);return;}
   if(d.act&&d.act.indexOf('bm_')===0){bmAct(b,e);return;}
   switch(d.act){
