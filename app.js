@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-05 · Full-screen battle map';
+const BUILD='2026-11-05 · Map window';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -8115,6 +8115,42 @@ document.addEventListener('fullscreenchange',()=>{
   const was=u.fullIn;u.fullIn=false;
   if(u.full&&u.fullApi&&was){u.fullApi=false;u.full=false;document.body.classList.remove('bmfson');render();}
 });
+/* ----- the map window: a second browser window showing only the battle map, edge to edge, for a second screen or a TV.
+   Opened from the battle map (#mapwin = what the players see, #mapwin-gm = the GM's own view). It follows the battle live
+   from the database, so the first window keeps the controls. The player view never shows hidden foes or fogged squares,
+   even when the GM is the one signed in. ----- */
+S.mapWin='';
+function bmWinMode(){const h=String(location.hash||'');return h==='#mapwin'?'p':h==='#mapwin-gm'?'g':'';}
+function bmWinOpen(){
+  const url=location.href.replace(/#.*$/,'')+'#mapwin';
+  const w=window.open(url,'sinnoh-battle-map','popup,width=1280,height=800');
+  if(!w)toast('Your browser blocked the new window. Allow pop-ups for this site, or open this address in a new window: '+url);
+  else{try{w.focus();}catch(e){}}
+}
+function bmWinHtml(){
+  const gmView=S.mapWin==='g'&&S.me.admin,was=S.me.admin;
+  if(!gmView)S.me.admin=false;
+  try{
+    const cfg=bmCfg();
+    const bar=h`<div class="bmwbar"><span class="pill">${gmView?'GM view':'Player view'}</span>
+      ${was?h`<button class="btn sm" data-act="bmw_view">${gmView?'Switch to player view':'Switch to GM view'}</button>`:''}
+      <button class="btn sm" data-act="bmw_fs">${document.fullscreenElement?'Exit full screen':'Full screen'}</button></div>`;
+    if(!cfg)return h`<div class="bmwin empty">${bar}<p>${was&&!gmView?'The map is hidden from the players. Show it from the battle window, or switch to the GM view.':'No battle map is being shown yet.'}</p></div>`;
+    const toks=bmTokens(cfg),placed=toks.filter(t=>t.placed&&(t.vis||gmView));
+    const bg=cfg.blank?h`<div class="bmbg blank" style="aspect-ratio:${cfg.w}/${cfg.h}"></div>`:(cfg.src?h`<img class="bmbg" src="${cfg.src}" alt="" draggable="false" width="${cfg.w}" height="${cfg.h}" style="aspect-ratio:${cfg.w}/${cfg.h}">`:h`<div class="bmbg blank load" style="aspect-ratio:${cfg.w}/${cfg.h}"><span>Loading the map…</span></div>`);
+    return h`<div class="bmwin ${gmView?'gmv':'plv'}">${bar}<div class="bmwturn">${bmTurnBar()}</div>
+      <div class="bmwstage"><div class="bmmap bmwmap" id="bmmap" ${gmView?raw('data-act="bm_map"'):''} style="width:min(100vw,calc(100dvh * ${(cfg.w/cfg.h).toFixed(4)}))">${bg}${bmTerSvg(cfg)}${bmGridSvg(cfg)}${bmFogSvg(cfg)}${bmMarkSvg(cfg)}${bmMkList(cfg).map(m=>bmMkEl(cfg,m))}${placed.map(t=>bmTok(cfg,t))}</div></div></div>`;
+  }finally{S.me.admin=was;}
+}
+function bmWinAct(d){
+  if(d.act==='bmw_view'){location.hash=S.mapWin==='g'?'mapwin':'mapwin-gm';return;}
+  if(d.act==='bmw_fs'){
+    try{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen({navigationUI:'hide'});}catch(e){}
+    setTimeout(render,300);
+  }
+}
+window.addEventListener('hashchange',()=>{const m=bmWinMode();if(m!==S.mapWin){S.mapWin=m;document.body.classList.toggle('mapwin',!!m);render();}});
+document.addEventListener('fullscreenchange',()=>{if(S.mapWin)render();});
 function bmapPanel(){
   const cfg=bmCfg(),gm=!!S.me.admin,u=S.ui.bm;
   if(!cfg){
@@ -8131,6 +8167,7 @@ function bmapPanel(){
   return h`<section class="panel bmp ${u.full?'bmfs':''}"><div class="ph"><h2>Battle map</h2>${gm?(cfg.live?h`<span class="pill good">Shown to players</span>`:h`<span class="pill gm">Hidden from players</span>`):''}
       <div class="acts"><span class="seg" role="group" aria-label="Zoom">${[1,2,3,4].map(n=>h`<button data-act="bm_zoom" data-z="${n}" aria-pressed="${String(z===n)}">${n===1?'Fit':n+'×'}</button>`)}</span>
         <button class="btn sm ${u.ruler?'primary':''}" data-act="bm_ruler" aria-pressed="${String(!!u.ruler)}">Ruler</button>
+        <button class="btn sm" data-act="bmw_open" title="Open just the map in its own window, for a second screen or a TV">Map window</button>
         <button class="btn sm ${u.full?'primary':''}" data-act="bm_full" aria-pressed="${String(!!u.full)}" title="${u.full?'Leave full screen (Esc)':'Fill the screen with the map'}">${u.full?'Exit full screen':'Full screen'}</button>
         ${gm?h`<button class="btn sm" data-act="bm_setup" aria-expanded="${String(!!u.setup)}">${u.setup?'Close settings':'Settings'}</button>`:''}</div></div>
     ${bmTurnBar()}
@@ -11923,6 +11960,7 @@ function footer(){
 function mainHtml(){
   if(S.noDb)return emptyState('This tracker needs a signed-in view','Open it from your claude.ai link while signed in. The shared table is stored with the page, so it cannot load anywhere else.');
   if(!S.ready)return h`<p class="loading">OPENING THE TABLE…</p>`;
+  if(S.mapWin)return bmWinHtml();
   const views={cal:calTab,overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,dex:dexTab,battle:battleTab,contest:ctTab,rank:rkTab,shop:shopTab,gm:gmTab,npc:npcTab,account:accountTab};
   let tab=S.tab;
   if((tab==='gm'||tab==='npc')&&!S.me.admin)tab='overview';
@@ -12157,6 +12195,8 @@ function act(b,e){
   if(d.act&&d.act.indexOf('nt_')===0){ntAct(b,e);return;}
   if(d.act&&d.act.indexOf('cf_')===0){cfAct(b);return;}
   if(d.act==='idflip'){S.ui.flip[d.uid]=!S.ui.flip[d.uid];render();return;}
+  if(d.act==='bmw_open'){bmWinOpen();return;}
+  if(d.act&&d.act.indexOf('bmw_')===0){bmWinAct(d);return;}
   if(d.act&&d.act.indexOf('bm_')===0){bmAct(b,e);return;}
   switch(d.act){
     case 'tab':S.ui.navOpen=false;setTab(d.tab);break;
@@ -12579,6 +12619,7 @@ document.addEventListener('keydown',e=>{
 
 /* ---------- start ---------- */
 async function boot(){
+  S.mapWin=bmWinMode();if(S.mapWin)document.body.classList.add('mapwin');
   applyTheme(themePref());
   const di=$('#dl-items');
   if(di)di.innerHTML=ITEMSL.split('|').map(s=>'<option value="'+esc(itemLabel(s))+'">').join('');

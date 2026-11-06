@@ -931,6 +931,18 @@ html.lbx-on,html.lbx-on body{overflow:hidden}
 body.bmfson .bar{position:fixed;top:auto;left:auto;bottom:max(8px,env(safe-area-inset-bottom));right:max(8px,env(safe-area-inset-right));margin:0;padding:4px 10px;gap:6px;z-index:16;opacity:.92}
 body.bmfson .bar .bar-t{display:none}
 body.bmfson{overflow:hidden}
+.bmwin{position:fixed;inset:0;z-index:30;background:#0b1020;display:flex;flex-direction:column;overflow:hidden}
+.bmwin.empty{align-items:center;justify-content:center;color:#cfd6ea;font-weight:700;text-align:center;padding:24px}
+.bmwstage{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden}
+.bmwmap{margin:0}
+.bmwin.plv .bmwmap *{pointer-events:none!important}
+.bmwbar{position:fixed;top:8px;right:8px;z-index:32;display:flex;gap:6px;align-items:center;opacity:.25;transition:opacity .2s}
+.bmwbar:hover,.bmwbar:focus-within{opacity:1}
+.bmwturn{position:fixed;top:8px;left:8px;z-index:32;max-width:60vw;background:rgba(255,255,255,.88);border-radius:10px;padding:0 10px;line-height:1.4}
+.bmwturn:empty,.bmwturn .bmturn:not(:has(.bnow)){display:none}
+body.mapwin{overflow:hidden}
+body.mapwin .bar,body.mapwin #rollbox{display:none!important}
+
 
 .bmview{position:relative;overflow:auto;max-height:72vh;border:2px solid var(--frame);border-radius:14px;box-shadow:0 3px 0 var(--frame-sh);background:var(--panel);overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .bmview.tool{touch-action:none;cursor:crosshair}
@@ -1393,5 +1405,5 @@ input,select,textarea{border-radius:9px}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-11-05-bmfs"></script>
+<script src="app.js?v=2026-11-05-mapwin"></script>
 </body></html>
