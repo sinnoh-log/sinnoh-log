@@ -926,6 +926,12 @@ html.lbx-on,html.lbx-on body{overflow:hidden}
 .bmsw{margin-bottom:10px}
 .bmp .acts{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .bmturn{margin:4px 0 8px;gap:8px}
+.bmp.bmfs{position:fixed;inset:0;z-index:15;margin:0;border-radius:0;max-width:none;width:auto;overflow:auto;padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));background:var(--panel)}
+.bmp.bmfs .bmview{max-height:calc(100dvh - 150px)}
+body.bmfson .bar{position:fixed;top:auto;left:auto;bottom:max(8px,env(safe-area-inset-bottom));right:max(8px,env(safe-area-inset-right));margin:0;padding:4px 10px;gap:6px;z-index:16;opacity:.92}
+body.bmfson .bar .bar-t{display:none}
+body.bmfson{overflow:hidden}
+
 .bmview{position:relative;overflow:auto;max-height:72vh;border:2px solid var(--frame);border-radius:14px;box-shadow:0 3px 0 var(--frame-sh);background:var(--panel);overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .bmview.tool{touch-action:none;cursor:crosshair}
 .bmview.cal{cursor:crosshair}
@@ -1387,5 +1393,5 @@ input,select,textarea{border-radius:9px}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-11-05-passives"></script>
+<script src="app.js?v=2026-11-05-bmfs"></script>
 </body></html>

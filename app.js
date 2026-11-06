@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-05 · Passives in attack rolls';
+const BUILD='2026-11-05 · Full-screen battle map';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -8094,6 +8094,27 @@ function bmSetup(cfg){
     ${bmSetup2(cfg)}
   </div>`;
 }
+/* full screen: the whole map panel fills the window (its tools, turn bar and tray come along). Where the browser allows it
+   the page also goes truly full screen; on iPhone, which doesn't, the panel still covers the window. */
+function bmFs(on){
+  const u=S.ui.bm;
+  u.full=!!on;
+  const de=document.documentElement;
+  try{
+    if(on&&!document.fullscreenElement&&de.requestFullscreen){u.fullApi=true;de.requestFullscreen({navigationUI:'hide'}).catch(()=>{u.fullApi=false;});}
+    if(!on&&document.fullscreenElement&&document.exitFullscreen){u.fullApi=false;document.exitFullscreen().catch(()=>{});}
+  }catch(e){u.fullApi=false;}
+  document.body.classList.toggle('bmfson',u.full);
+  render();
+  if(on)setTimeout(()=>{const el=document.querySelector('.bmp.bmfs');if(el)el.scrollTop=0;},0);
+}
+document.addEventListener('fullscreenchange',()=>{
+  const u=S.ui.bm;
+  if(!u)return;
+  if(document.fullscreenElement){u.fullIn=true;return;}
+  const was=u.fullIn;u.fullIn=false;
+  if(u.full&&u.fullApi&&was){u.fullApi=false;u.full=false;document.body.classList.remove('bmfson');render();}
+});
 function bmapPanel(){
   const cfg=bmCfg(),gm=!!S.me.admin,u=S.ui.bm;
   if(!cfg){
@@ -8107,16 +8128,17 @@ function bmapPanel(){
   const mks=bmMkList(cfg);
   const tpl=bmTpAll(cfg);
   const bg=cfg.blank?h`<div class="bmbg blank" style="aspect-ratio:${cfg.w}/${cfg.h}"></div>`:(cfg.src?h`<img class="bmbg" src="${cfg.src}" alt="" draggable="false" width="${cfg.w}" height="${cfg.h}" style="aspect-ratio:${cfg.w}/${cfg.h}">`:h`<div class="bmbg blank load" style="aspect-ratio:${cfg.w}/${cfg.h}"><span>Loading the map…</span></div>`);
-  return h`<section class="panel bmp"><div class="ph"><h2>Battle map</h2>${gm?(cfg.live?h`<span class="pill good">Shown to players</span>`:h`<span class="pill gm">Hidden from players</span>`):''}
+  return h`<section class="panel bmp ${u.full?'bmfs':''}"><div class="ph"><h2>Battle map</h2>${gm?(cfg.live?h`<span class="pill good">Shown to players</span>`:h`<span class="pill gm">Hidden from players</span>`):''}
       <div class="acts"><span class="seg" role="group" aria-label="Zoom">${[1,2,3,4].map(n=>h`<button data-act="bm_zoom" data-z="${n}" aria-pressed="${String(z===n)}">${n===1?'Fit':n+'×'}</button>`)}</span>
         <button class="btn sm ${u.ruler?'primary':''}" data-act="bm_ruler" aria-pressed="${String(!!u.ruler)}">Ruler</button>
+        <button class="btn sm ${u.full?'primary':''}" data-act="bm_full" aria-pressed="${String(!!u.full)}" title="${u.full?'Leave full screen (Esc)':'Fill the screen with the map'}">${u.full?'Exit full screen':'Full screen'}</button>
         ${gm?h`<button class="btn sm" data-act="bm_setup" aria-expanded="${String(!!u.setup)}">${u.setup?'Close settings':'Settings'}</button>`:''}</div></div>
     ${bmTurnBar()}
     ${bmTools(cfg)}
     ${bmOpts(cfg,toks)}
     ${u.ruler?h`<p class="sub" id="bmrlnote" aria-live="polite">${bmRulerText(u.rl)||'Drag across the map to measure.'}</p>`:''}
     <div class="bmview ${tool?'tool':''} ${u.cal?'cal':''}" id="bmview" role="region" aria-label="Battle map, scrollable" tabindex="0">
-      <div class="bmmap" id="bmmap" data-act="bm_map" style="width:${z===1?'min(100%,'+(72*cfg.w/cfg.h).toFixed(3)+'vh)':z*100+'%'}">${bg}${bmTerSvg(cfg)}${bmGridSvg(cfg)}${bmFogSvg(cfg)}${bmMarkSvg(cfg)}${mks.map(m=>bmMkEl(cfg,m))}${placed.map(t=>bmTok(cfg,t))}</div></div>
+      <div class="bmmap" id="bmmap" data-act="bm_map" style="width:${z===1?(u.full?'min(100%,calc((100dvh - 160px) * '+(cfg.w/cfg.h).toFixed(4)+'))':'min(100%,'+(72*cfg.w/cfg.h).toFixed(3)+'vh)'):z*100+'%'}">${bg}${bmTerSvg(cfg)}${bmGridSvg(cfg)}${bmFogSvg(cfg)}${bmMarkSvg(cfg)}${mks.map(m=>bmMkEl(cfg,m))}${placed.map(t=>bmTok(cfg,t))}</div></div>
     ${bmLegend(cfg)}
     ${gm&&cfg.fg?h`<p class="sub bmfogkey">Fog of war is on. Hatched squares are hidden from the players; lighter ones were seen earlier but are out of sight now.</p>`:''}
     ${bmInfoBar(cfg,toks)}
@@ -8158,6 +8180,7 @@ function bmAct(b,e){
     case 'bm_off':bmOff(d.cid);render();break;
     case 'bm_vis':bmFoeVis(d.cid,d.on==='1');render();break;
     case 'bm_open':S.ui.bt.view='order';S.ui.bt.open[d.cid]=true;S.ui.bm.sel=d.cid;render();break;
+    case 'bm_full':bmFs(!u.full);break;
     case 'bm_ruler':u.ruler=!u.ruler;u.rl=null;u.cal=0;u.calA=null;if(u.ruler)u.tool='';render();break;
     case 'bm_setup':u.setup=!u.setup;render();break;
     case 'bm_cal':if(!gm)break;u.cal=u.cal?0:1;u.calA=null;u.ruler=false;if(u.cal)u.tool='';render();break;
@@ -12008,7 +12031,7 @@ function toast(msg,ok){
   const tk=S.noteTok=(S.noteTok||0)+1;
   setTimeout(()=>{if(S.noteTok!==tk)return;S.noteUntil=0;setStatus(Q.size?'busy':'saved');},3500);
 }
-function setTab(t){S.tab=t;lsSet('stl.tab',t);S.ui.toTop=true;setPresence();render();}
+function setTab(t){if(S.ui.bm&&S.ui.bm.full&&t!==S.tab)bmFs(false);S.tab=t;lsSet('stl.tab',t);S.ui.toTop=true;setPresence();render();}
 
 /* ---------- actions ---------- */
 function addEntry(kind){
@@ -12549,6 +12572,7 @@ document.addEventListener('keydown',e=>{
   }
   if(e.target&&e.target.classList&&e.target.classList.contains('ptr')&&e.target.classList.contains('edit')&&ntFrameKey(e.target,e))return;
   if(e.target&&e.target.classList&&(e.target.classList.contains('bmt')||e.target.classList.contains('bmk'))&&bmKey(e.target,e))return;
+  if(e.key==='Escape'&&S.ui.bm&&S.ui.bm.full&&!S.ui.lbx){e.preventDefault();bmFs(false);return;}
   if(e.key==='Escape'&&tipId)hideTip(true);
   if(e.key==='Escape'&&S.ui.navOpen){S.ui.navOpen=false;render();const m=$('.menu-btn');if(m)m.focus({preventScroll:true});}
 });
