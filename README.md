@@ -687,3 +687,21 @@ A new **Moves** tab sits between Battle and Contests, open to everyone at the ta
 - The GM sees the same page for the trainer chosen at the top.
 
 **Needs a re-import.** Open the GM Desk, choose **Import again** under Handbook data, and pick the newest `pta-handbook-data.json` (it now marks which moves are in the handbook). Until then the tab shows a note instead of the list. Keep the JSON file off GitHub; no new database rules are needed.
+
+## Who can learn each move (Update 37)
+
+Every move now has a rule for who can learn it. The rule shows on each card in the **Moves** tab, and the tab has a **Who can learn it** filter.
+
+- **Proficiency groups** (Slashing, Water and so on): a Pokémon can learn the move if it has a proficiency in one of the move's groups. This is how the 3.0 lists already worked; about 30 moves that were on no list now have groups.
+- **Species list**: only the listed species can learn it. Signature moves use the Pokémon whose Pokédex entry lists them, and the Style moves use the Pokémon that learn them in the games. Evolutions are included. A few moves that no entry lists use the game learnsets instead.
+- **Own type**: Majesty's Order, for Bug-types only.
+- **Anyone**: Agile, Strong, Mach Speeds and Struggle.
+- **By GM decision**: Arena Trap, Migraine and Tea Time. Players cannot add them; you can.
+
+Players see **Add to** only work for a Pokémon that can learn the move, and the TM and tutor machines use the same rules. As GM, the Add button always works and says **Add anyway (GM)** when the Pokémon would not normally learn the move.
+
+**GM Desk, Who can learn each move.** Type a move, then change its rule: groups, species, types, anyone or by GM decision. **Back to the handbook lists** removes your rule. The rules are saved with the other handbook data, so no database rules change.
+
+**Needs a re-import.** Open the GM Desk, choose **Import again** under Handbook data, and pick the newest `pta-handbook-data.json`. It now carries the rules. If you change rules in the GM Desk and later import a file that has its own rules, the file's rules replace yours. Keep the JSON off GitHub.
+
+Struggle is now typeless, as in the book.

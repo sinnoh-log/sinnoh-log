@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-09 · Moves tab';
+const BUILD='2026-11-09 · Who can learn it';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -1390,7 +1390,8 @@ function ptaLists(){
     if(!s.exists){if(s.metadata&&s.metadata.fromCache)return;fin(null);return;}
     const d=jparse((s.data()||{}).j)||{};
     const mk=a=>{const m=new Map();(a||[]).forEach(x=>m.set(dexKey(x.n),x));return m;};
-    PTA.lists={moves:d.moves||[],passives:d.passives||[],skills:d.skills||[],megas:d.megas||[],moveMap:mk(d.moves),passMap:mk(d.passives),megaMap:mk(d.megas)};
+    PTA.lists={moves:d.moves||[],passives:d.passives||[],skills:d.skills||[],megas:d.megas||[],moveMap:mk(d.moves),passMap:mk(d.passives),megaMap:mk(d.megas),learn:d.learn||null};
+    lnApply();
     ptaFillLists();
     ptaResyncMegas();
     fin(PTA.lists);
@@ -1638,7 +1639,7 @@ async function ptaImport(file){
       await S.db.collection('meta').doc('pta_'+L).set({v:1,j:JSON.stringify(groups[L])});
       im.done++;scheduleRender();
     }
-    await S.db.collection('meta').doc('pta_lists').set({v:1,j:JSON.stringify({moves:d.moves||[],passives:d.passives||[],skills:d.skills||[],megas:d.megas||[]})});
+    await S.db.collection('meta').doc('pta_lists').set({v:1,j:JSON.stringify({moves:d.moves||[],passives:d.passives||[],skills:d.skills||[],megas:d.megas||[],learn:d.learn||(PTA.lists&&PTA.lists.learn)||null})});
     im.done++;
     if(cm){await S.db.collection('meta').doc('pta_contest').set({v:1,j:JSON.stringify(cm)});im.done++;}
     await S.db.collection('meta').doc('pta_idx').set({v:num(d.v)||1,t:Date.now(),j:JSON.stringify(d.species.map(s=>s.n))});
@@ -3764,6 +3765,8 @@ function pxSet(d){
   PX.lists={};Object.entries(d.lists||{}).forEach(([g,a])=>{PX.lists[g]=new Set(a.map(dexKey));});
   PX.sig=new Set((d.signature||[]).map(dexKey));PX.basic=new Set((d.basic||[]).map(dexKey));
   PX.names={};Object.values(d.lists||{}).concat([d.basic||[]]).forEach(a=>a.forEach(m=>{PX.names[dexKey(m)]=m;}));
+  PX.lists0=PX.lists;PX.sig0=PX.sig;PX.ln=new Map();PX.lnSet=new Map();
+  lnApply();
 }
 const pxReady=()=>{if(!PX.d)pxLoad();return !!PX.d;};
 /* the record for a species name, trying the exact form first and then the base species */
@@ -3789,6 +3792,11 @@ function pxLearnable(name,types){
   pr.forEach(p=>{if(/no moves from any/i.test(p.g))return;pxGroupKeys(p).forEach(k=>{const L=PX.lists[k];if(L)L.forEach(mk=>add(mk,p.g));});});
   if(!noAny&&PX.lists.Any)PX.lists.Any.forEach(mk=>add(mk,'Any'));
   if((types||[]).includes('Normal')&&PX.lists['Normal Block']&&!pr.some(p=>p.g==='Normal Block'))PX.lists['Normal Block'].forEach(mk=>add(mk,'Normal Block'));
+  if(PX.ln)PX.ln.forEach((e,mk)=>{
+    if(e.m==='any')add(mk,'Anyone');
+    else if(e.m==='ty'){if((types||[]).some(t=>(e.ty||[]).includes(t)))add(mk,'Own type');}
+    else if(e.m==='sp'){const ss=PX.lnSet.get(mk);if(ss&&(ss.has(dexKey(String(r.n).replace(/\s*\(.*$/,'')))||ss.has(dexKey(r.n))))add(mk,'Species list');}
+  });
   pxLearnMemo.set(key,out);
   return out;
 }
@@ -4753,8 +4761,128 @@ function ctExView(){
   </div>`;
 }
 
+/* ----- Who can learn what (Update 37): rules per move on top of the proficiency groups -----
+   learn.mv[moveKey] = {n, m:'g'|'sp'|'any'|'ty'|'gm', g:[groups], sp:[species], ty:[types]}
+   g: the move joins those proficiency groups. sp: only those species (and the evolutions listed with them). any: every Pokémon.
+   ty: Pokémon of those types. gm: nobody, unless the GM adds it. Kept inside meta/pta_lists, so the database rules do not change. */
+S.ui.ln=S.ui.ln||{mv:'',m:'g',txt:'',msg:'',bad:false};
+function lnApply(){
+  if(!PX.d||!PX.lists0)return;
+  PX.lists={};Object.keys(PX.lists0).forEach(g=>{PX.lists[g]=new Set(PX.lists0[g]);});
+  PX.sig=new Set(PX.sig0);PX.ln=new Map();PX.lnSet=new Map();
+  const ln=PTA.lists&&PTA.lists.learn;
+  if(ln&&ln.mv){
+    Object.keys(ln.mv).forEach(mk=>{
+      const e=ln.mv[mk];if(!e)return;
+      Object.keys(PX.lists).forEach(g=>PX.lists[g].delete(mk));
+      PX.sig.delete(mk);
+      if(e.n&&!PX.names[mk])PX.names[mk]=e.n;
+      if(e.m==='g')(e.g||[]).forEach(g=>{(PX.lists[g]=PX.lists[g]||new Set()).add(mk);});
+      else{
+        PX.ln.set(mk,e);
+        if(e.m==='sp')PX.lnSet.set(mk,new Set((e.sp||[]).map(dexKey)));
+      }
+    });
+  }
+  pxLearnMemo.clear();
+}
+/* what the rule for one move is, in words and as a kind (g, sp, any, ty, gm, sig, none) */
+function lnInfo(name){
+  if(!PX.d)return null;
+  const mk=dexKey(name),e=PX.ln&&PX.ln.get(mk);
+  if(e){
+    if(e.m==='any')return {k:'any',t:'Anyone can learn it'};
+    if(e.m==='ty')return {k:'ty',t:'Pokémon of type '+(e.ty||[]).join(' or ')};
+    if(e.m==='gm')return {k:'gm',t:'By GM decision: only the GM can add it'};
+    if(e.m==='sp'){const n=(e.sp||[]).length;return {k:'sp',t:'Species list ('+n+'): '+(e.sp||[]).slice(0,8).join(', ')+(n>8?' …':'')};}
+  }
+  const gs=Object.keys(PX.lists).filter(g=>PX.lists[g].has(mk));
+  if(gs.length)return {k:'g',g:gs,t:'Groups: '+gs.join(', ')};
+  if(PX.sig.has(mk))return {k:'sig',t:'Signature move: not teachable'};
+  return {k:'none',t:'Not on any list'};
+}
+async function lnWrite(learn){
+  const L=PTA.lists;
+  await S.db.collection('meta').doc('pta_lists').set({v:1,j:JSON.stringify({moves:L.moves,passives:L.passives,skills:L.skills,megas:L.megas,learn})});
+  L.learn=learn;lnApply();
+}
+const lnSpecies=()=>{const s=new Set();(PTA.idx?PTA.idx.names:[]).forEach(n=>s.add(dexKey(String(n).replace(/\s*\(.*$/,''))));DEXA.forEach(n=>s.add(dexKey(n)));return s;};
+function lnLoadMove(u){
+  const L=PTA.lists,def=L&&L.moveMap.get(dexKey(u.mv));
+  if(!def){u.cur=null;return;}
+  const mk=dexKey(def.n),e=PX.ln&&PX.ln.get(mk),i=lnInfo(def.n);
+  u.cur=def.n;
+  if(e&&e.m==='sp'){u.m='sp';u.txt=(e.sp||[]).join(', ');}
+  else if(e&&e.m==='ty'){u.m='ty';u.txt=(e.ty||[]).join(', ');}
+  else if(e&&(e.m==='any'||e.m==='gm')){u.m=e.m;u.txt='';}
+  else{u.m='g';u.txt=i&&i.g?i.g.join(', '):'';}
+  u.msg='';u.bad=false;
+}
+function lnBody(){
+  const u=S.ui.ln,i=u.cur?lnInfo(u.cur):null;
+  const hint={g:'Proficiency groups, separated by commas (for example Slashing, Water). A Pokémon can learn the move if it has a proficiency in any of them.',sp:'Species names, separated by commas. Give the evolutions too: a Pokémon only gets the move if its own name is on the list.',ty:'Types, separated by commas (for example Bug). Pokémon with any of those types can learn it.',any:'Every Pokémon can learn it.',gm:'Nobody can learn it unless the GM adds it from the Moves tab.'}[u.m];
+  return h`${u.cur?h`<p class="sub"><b>${u.cur}</b> now: ${i?i.t:'rules not loaded'}.</p>`:h`<p class="sub">Type a handbook move above.</p>`}
+    ${u.cur?h`<div class="fgrid"><label class="fld"><span class="fl">Who can learn it</span><select data-u="ln.m">${[['g','Proficiency groups'],['sp','Species list'],['ty','Own type'],['any','Anyone'],['gm','By GM decision']].map(([v,l])=>h`<option value="${v}" ${v===u.m?raw('selected'):''}>${l}</option>`)}</select></label></div>
+      ${u.m==='g'||u.m==='sp'||u.m==='ty'?h`<label class="fld wide"><span class="fl">${u.m==='g'?'Groups':u.m==='sp'?'Species':'Types'}</span><textarea rows="${u.m==='sp'?6:2}" data-u="ln.txt" data-nr>${u.txt||''}</textarea></label>`:''}
+      <p class="sub">${hint}</p>
+      ${u.msg?h`<p class="sub ${u.bad?'bad':'good'}" role="status">${u.msg}</p>`:''}
+      <div class="row"><button class="btn sm primary" data-act="ln_save">Save</button><button class="btn sm ghost" data-act="ln_revert">Back to the handbook lists</button></div>`:''}`;
+}
+function lnDesk(){
+  if(!PTA.idx)return '';
+  pxReady();
+  if(!PTA.lists)ptaLists().then(()=>scheduleRender());
+  const u=S.ui.ln;
+  return h`<section class="panel"><div class="ph"><h2>Who can learn each move</h2><span class="pill gm">GM only</span></div>
+    <p class="sub">Every move is learnable through proficiency groups, a list of species, a type, by anyone, or only by your decision. Pick a move to see and change its rule. Changes apply to everyone at once. Importing the handbook data file again keeps your changes unless the file has its own rules.</p>
+    ${PX.d&&PTA.lists?h`<label class="fld"><span class="fl">Move</span><input type="search" data-u="ln.mv" data-nr list="dl-moves" value="${u.mv||''}" placeholder="Move name" autocomplete="off"></label>
+      <div id="lnbody">${lnBody()}</div>
+      <p class="sub">Groups: ${Object.keys(PX.lists).sort().join(', ')}.</p>`:h`<p class="sub" role="status">Loading…</p>`}
+  </section>`;
+}
+function lnRefresh(){const el=$('#lnbody');if(el)el.innerHTML=lnBody().s;}
+function lnInput(key,t){
+  const u=S.ui.ln;
+  if(key==='mv'){lnLoadMove(u);lnRefresh();return true;}
+  if(key==='m'){u.txt='';u.msg='';lnRefresh();return true;}
+  return false;
+}
+async function lnAct(b){
+  const d=b.dataset,u=S.ui.ln;
+  if(!S.me.admin||!u.cur||!PTA.lists)return;
+  const L=PTA.lists,learn={v:1,mv:Object.assign({},(L.learn&&L.learn.mv)||{})},mk=dexKey(u.cur);
+  const items=String(u.txt||'').split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean);
+  if(d.act==='ln_revert'){
+    delete learn.mv[mk];
+  }else{
+    const e={n:u.cur,m:u.m};
+    if(u.m==='g'){
+      const known=Object.keys(PX.lists),bad=[],gs=[];
+      items.forEach(x=>{const f=known.find(g=>dexKey(g)===dexKey(x));if(f)gs.push(f);else bad.push(x);});
+      if(bad.length){u.msg='Not a group: '+bad.join(', ')+'.';u.bad=true;lnRefresh();return;}
+      if(!gs.length){u.msg='Add at least one group, or choose another option.';u.bad=true;lnRefresh();return;}
+      e.g=Array.from(new Set(gs));
+    }else if(u.m==='sp'){
+      const known=lnSpecies(),bad=items.filter(x=>!known.has(dexKey(String(x).replace(/\s*\(.*$/,''))));
+      if(bad.length){u.msg='Not a species I know: '+bad.join(', ')+'.';u.bad=true;lnRefresh();return;}
+      if(!items.length){u.msg='Add at least one species, or choose another option.';u.bad=true;lnRefresh();return;}
+      e.sp=Array.from(new Set(items.map(x=>String(x).replace(/\s*\(.*$/,'').trim())));
+    }else if(u.m==='ty'){
+      const ts=items.map(x=>TYPES.find(t=>t.toLowerCase()===x.toLowerCase())||'');
+      if(!items.length||ts.some(x=>!x)){u.msg='Use type names such as Bug or Fire.';u.bad=true;lnRefresh();return;}
+      e.ty=Array.from(new Set(ts));
+    }
+    learn.mv[mk]=e;
+  }
+  try{await lnWrite(learn);}
+  catch(err){u.msg='That did not save ('+((err&&err.code)||'error')+'). Try again.';u.bad=true;lnRefresh();return;}
+  lnLoadMove(u);
+  u.msg=d.act==='ln_revert'?'Back to the handbook lists.':'Saved.';u.bad=false;
+  lnRefresh();toast('Saved the rule for '+u.cur+'.',true);
+}
+
 /* ----- Moves tab (Update 36): every move in the Players Handbook, with its contest entry, and an Add button ----- */
-S.ui.mvx=S.ui.mvx||{q:'',type:'',kind:'',freq:'',ct:'',kw:'',mon:'',page:1,arm:''};
+S.ui.mvx=S.ui.mvx||{q:'',type:'',kind:'',freq:'',ct:'',kw:'',grp:'',mon:'',page:1,arm:''};
 const MVX_PAGE=40;
 const mvxAll=()=>((PTA.lists&&PTA.lists.moves)||[]).filter(m=>m&&m.ph);
 function mvxFiltered(){
@@ -4764,6 +4892,7 @@ function mvxFiltered(){
     if(o.type&&m.t!==o.type)return false;
     if(o.kind&&m.k!==o.kind)return false;
     if(o.freq&&m.f!==o.freq)return false;
+    if(o.grp){const li=lnInfo(m.n);if(!li)return false;if(o.grp.charAt(0)==='~'){if(li.k!==o.grp.slice(1))return false;}else if(!(li.k==='g'&&li.g.indexOf(o.grp)>=0))return false;}
     if(o.ct||o.kw){
       const e=ctOf(m.n);
       if(!e)return false;
@@ -4785,18 +4914,23 @@ function mvxCard(m,mx){
   const known=mon&&(mon.moves||[]).some(z=>dexKey(z.name)===dexKey(m.n));
   const sty=m.k==='Style';
   const armed=o.arm===m.n;
+  const li=lnInfo(m.n);
+  const can=mon&&PX.d?pxCan(mon.species,mon.types,m.n):null;
+  const blocked=!!(mon&&PX.d&&!can&&!known);
+  const gmOk=S.me.admin;
   return h`<article class="move mvxc ${sty?'mvstyle':''}">
     <div class="mvxh"><b class="mvxn">${m.n}</b>${chipsOf([m.t])}<span class="pill ${sty?'sty':''}">${m.k}</span></div>
     <p class="sub mvxm">${m.f||''}${m.r?' · '+m.r:''}${m.d?' · Damage '+m.d:''}</p>
     ${m.x?h`<p class="mvxx">${m.x}</p>`:''}
     <p class="mvxct">${e?h`${ctChip(e.t)} <b>${e.k}</b>${kw?h` <span class="sub">${kw.hp}</span>`:''}${e.note?h` <span class="sub">${e.note}</span>`:''}${kw&&kw.fx?h`<br><span class="sub">${kw.fx}</span>`:''}`:h`<span class="sub">${CT.list?'Not on the contest list. If a tutor teaches it, it is an Appeal move.':'Contest entry not loaded.'}</span>`}</p>
-    ${mx.can?h`<div class="row"><button class="btn sm ${armed?'danger armed':''}" data-act="mvx_add" data-n="${m.n}" ${mon&&!known?'':raw('disabled')}>${known?'Already known':armed?'Tap again to add anyway':mon?'Add to '+mName(mon):'Pick a Pokémon above'}</button></div>`:''}
+    ${li?h`<p class="sub mvxl"><b>Who can learn it:</b> ${li.t}</p>`:''}
+    ${mx.can?h`<div class="row"><button class="btn sm ${armed||(blocked&&gmOk)?'danger armed':''}" data-act="mvx_add" data-n="${m.n}" ${mon&&!known&&(!blocked||gmOk)?'':raw('disabled')}>${known?'Already known':!mon?'Pick a Pokémon above':blocked?(gmOk?'Add anyway (GM)':mName(mon)+' can’t learn it'):armed?'Tap again to add anyway':'Add to '+mName(mon)}</button>${mon&&PX.d&&can?h`<span class="sub good">${mName(mon)} can learn it: ${can.via.join(', ')}</span>`:''}</div>`:''}
   </article>`;
 }
 function mvxResults(){
   const o=S.ui.mvx,mx=mvxMons();
   const all=mvxFiltered(),shown=all.slice(0,o.page*MVX_PAGE);
-  const filt=!!(o.q||o.type||o.kind||o.freq||o.ct||o.kw);
+  const filt=!!(o.q||o.type||o.kind||o.freq||o.ct||o.kw||o.grp);
   return h`<p class="sub" id="mvxcount" aria-live="polite">${all.length===1?'1 move':all.length+' moves'}${all.length>shown.length?' · showing '+shown.length:''}</p>
     ${all.length?h`<div class="mvxlist">${shown.map(m=>mvxCard(m,mx))}</div>`:h`<p class="sub">Nothing matches.${filt?h` <button class="btn sm" data-act="mvx_clear">Clear the filters</button>`:''}</p>`}
     ${all.length>shown.length?h`<div class="row"><button class="btn" data-act="mvx_more">Show ${Math.min(MVX_PAGE,all.length-shown.length)} more</button></div>`:''}`;
@@ -4804,7 +4938,7 @@ function mvxResults(){
 function mvxRefresh(){const el=$('#mvxres');if(el)el.innerHTML=mvxResults().s;}
 const mvxSel=(key,label,opts,cur)=>h`<label class="fld"><span class="fl">${label}</span><select data-u="mvx.${key}">${opts.map(op=>h`<option value="${op[0]}" ${String(op[0])===String(cur)?raw('selected'):''}>${op[1]}</option>`)}</select></label>`;
 function mvxTab(){
-  ctWarm();
+  ctWarm();pxReady();
   if(PTA.idx&&!PTA.lists)ptaLists().then(()=>scheduleRender());
   const o=S.ui.mvx,mx=mvxMons(),all=mvxAll();
   let body;
@@ -4820,6 +4954,7 @@ function mvxTab(){
         ${mvxSel('type','Type',[['','All types']].concat(TYPES.map(t=>[t,t])),o.type)}
         ${mvxSel('kind','Kind',[['','All kinds'],['Physical','Physical'],['Special','Special'],['Effect','Effect'],['Style','Style']],o.kind)}
         ${mvxSel('freq','Frequency',[['','Any frequency'],['At-Will','At-Will'],['3/day','3/day'],['1/day','1/day']],o.freq)}
+        ${PX.d?mvxSel('grp','Who can learn it',[['','Any rule'],['~sp','Species list'],['~ty','Own type'],['~any','Open to every Pokémon'],['~gm','By GM decision'],['~sig','Not teachable'],['~none','Not on any list']].concat(Object.keys(PX.lists).sort().map(g=>[g,'Group: '+g])),o.grp):''}
         ${CT.list?mvxSel('ct','Contest type',[['','All contest types']].concat(CT_TYPES.concat(['Any']).map(t=>[t,t==='Any'?'Any type':t])),o.ct):''}
         ${CT.list?mvxSel('kw','Contest keyword',[['','All keywords']].concat(CT_KW.map(x=>[x.k,x.k])),o.kw):''}
       </div>
@@ -4841,7 +4976,7 @@ function mvxInput(key,t){
 function mvxAct(b){
   const d=b.dataset,o=S.ui.mvx;
   if(d.act==='mvx_more'){o.page++;mvxRefresh();return;}
-  if(d.act==='mvx_clear'){o.q='';o.type='';o.kind='';o.freq='';o.ct='';o.kw='';o.page=1;o.arm='';render();return;}
+  if(d.act==='mvx_clear'){o.q='';o.type='';o.kind='';o.freq='';o.ct='';o.kw='';o.grp='';o.page=1;o.arm='';render();return;}
   if(d.act!=='mvx_add')return;
   const mx=mvxMons();
   if(!mx.uid||!mx.can)return;
@@ -4851,6 +4986,7 @@ function mvxAct(b){
   if(!def)return;
   const mv=(m.moves||[]).slice();
   if(mv.some(z=>dexKey(z.name)===dexKey(def.n))){toast(mName(m)+' already knows '+def.n+'.');return;}
+  if(PX.d&&!S.me.admin&&!pxCan(m.species,m.types,def.n)){toast(mName(m)+' can’t learn '+def.n+'. Ask your GM.');return;}
   const t=S.trainers[mx.uid],cap=/move tutor/i.test([t.cls,t.adv].join(' '))?8:TPL_MAX.moves;
   if(mv.length>=cap){toast(mName(m)+' already knows '+cap+' moves. Remove one on the Pokémon page first.');return;}
   if(def.k==='Style'&&styleCount(m)>=1&&!hasPassive(m,'luckycharm')&&o.arm!==def.n){
@@ -10448,7 +10584,7 @@ function gmTab(){
   ${awardForm()}${awardHistory()}
   ${megaDesk()}
   ${giveDesk()}
-  ${evoDesk()}${evoLogDesk()}${ptaDesk()}${encDesk()}${ccDesk()}${agDesk()}
+  ${evoDesk()}${evoLogDesk()}${ptaDesk()}${lnDesk()}${encDesk()}${ccDesk()}${agDesk()}
   <section class="panel"><div class="ph"><h2>Party snapshot</h2></div>
     <p>${top?h`Highest badge count: <b class="mono">${top[1]}</b> (${tName(S.trainers[top[0]])}).`:'No trainers yet.'}</p>
     <p class="sub">Loyalty and NPC secrets are stored where only editors can read them. Players never receive that data.</p></section>
@@ -12652,6 +12788,7 @@ function act(b,e){
   if(d.act&&d.act.indexOf('dx_')===0){dxAct(b,e);return;}
   if(d.act&&d.act.indexOf('ct_')===0){ctAct(b,e);return;}
   if(d.act&&d.act.indexOf('mvx_')===0){mvxAct(b);return;}
+  if(d.act&&d.act.indexOf('ln_')===0){lnAct(b);return;}
   if(d.act&&d.act.indexOf('en_')===0){encAct(b);return;}
   if(d.act&&d.act.indexOf('cc_')===0){ccAct(b);return;}
   if(d.act&&d.act.indexOf('hpx_')===0){hpxAct(b);return;}
@@ -12996,6 +13133,7 @@ document.addEventListener('input',e=>{
     if(k[0]==='dx'){S.ui.dx.page=1;if(k[1]==='q'){dxRefresh();return;}}
     if(k[0]==='ct'&&ctInput(k[1],t))return;
     if(k[0]==='mvx'&&mvxInput(k[1],t))return;
+    if(k[0]==='ln'&&lnInput(k[1],t))return;
     if(k[0]==='shop'&&k[1]==='q'){shRefresh();return;}
     if(k[0]==='clf'&&k[1]==='q'){clListRefresh();return;}
     if(k[0]==='rk'&&k[1]==='q'){rkListRefresh();return;}
