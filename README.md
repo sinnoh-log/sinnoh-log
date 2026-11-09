@@ -724,3 +724,12 @@ Updates 36 to 38 were run in a browser against a test copy of the database: the 
 - **Undo my change** in the move-rule editor now puts back the rule that came with the data file. Before, it fell back to the old 3.0 lists, which for about 30 moves meant no rule at all.
 - **Importing again** now updates the default rules and keeps the changes you made in the GM Desk. Rules already saved by Update 37 stay as they are until you import again.
 - The ID number on the Trainer ID no longer wraps onto two lines.
+
+## Forms and shiny on the Pokédex (Update 40)
+
+Open any entry in the Pokédex and, when the species has other forms, a row of small pictures appears under the name.
+
+- **Tap a form** to swap the big picture, the type badges and the caption. The row holds the base form, regional forms (Alolan, Galarian, Hisuian, Paldean), alternate forms such as Wormadam cloaks, Lycanroc, Oricorio, Deoxys and Rotom, and every **Mega Evolution** with its stone.
+- **✨ Shiny** under the picture switches the big picture to the shiny colours. It stays on while you flip through entries. Entries with no shiny picture show the normal one.
+- **Campaign-only forms** (Volcanic Marowak, Iron-rich Sliggoo, Icy Mountain Vulpix and the other habitat forms) have no official art. They show in the row with the base picture and a note saying so.
+- The pictures load from the PokeAPI sprite collection on GitHub, so they need an internet connection. Nothing was added to the repo, and the data file is unchanged.
