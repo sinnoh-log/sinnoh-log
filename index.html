@@ -360,6 +360,9 @@ progress.hp.bad::-moz-progress-bar{background:var(--bad)}
 .move{border:2px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;background:var(--raised)}
 .move .mv1{display:grid;gap:8px;grid-template-columns:minmax(0,1fr) 100px auto auto;align-items:end}
 .move .mv2{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(100%,110px),1fr))}
+.move.mvstyle{border-left:6px solid var(--gold)}
+.pill.sty{background:var(--gold);color:var(--gold-ink);border-color:var(--gold)}
+.stynote{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0}
 @media (max-width:560px){.move .mv1{grid-template-columns:minmax(0,1fr) 90px}}
 .pips{display:flex;gap:4px;align-items:center;padding-bottom:8px}
 .pip{appearance:none;width:17px;height:17px;border-radius:50%;border:2px solid var(--accent);background:var(--accent);cursor:pointer;padding:0}
@@ -1415,5 +1418,5 @@ input,select,textarea{border-radius:9px}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-11-05-fcanim"></script>
+<script src="app.js?v=2026-11-09-style"></script>
 </body></html>

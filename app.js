@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-05 · Animated field conditions';
+const BUILD='2026-11-09 · Style moves';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -26,7 +26,9 @@ const TYPES=['Normal','Fire','Water','Electric','Grass','Ice','Fighting','Poison
 const SIZES=['Tiny','Small','Medium','Large','Huge','Gigantic'];
 const WEIGHTS=['Featherweight','Light','Medium','Heavy','Superweight'];
 const DICE=['d4','d6','d8','d10','d12'];
-const KINDS=['Physical','Special','Effect'];
+const KINDS=['Physical','Special','Effect','Style'];
+/* Styles (PTA 3.5) have a type but never roll to hit or deal damage, so they work like Effect moves in the maths and get no Roll button */
+const isEff=k=>k==='Effect'||k==='Style';
 const GENDERS=['Male','Female','Genderless'];
 const genPill=g=>g==='Male'||g==='Female'?h`<span class="pill gen ${g.toLowerCase()}" title="${g}"><span aria-hidden="true">${g==='Male'?'♂':'♀'}</span> ${g}</span>`:g==='Genderless'?h`<span class="pill gen none">Genderless</span>`:'';
 const BADGES=[
@@ -2144,7 +2146,7 @@ function d20adv(mode){
   const b=rnd(20);
   return {v:mode==='adv'?Math.max(a,b):Math.min(a,b),all:[a,b]};
 }
-const kindStat=k=>k==='Special'?{acc:'spa',dmg:'spa',def:'spd',ab:'SpA',dab:'SpDef'}:k==='Effect'?{acc:'spe',dmg:null,def:'spe',ab:'Spe',dab:'Spe'}:{acc:'atk',dmg:'atk',def:'def',ab:'Atk',dab:'Def'};
+const kindStat=k=>k==='Special'?{acc:'spa',dmg:'spa',def:'spd',ab:'SpA',dab:'SpDef'}:isEff(k)?{acc:'spe',dmg:null,def:'spe',ab:'Spe',dab:'Spe'}:{acc:'atk',dmg:'atk',def:'def',ab:'Atk',dab:'Def'};
 
 /* One attack, worked out in full. o:
    mv {name,kind,type,dice}  aTypes  aAcc (the accuracy stat)  aDmg (the damage stat)  aStage (Attack or Sp. Attack stage)
@@ -2180,6 +2182,8 @@ const PS_SIT=[
 ];
 const psTog=u=>{const o={};Object.keys(u||{}).forEach(k=>{if(k.indexOf('ps_')===0&&u[k])o[k.slice(3)]=true;});return o;};
 const psKeys=list=>new Set((list||[]).map(p=>dexKey(p&&(p.name||p.n))).filter(Boolean));
+const styleCount=m=>((m&&m.moves)||[]).filter(x=>x&&x.kind==='Style').length;
+const hasPassive=(m,k)=>psKeys(m&&m.passives).has(k);
 /* the tick boxes that matter for this attacker (and target, when its passives are known) */
 function psSitFor(aPs,tPs){
   const A=psKeys(aPs),T=psKeys(tPs);
@@ -2202,7 +2206,7 @@ function psAtkMods(o){
   if(A.has('hustle')&&tog.hustle){r.acc-=2;say('Hustle','−2 Acc');}
   if(A.has('skilllink')&&/scatter/i.test((o.rng||'')+' '+(o.mv&&o.mv.text||''))){r.acc+=2;say('Skill Link','+2 Acc');}
   if(!r.ignoreT)[['sandveil','Sand Veil'],['snowcloak','Snow Cloak'],['tangledfeet','Tangled Feet']].forEach(([k,n])=>{if(T.has(k)&&tog[k]){r.acc-=1;say(n,'−1 Acc');}});
-  if(o.k==='Effect')return r;
+  if(isEff(o.k))return r;
   /* damage */
   const add=(n,v)=>{r.dmg+=v;say(n,(v>0?'+':'−')+Math.abs(v));};
   if(A.has('adaptability')&&same)add('Adaptability',4);
@@ -2481,7 +2485,7 @@ function atkCalc(o){
   out.crit=crit;
   const dc=parseDice(mv.dice);
   if(!dc)return out;
-  const plain=k==='Effect';
+  const plain=isEff(k);
   const ty=out.type;
   let eff=EFF_CODES.n;
   if(!plain){
@@ -2648,7 +2652,7 @@ function moveForm(uid,pid,i,x){
   const tg=btTargets(uid+'/'+pid);
   const info=f.tgt?btInfo(f.tgt,false):null;
   const known=info&&info.types;
-  const plain=x.kind==='Effect';
+  const plain=isEff(x.kind);
   return h`<div class="mrform lcd" role="group" aria-label="Roll ${x.name||'move'}">
     <div class="mrgrid">
       ${tg.length?h`<label class="fld"><span class="fl">Target</span><select data-u="mr.tgt"><option value="">No target</option>${tg.map(t=>h`<option value="${t.cid}" ${f.tgt===t.cid?raw('selected'):''}>${t.name}</option>`)}</select></label>`:''}
@@ -2678,8 +2682,8 @@ function moveRoll(uid,pid,i,onlyDmg){
   const tgtBit=info?{cid:f.tgt,name:info.name}:null;
   /* a target's Defense and stages are used only when everyone can see them (a player's Pokémon always can) */
   const c=atkCalc({
-    mv:x,aTypes:effTypes(m),aAcc:k==='Effect'?spdOf(m):effStat(m,ks.acc),aDmg:ks.dmg?effStat(m,ks.dmg):0,aStage:ks.dmg?stg(m,ks.dmg):0,
-    tTypes:info?info.types:null,tDef:info&&info.stat?(k==='Effect'?info.stat.spe:info.stat[fcSwapDef(f.tgt,ks.def)]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
+    mv:x,aTypes:effTypes(m),aAcc:isEff(k)?spdOf(m):effStat(m,ks.acc),aDmg:ks.dmg?effStat(m,ks.dmg):0,aStage:ks.dmg?stg(m,ks.dmg):0,
+    tTypes:info?info.types:null,tDef:info&&info.stat?(isEff(k)?info.stat.spe:info.stat[fcSwapDef(f.tgt,ks.def)]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
     eff:f.eff||'auto',accBonus:num(f.acc),dmgBonus:num(f.dmg),adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:!!onlyDmg&&!!f.crit,
     aPs:m.passives,aHp:m.hp,tPs:info&&info.side==='a'?(info.m.passives||[]):null,tHp:info&&info.side==='a'?info.hp:null,tog:psTog(f),
     fcA:fcAt(btCidOf(uid+'/'+pid)),fcT:f.tgt?fcAt(f.tgt):[]
@@ -3254,8 +3258,8 @@ function foeRoll(cid,i,onlyDmg){
   const u=S.ui.bt;
   const info=u.tgt&&btC(u.tgt)?btInfo(u.tgt,true):null;
   const c=atkCalc({
-    mv:x,aTypes:foeTypes(f),aAcc:k==='Effect'?fSpd(f):fStat(f,ks.acc),aDmg:ks.dmg?fStat(f,ks.dmg):0,aStage:ks.dmg?stg(f,ks.dmg):0,
-    tTypes:info?info.types:null,tDef:info&&info.stat?(k==='Effect'?info.stat.spe:info.stat[fcSwapDef(u.tgt,ks.def)]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
+    mv:x,aTypes:foeTypes(f),aAcc:isEff(k)?fSpd(f):fStat(f,ks.acc),aDmg:ks.dmg?fStat(f,ks.dmg):0,aStage:ks.dmg?stg(f,ks.dmg):0,
+    tTypes:info?info.types:null,tDef:info&&info.stat?(isEff(k)?info.stat.spe:info.stat[fcSwapDef(u.tgt,ks.def)]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
     eff:u.eff||'auto',adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:false,
     aPs:f.ps,aHp:f.hp,tPs:info?(info.side==='a'?(info.m.passives||[]):((info.f&&info.f.ps)||[])):null,tHp:info?(info.side==='a'?info.hp:(info.f&&info.f.hp)):null,tog:psTog(u),
     fcA:fcAt(cid),fcT:u.tgt?fcAt(u.tgt):[]
@@ -3453,10 +3457,10 @@ function btFoeBody(cid,v,idx){
       ${mrPsLine('bt',f,S.ui.bt.tgt&&btC(S.ui.bt.tgt)?((x=>x?(x.side==='a'?x.m:x.f):null)(btInfo(S.ui.bt.tgt,true))):null,null)}
       <div class="row"><div class="seg" role="group" aria-label="Roll mode">${[['normal','Normal'],['adv','Advantage'],['dis','Disadvantage']].map(([k,l])=>h`<button data-act="adv" data-v="${k}" aria-pressed="${String(S.ui.adv===k)}">${l}</button>`)}</div>
         <label class="row"><input type="checkbox" data-act="b_secret" ${S.ui.secret?raw('checked'):''}><span>Roll in secret (not shared)</span></label></div>
-      ${mvs.length?mvs.map((x,i)=>h`<div class="move"><div class="mv1">${fText('Move','gb','battle',P+'mv.'+i+'.name',S.battleGm,{list:'dl-moves'})}${fText('Uses','gb','battle',P+'mv.'+i+'.freq',S.battleGm,{})}<span></span>${rowBtns('gb','battle',P+'mv',i,mvs.length,false)}</div>
+      ${mvs.length?mvs.map((x,i)=>h`<div class="move ${x.kind==='Style'?'mvstyle':''}"><div class="mv1">${fText('Move','gb','battle',P+'mv.'+i+'.name',S.battleGm,{list:'dl-moves'})}${fText('Uses','gb','battle',P+'mv.'+i+'.freq',S.battleGm,{})}<span></span>${rowBtns('gb','battle',P+'mv',i,mvs.length,false)}</div>
         <div class="mv2">${fSel('Kind','gb','battle',P+'mv.'+i+'.kind',S.battleGm,KINDS,{})}${fSel('Type','gb','battle',P+'mv.'+i+'.type',S.battleGm,TYPES,{})}${fText('Range','gb','battle',P+'mv.'+i+'.range',S.battleGm,{})}${fText('Damage','gb','battle',P+'mv.'+i+'.dice',S.battleGm,{ph:'e.g. 3d8'})}</div>
         ${fArea('Effect','gb','battle',P+'mv.'+i+'.text',S.battleGm,{rows:2})}
-        <div class="row"><button class="btn primary sm" data-act="b_fmroll" data-cid="${cid}" data-i="${i}">Roll attack</button><button class="btn sm" data-act="b_fmdmg" data-cid="${cid}" data-i="${i}">Damage only</button></div></div>`):h`<p class="sub">No moves yet. Add one, or type a move name to fill it in from the handbook.</p>`}
+        ${x.kind==='Style'?h`<p class="sub stynote"><span class="pill sty">Style</span> No attack roll and no damage.</p>`:h`<div class="row"><button class="btn primary sm" data-act="b_fmroll" data-cid="${cid}" data-i="${i}">Roll attack</button><button class="btn sm" data-act="b_fmdmg" data-cid="${cid}" data-i="${i}">Damage only</button></div>`}</div>`):h`<p class="sub">No moves yet. Add one, or type a move name to fill it in from the handbook.</p>`}
     </div>
     ${(f.ps||[]).length?h`<div class="list"><div class="ph"><h3>Passives</h3></div><ul class="mini-list">${f.ps.map(x=>h`<li><b>${x.name}</b><br><span class="sub">${x.text}</span></li>`)}</ul></div>`:''}
     ${fArea('Notes (only you see these)','gb','battle',P+'notes',S.battleGm,{rows:2})}
@@ -9789,14 +9793,15 @@ function moveRow(id,m,x,i,ro){
   const n=mm?clamp(+mm[1],1,9):0;
   const used=num(x.used);
   const p='moves.'+i+'.';
-  return h`<div class="move">
+  const sty=x.kind==='Style';
+  return h`<div class="move ${sty?'mvstyle':''}">
     <div class="mv1">
       ${fText('Move','p',id,p+'name',m,{ro,list:'dl-moves'})}
       ${fText('Uses','p',id,p+'freq',m,{ro,list:'dl-freq'})}
       ${n?h`<span class="pips" role="group" aria-label="Daily uses">${Array.from({length:n},(_,j)=>h`<button class="pip ${j<used?'spent':''}" data-act="pip" ${bp('p',id,'moves.'+i+'.used')} data-j="${j}" aria-label="Use ${j+1}" ${dis(ro)}></button>`)}</span>`:h`<span></span>`}
       ${rowBtns('p',id,'moves',i,(m.moves||[]).length,ro)}
     </div>
-    ${ro||!String(x.name||'').trim()?'':h`<div class="row mvroll"><button class="btn sm ${S.ui.mr.key===mrKey(id.split('/')[0],id.split('/')[1],i)?'primary':''}" data-act="b_mopen" data-uid="${id.split('/')[0]}" data-pid="${id.split('/')[1]}" data-i="${i}" aria-expanded="${String(S.ui.mr.key===mrKey(id.split('/')[0],id.split('/')[1],i))}">Roll ${x.name}</button></div>`}
+    ${ro||sty||!String(x.name||'').trim()?'':h`<div class="row mvroll"><button class="btn sm ${S.ui.mr.key===mrKey(id.split('/')[0],id.split('/')[1],i)?'primary':''}" data-act="b_mopen" data-uid="${id.split('/')[0]}" data-pid="${id.split('/')[1]}" data-i="${i}" aria-expanded="${String(S.ui.mr.key===mrKey(id.split('/')[0],id.split('/')[1],i))}">Roll ${x.name}</button></div>`}
     ${ro?'':moveForm(id.split('/')[0],id.split('/')[1],i,x)}
     <div class="mv2">
       ${fSel('Kind','p',id,p+'kind',m,KINDS,{ro})}
@@ -9805,6 +9810,7 @@ function moveRow(id,m,x,i,ro){
       ${fText('Damage','p',id,p+'dice',m,{ro,ph:'e.g. 3d8'})}
     </div>
     ${fArea('Effect','p',id,p+'text',m,{ro,rows:2})}
+    ${sty?h`<p class="sub stynote"><span class="pill sty">Style</span> No attack roll and no damage. Use it when its text says to.${styleCount(m)>1&&!hasPassive(m,'luckycharm')?' A Pokémon normally has only one Style.':''}</p>`:''}
     ${ctLine(id,m,x,i,ro)}
   </div>`;
 }

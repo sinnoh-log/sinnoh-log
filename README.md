@@ -402,6 +402,19 @@ What the fog hides from the players: a foe you have shown stays out of their cop
 - Squares are counted for you, and walls stop shapes and tokens, but movement costs, the effects of other terrain, cover, doors and real line of sight are not applied: you judge those. A wall is a whole square, and "line of effect" is a straight line between square centres, so a corner case may need your ruling. The terrain, markers and shapes are there to show everyone what you decided.
 - **Download my backup** includes the map's settings, terrain, markers and foe positions for the GM, but not the picture or the library. Keep the original picture files.
 
+## Style moves (Update 35)
+
+PTA 3.5 splits the old "Effect" moves in two: **Effect** moves, and **Style** moves, which have a type but never roll to hit or deal damage. The site now has a fourth move **Kind**, *Style*, next to Physical, Special and Effect.
+
+- A Style move has a gold bar down its left edge and a **Style** tag under it, on Pokémon sheets and on foes in the Battle page.
+- It has **no Roll button**. In the maths it counts like an Effect move.
+- If a Pokémon has more than one Style on its sheet, the tag adds a short note that a Pokémon normally has one (a Pokémon with Lucky Charm is exempt).
+- The Kind drop-down on any move, for players, foes and NPC trainers, now includes Style.
+
+**Handbook data, version 5.** The 3.5 draft Pokédex and Mega file replace the 3.0 stats and moves. Import the new `pta-handbook-data.json` in **GM Desk → Handbook data → Import handbook data** (do not upload it to GitHub). It sets each handbook move's kind to Physical, Special, Effect or Style. Moves you already have on sheets keep the kind they were saved with; use the Kind drop-down to change one, or delete the move and type its name again to fill it from the handbook.
+
+No new database rules are needed.
+
 ## Trainer sheet sections (Update 34)
 
 Under the ID card, the **Trainer** page now has a row of section buttons: **Stats & skills**, **Features**, **Bag**, **Badges & ribbons**, **Profile** and **All**.
