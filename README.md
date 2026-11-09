@@ -733,3 +733,13 @@ Open any entry in the Pokédex and, when the species has other forms, a row of s
 - **✨ Shiny** under the picture switches the big picture to the shiny colours. It stays on while you flip through entries. Entries with no shiny picture show the normal one.
 - **Campaign-only forms** (Volcanic Marowak, Iron-rich Sliggoo, Icy Mountain Vulpix and the other habitat forms) have no official art. They show in the row with the base picture and a note saying so.
 - The pictures load from the PokeAPI sprite collection on GitHub, so they need an internet connection. Nothing was added to the repo, and the data file is unchanged.
+
+## Rolling moves that use the Monster die (Update 41)
+
+A move written NdM in the handbook, such as Aqua Tail at 3dM, now rolls in battle. It uses the attacker's own **Monster die**: a d10 Pokémon rolls 3d10. 133 moves are written this way.
+
+- **Same roller as every other move.** Type advantage and resistance, stat stages, same-type bonus, passives and the Critical hit box all work as before. The roll log reads, for example, "3dM → 3d10 (Monster die d10)".
+- **Critical hits** show the top face of the Monster die on every die.
+- **Not set means no roll.** If the Pokémon has no Monster die, the roll stops with "Set … Monster die first". Set it in the Monster die box on the Pokémon sheet (it now says Not set until you pick one).
+- **Foes** have a Monster die box in the foe editor, set by the GM. Capturing a foe carries its die over to the new Pokémon.
+- **Mega forms have their own die.** Open the Mega form editor and use **Mega Monster die**. While a Pokémon is Mega Evolved, that die is used, and if it is blank the roll stops. It does not fall back to the base form's die.

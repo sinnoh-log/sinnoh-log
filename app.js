@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-09 · Forms and shiny';
+const BUILD='2026-11-09 · Monster die rolls';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -1073,6 +1073,7 @@ function megaPanel(uid,m,ro){
         ${fText('Mega Stone','p',id,'mega.stone',m,{list:'dl-items'})}
         ${fSel('Type 1','p',id,'mega.types.0',m,TYPES,{blank:'None'})}
         ${fSel('Type 2','p',id,'mega.types.1',m,TYPES,{blank:'None'})}
+        ${fSel('Mega Monster die','p',id,'mega.die',m,DICE,{blank:'Not set'})}
         ${fText('Ability','p',id,'mega.ability',m,{cls:'wide'})}
         ${STATS.map(s=>fNum(s[2]+' bonus','p',id,'mega.bonus.'+s[0],m))}
       </div>
@@ -1183,6 +1184,7 @@ function megaRunPanel(o){
         ${fText('Mega Stone',o.sc,o.id,P+'mega.stone',o.doc,{list:'dl-items'})}
         ${fSel('Type 1',o.sc,o.id,P+'mega.types.0',o.doc,TYPES,{blank:'None'})}
         ${fSel('Type 2',o.sc,o.id,P+'mega.types.1',o.doc,TYPES,{blank:'None'})}
+        ${fSel('Mega Monster die',o.sc,o.id,P+'mega.die',o.doc,DICE,{blank:'Not set'})}
         ${fText('Ability',o.sc,o.id,P+'mega.ability',o.doc,{cls:'wide'})}
         ${STATS.map(s=>fNum(s[2]+' bonus',o.sc,o.id,P+'mega.bonus.'+s[0],o.doc))}
       </div>
@@ -2140,15 +2142,26 @@ function afflChips(sc,id,path,cur,ro,cid){
 /* ----- dice ----- */
 const rnd=n=>1+Math.floor(Math.random()*n);
 function parseDice(s){
-  const m=/^\s*(\d+)\s*d\s*(\d+)\s*(?:([+\-−])\s*(\d+))?\s*$/i.exec(String(s==null?'':s));
+  const m=/^\s*(\d+)\s*d\s*(\d+|M)\s*(?:([+\-−])\s*(\d+))?\s*$/i.exec(String(s==null?'':s));
   if(!m)return null;
-  return {n:+m[1],s:+m[2],f:m[3]?(m[3]==='+'?1:-1)*(+m[4]):0};
+  const mon=/m/i.test(m[2]);
+  return {n:+m[1],s:mon?0:+m[2],mon,f:m[3]?(m[3]==='+'?1:-1)*(+m[4]):0};
 }
 function d20adv(mode){
   const a=rnd(20);
   if(mode!=='adv'&&mode!=='dis')return {v:a,all:[a]};
   const b=rnd(20);
   return {v:mode==='adv'?Math.max(a,b):Math.min(a,b),all:[a,b]};
+}
+/* a Pokémon's or foe's Monster die as a number of sides (0 when not set); a Mega form uses its own */
+const dieSides=v=>{const m=/^d?(\d+)$/i.exec(String(v==null?'':v).trim());return m?+m[1]:0;};
+const monDie=m=>m?dieSides(megaOn(m)?(m.mega&&m.mega.die):m.die):0;
+/* a move written NdM needs the roller's Monster die; says so and returns true when it is missing */
+function needDie(x,die,who){
+  const dc=parseDice(x&&x.dice);
+  if(!(dc&&dc.mon)||die>0)return false;
+  toast('Set '+who+'’s Monster die first. '+(x.name||'This move')+' rolls '+dc.n+'dM, and '+who+' has none set.');
+  return true;
 }
 const kindStat=k=>k==='Special'?{acc:'spa',dmg:'spa',def:'spd',ab:'SpA',dab:'SpDef'}:isEff(k)?{acc:'spe',dmg:null,def:'spe',ab:'Spe',dab:'Spe'}:{acc:'atk',dmg:'atk',def:'def',ab:'Atk',dab:'Def'};
 
@@ -2489,6 +2502,11 @@ function atkCalc(o){
   out.crit=crit;
   const dc=parseDice(mv.dice);
   if(!dc)return out;
+  /* NdM: the dice are the attacker's own Monster die; with none set there is nothing to roll */
+  if(dc.mon){
+    if(!(num(o.die)>0))return out;
+    dc.s=num(o.die);
+  }
   const plain=isEff(k);
   const ty=out.type;
   let eff=EFF_CODES.n;
@@ -2525,7 +2543,7 @@ function atkCalc(o){
   if(!plain){D.dbl.forEach(n=>{tot*=2;out.ps.push(n+' ×2');});D.half.forEach(n=>{tot=Math.floor(tot/2);out.ps.push(n+' ½');});}
   let heal=0;
   if(!plain&&D.absorb){heal=Math.floor(tot/2);out.ps.push(D.absorb+': heals '+heal+' instead');tot=0;}
-  out.dm={tot,base:dc.n,n,s:dc.s,rolled,eff:eff.d,stageD,fixed:dc.f,stat,stab,extra,psd,heal,absorb:D.absorb,ef:eff.c,ab:ks.ab};
+  out.dm={tot,base:dc.n,n,s:dc.s,mon:!!dc.mon,rolled,eff:eff.d,stageD,fixed:dc.f,stat,stab,extra,psd,heal,absorb:D.absorb,ef:eff.c,ab:ks.ab};
   return out;
 }
 const dieWord=n=>Math.abs(n)+(Math.abs(n)===1?' die':' dice');
@@ -2545,7 +2563,7 @@ function dmText(c){
   const bits=[];
   if(m.eff)bits.push((m.eff>0?'+':'−')+dieWord(m.eff)+' '+EFF_LBL[m.ef].toLowerCase());
   if(m.stageD)bits.push((m.stageD>0?'+':'−')+dieWord(m.stageD)+' from stages');
-  const dice=m.base+'d'+m.s+(bits.length?' ('+bits.join(', ')+') = '+m.n+'d'+m.s:'');
+  const dice=(m.mon?m.base+'dM → ':'')+m.base+'d'+m.s+(bits.length?' ('+bits.join(', ')+') = '+m.n+'d'+m.s:'')+(m.mon?' (Monster die d'+m.s+')':'');
   let s=dice+(c.crit?' · critical, every die at its top face':'')+': ['+m.rolled.join(', ')+']';
   const add=[];
   if(m.fixed)add.push(sgn(m.fixed));
@@ -2682,11 +2700,12 @@ function moveRoll(uid,pid,i,onlyDmg){
   const f=S.ui.mr;
   const k=KINDS.indexOf(x.kind)>=0?x.kind:'Physical';
   const ks=kindStat(k);
+  if(needDie(x,monDie(m),mName(m)+(megaOn(m)?' (Mega)':'')))return;
   const info=f.tgt?btInfo(f.tgt,false):null;
   const tgtBit=info?{cid:f.tgt,name:info.name}:null;
   /* a target's Defense and stages are used only when everyone can see them (a player's Pokémon always can) */
   const c=atkCalc({
-    mv:x,aTypes:effTypes(m),aAcc:isEff(k)?spdOf(m):effStat(m,ks.acc),aDmg:ks.dmg?effStat(m,ks.dmg):0,aStage:ks.dmg?stg(m,ks.dmg):0,
+    mv:x,die:monDie(m),aTypes:effTypes(m),aAcc:isEff(k)?spdOf(m):effStat(m,ks.acc),aDmg:ks.dmg?effStat(m,ks.dmg):0,aStage:ks.dmg?stg(m,ks.dmg):0,
     tTypes:info?info.types:null,tDef:info&&info.stat?(isEff(k)?info.stat.spe:info.stat[fcSwapDef(f.tgt,ks.def)]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
     eff:f.eff||'auto',accBonus:num(f.acc),dmgBonus:num(f.dmg),adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:!!onlyDmg&&!!f.crit,
     aPs:m.passives,aHp:m.hp,tPs:info&&info.side==='a'?(info.m.passives||[]):null,tHp:info&&info.side==='a'?info.hp:null,tog:psTog(f),
@@ -3260,9 +3279,10 @@ function foeRoll(cid,i,onlyDmg){
   const k=KINDS.indexOf(x.kind)>=0?x.kind:'Physical';
   const ks=kindStat(k);
   const u=S.ui.bt;
+  if(needDie(x,monDie(f),foeLabel(f)+(megaOn(f)?' (Mega)':'')))return;
   const info=u.tgt&&btC(u.tgt)?btInfo(u.tgt,true):null;
   const c=atkCalc({
-    mv:x,aTypes:foeTypes(f),aAcc:isEff(k)?fSpd(f):fStat(f,ks.acc),aDmg:ks.dmg?fStat(f,ks.dmg):0,aStage:ks.dmg?stg(f,ks.dmg):0,
+    mv:x,die:monDie(f),aTypes:foeTypes(f),aAcc:isEff(k)?fSpd(f):fStat(f,ks.acc),aDmg:ks.dmg?fStat(f,ks.dmg):0,aStage:ks.dmg?stg(f,ks.dmg):0,
     tTypes:info?info.types:null,tDef:info&&info.stat?(isEff(k)?info.stat.spe:info.stat[fcSwapDef(u.tgt,ks.def)]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
     eff:u.eff||'auto',adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:false,
     aPs:f.ps,aHp:f.hp,tPs:info?(info.side==='a'?(info.m.passives||[]):((info.f&&info.f.ps)||[])):null,tHp:info?(info.side==='a'?info.hp:(info.f&&info.f.hp)):null,tog:psTog(u),
@@ -3344,7 +3364,7 @@ function foeGive(cid){
     nick,species:f.sp||'',types:[(f.ty||[])[0]||'',(f.ty||[])[1]||''],size:f.sz||'Medium',weight:f.wt||'Medium',
     hp:{cur:Math.max(1,num(hp.cur)),max:Math.max(1,num(hp.max))},base:Object.assign({atk:3,def:3,spa:3,spd:3,spe:3},f.base),
     skills:f.sk||'',passives:ps,moves:mv,
-    item:f.item||'',up:f.up||'',down:f.down||'',natureName:f.natureName||'',gender:f.gender||'',shiny:f.shiny===true,mega:f.mega?JSON.parse(JSON.stringify(f.mega)):null,
+    item:f.item||'',up:f.up||'',down:f.down||'',natureName:f.natureName||'',gender:f.gender||'',die:f.die||'',shiny:f.shiny===true,mega:f.mega?JSON.parse(JSON.stringify(f.mega)):null,
     caught:'Caught in the wild, session '+(num(S.meta.session)||1)
   },f.hpx?{hpx:num(f.hpx)}:{})));
   toast((f.sp||'The foe')+' now belongs to '+tName(S.trainers[uid])+'.'+(wasAlpha?' It lost the alpha aura and has the passive Alpha: choose its +1 bonuses on its sheet. If it now has four stat passives, one must go.':''),true);
@@ -3443,6 +3463,7 @@ function btFoeBody(cid,v,idx){
       ${fSel('Type 2','gb','battle',P+'ty.1',S.battleGm,TYPES,{blank:'None'})}
       ${fNum('HP now','gb','battle',P+'hp.cur',S.battleGm,{min:0})}
       ${fNum('HP max','gb','battle',P+'hp.max',S.battleGm,{min:1})}
+      ${fSel('Monster die','gb','battle',P+'die',S.battleGm,DICE,{blank:'Not set'})}
       ${fSel('Gender','gb','battle',P+'gender',S.battleGm,GENDERS,{blank:'Not set'})}
       <div class="fld shn"><span class="fl">Colour</span>${fCheck('Shiny ✦','gb','battle',P+'shiny',S.battleGm,false)}</div>
       ${fText('Held item','gb','battle',P+'item',S.battleGm,{list:'dl-items'})}
@@ -7560,7 +7581,7 @@ function ntFoeFrom(id,nt,m){
     hp:{cur:clamp(num(hp.cur)>0?num(hp.cur):mx,1,mx),max:mx},
     base:Object.assign({atk:3,def:3,spa:3,spd:3,spe:3},m.base),bonus:Object.assign(zeroStats(),m.bonus),stages:zeroStats(),st:'',
     notes:m.notes||'',sk:m.sk||'',ps:(m.ps||[]).map(x=>Object.assign({},x)),mv:(m.mv||[]).map(x=>Object.assign({},x,{used:0})),
-    item:m.item||'',up:m.up||'',down:m.down||'',natureName:m.natureName||'',gender:m.gender||'',shiny:m.shiny===true,
+    item:m.item||'',up:m.up||'',down:m.down||'',natureName:m.natureName||'',gender:m.gender||'',die:m.die||'',shiny:m.shiny===true,
     mega:m.mega?JSON.parse(JSON.stringify(m.mega)):null,megaOn:false,
     sh:{name:num(m.sh&&m.sh.name),pic:num(m.sh&&m.sh.pic),types:num(m.sh&&m.sh.types),st:0,hp:0,item:num(m.sh&&m.sh.item),mega:0},
     pn:foeLetter(),nt:id,ni:m.id,own:ntName(nt)},m.hpx?{hpx:num(m.hpx)}:{});
@@ -10162,7 +10183,7 @@ function monBody(uid,m,ro,pos,len){
       ${fSel('Type 2','p',id,'types.1',m,TYPES,{ro,blank:'None'})}
       ${fSel('Size','p',id,'size',m,SIZES,{ro})}
       ${fSel('Weight','p',id,'weight',m,WEIGHTS,{ro})}
-      ${fSel('Monster die','p',id,'die',m,DICE,{ro})}
+      ${fSel('Monster die','p',id,'die',m,DICE,{ro,blank:'Not set'})}
       ${fText('Held item','p',id,'item',m,{ro,list:'dl-items'})}
       ${fText('Nature','p',id,'natureName',m,{ro})}
       ${fSel('Nature raises','p',id,'up',m,STAT_OPTS,{ro,blank:'None'})}
