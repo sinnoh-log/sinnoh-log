@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-09 · Who can learn it';
+const BUILD='2026-11-09 · Circuits and ID';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -9674,15 +9674,20 @@ const LC_ACC=[['#E58FB0','Rose'],['#7FD69A','Leaf green'],['#8FC7E5','Ice blue']
 const lcAcc=(uid,t)=>{const c=String(t.kitCol||'');return LC_ACC.some(x=>x[0]===c)?c:LC_ACC[idHash(uid)%LC_ACC.length][0];};
 const lcNo=t=>{const n=String(t.kitNo==null?'':t.kitNo).replace(/\D/g,'').slice(0,3);return n?n.padStart(3,'0'):'---';};
 const lcTier=n=>n>=7?'VANGUARD':n>=5?'WARDEN':n>=2?'PATHFINDER':'ROOKIE';
+/* which circuits a trainer is on (Update 38): everyone is on both until a box on the sheet says otherwise */
+const onGym=t=>!(t&&t.noGym),onCon=t=>!(t&&t.noCon),onAny=t=>onGym(t)||onCon(t);
 function lcStats(uid,t){
-  let pos=0,w=0,l=0,ce=0,cr=0;
+  let pos=0,posC=0,w=0,l=0,ce=0,cr=0;
   try{const g=rkWith('gym',()=>rkRows().find(x=>x.id===uid));if(g){pos=g.pos;const r=g.rec||{};w=num(r.w);l=num(r.l);}
-    const c=rkWith('con',()=>rkRows().find(x=>x.id===uid));if(c){const cc=c.con||{};ce=num(cc.e);cr=num(cc.r);}}catch(e){}
+    const c=rkWith('con',()=>rkRows().find(x=>x.id===uid));if(c){posC=c.pos;const cc=c.con||{};ce=num(cc.e);cr=num(cc.r);}}catch(e){}
   const halls=ribHalls();
+  if(!onGym(t))pos=posC;
   return {pos,w,l,ce,rib:Math.max(ribCount(t,halls),cr),need:ribNeedEff(halls)};
 }
 function trainerCard(uid){
   const t=S.trainers[uid];
+  if(!onAny(t))return idCard(uid);
+  const gy=onGym(t),cn=onCon(t);
   const mons=partyOf(uid);
   const bg=t.badges||{};
   const back=!!S.ui.flip[uid];
@@ -9693,21 +9698,47 @@ function trainerCard(uid){
   return h`<article class="panel tcard lcard" ${raw('style="--acc:'+acc+'"')} aria-label="League Card for ${tName(t)}"><div class="lcin">
     ${back?h`<div class="lchead"><div><b class="lcnm">${tName(t)}</b><span class="lcsm">${no!=='---'?'No. '+no+' · ':''}${[t.cls,t.adv].filter(Boolean).join(' · ')||'Challenger'}</span></div>${no!=='---'?h`<b class="lcbig">${no}</b>`:''}</div>
       <div class="lcback">
-        <div class="lcboxes">${[['Battles',st.w+st.l],['Wins',st.w],['Contests',st.ce],['Rank',st.pos?'#'+st.pos:'—']].map(([k,v])=>h`<div><span>${k}</span><b>${v}</b></div>`)}</div>
-        <div class="lcsec"><span class="lck">Badge band</span><div class="lcband">${BADGES.map(b=>h`<i class="${bg[b[0]]?'on':''}" ${raw('style="--bc:'+BADGE_COL[b[0]]+'"')} title="${b[1]} Badge${bg[b[0]]?'':' (not yet)'}"></i>`)}</div></div>
+        <div class="lcboxes">${(gy&&cn?[['Battles',st.w+st.l],['Wins',st.w],['Contests',st.ce],['Rank',st.pos?'#'+st.pos:'—']]:gy?[['Battles',st.w+st.l],['Wins',st.w],['Rank',st.pos?'#'+st.pos:'—']]:[['Contests',st.ce],['Ribbons',st.rib],['Rank',st.pos?'#'+st.pos:'—']]).map(([k,v])=>h`<div><span>${k}</span><b>${v}</b></div>`)}</div>
+        ${gy?h`<div class="lcsec"><span class="lck">Badge band</span><div class="lcband">${BADGES.map(b=>h`<i class="${bg[b[0]]?'on':''}" ${raw('style="--bc:'+BADGE_COL[b[0]]+'"')} title="${b[1]} Badge${bg[b[0]]?'':' (not yet)'}"></i>`)}</div></div>`:''}
         <div class="lcsec"><span class="lck">Team</span><div class="lcteam">${mons.length?mons.map(m=>h`<span>${mName(m)}</span>`):h`<span class="lcempty">No Pokémon on hand</span>`}</div></div>
         <div class="lcgrid">${lbl('Endorsed by',t.endorser||'Not yet')}${lbl('Agency',String(t.agency||'').trim()||'Independent')}${lbl('Sponsors',sp.length?sp.slice(0,3).join(', '):'None yet')}${lbl('Signature play',t.sigPlay||'Not yet')}</div>
         ${t.quote?h`<p class="lcq">“${t.quote}”</p>`:''}
       </div>
-      <div class="lcfoot"><span>Sinnoh League · Official challenger card</span><span>Season ${num(S.meta.season)||1}${no!=='---'?' · '+no+' / 999':''}</span></div>`
-    :h`<div class="lchead"><span class="lcbrand"><svg width="18" height="21" viewBox="0 0 26 30" aria-hidden="true"><path d="M13 1 L25 6 V15 C25 22 19 27 13 29 C7 27 1 22 1 15 V6 Z" fill="none" stroke="currentColor" stroke-width="2.4"></path><path d="M13 8 L18 15 L13 22 L8 15 Z" fill="var(--acc)"></path></svg>SINNOH LEAGUE</span><span class="lcsm">SEASON ${num(S.meta.season)||1} · ${lcTier(nb)}</span></div>
+      <div class="lcfoot"><span>Sinnoh League · Official ${gy?'challenger':'coordinator'} card</span><span>Season ${num(S.meta.season)||1}${no!=='---'?' · '+no+' / 999':''}</span></div>`
+    :h`<div class="lchead"><span class="lcbrand"><svg width="18" height="21" viewBox="0 0 26 30" aria-hidden="true"><path d="M13 1 L25 6 V15 C25 22 19 27 13 29 C7 27 1 22 1 15 V6 Z" fill="none" stroke="currentColor" stroke-width="2.4"></path><path d="M13 8 L18 15 L13 22 L8 15 Z" fill="var(--acc)"></path></svg>SINNOH LEAGUE</span><span class="lcsm">SEASON ${num(S.meta.season)||1} · ${gy?lcTier(nb):'COORDINATOR'}</span></div>
       <div class="lcphoto"><button class="pbtn" data-act="view" data-uid="${uid}" data-tab="trainer" aria-label="Open sheet for ${tName(t)}">${pimg(t.img,tName(t),'tall',t.imgc)}</button>
         ${no!=='---'?h`<b class="lcno" aria-label="League number ${no}">${no}</b>`:''}
-        <div class="lctags">${t.cls?h`<span class="on">${String(t.cls).toUpperCase()}</span>`:''}<span>CHALLENGER</span></div></div>
+        <div class="lctags">${t.cls?h`<span class="on">${String(t.cls).toUpperCase()}</span>`:''}<span>${gy?'CHALLENGER':'COORDINATOR'}</span></div></div>
       <div class="lcstripe"></div>
       <div class="lcbody">
         <div class="row sp lcname"><h3>${tName(t)}</h3><span class="sub">${t.hometown||''}</span></div>
-        <div class="lcstats">${[['Badges',nb+' / 8'],['Ribbons',st.rib+' / '+st.need],['Rank',st.pos?'#'+st.pos:'—']].map(([k,v])=>h`<div><span>${k}</span><b>${v}</b></div>`)}</div>
+        <div class="lcstats">${(gy&&cn?[['Badges',nb+' / 8'],['Ribbons',st.rib+' / '+st.need],['Rank',st.pos?'#'+st.pos:'—']]:gy?[['Badges',nb+' / 8'],['Wins',st.w],['Rank',st.pos?'#'+st.pos:'—']]:[['Ribbons',st.rib+' / '+st.need],['Contests',st.ce],['Rank',st.pos?'#'+st.pos:'—']]).map(([k,v])=>h`<div><span>${k}</span><b>${v}</b></div>`)}</div>
+        <div class="lcpartner"><span class="lck">Partner</span>${lead?h`${monIcon(lead)}<b>${mName(lead)}</b>${typeChips(lead)}`:h`<span class="sub">None yet</span>`}</div>
+        <div class="hpline">${hpBar(t.hp)}<span class="mono">${num(t.hp&&t.hp.cur)}/${num(t.hp&&t.hp.max)} HP</span></div>
+      </div>`}
+    </div>
+    <footer><button class="btn sm" data-act="idflip" data-uid="${uid}" aria-pressed="${String(back)}">${back?'Flip to front':'Flip card'}</button><button class="btn sm" data-act="view" data-uid="${uid}" data-tab="trainer">Sheet</button></footer>
+  </article>`;
+}
+/* Trainer ID: the card for a trainer who is on neither circuit (Update 38) */
+function idCard(uid){
+  const t=S.trainers[uid],mons=partyOf(uid),back=!!S.ui.flip[uid],acc=lcAcc(uid,t),lead=mons[0],idn=idNo(uid);
+  const lbl=(k,v)=>h`<div class="lcf"><span>${k}</span><b>${v}</b></div>`;
+  return h`<article class="panel tcard lcard idc" ${raw('style="--acc:'+acc+'"')} aria-label="Trainer ID for ${tName(t)}"><div class="lcin">
+    ${back?h`<div class="lchead"><div><b class="lcnm">${tName(t)}</b><span class="lcsm">${idn}</span></div></div>
+      <div class="lcback">
+        <div class="lcsec"><span class="lck">Team</span><div class="lcteam">${mons.length?mons.map(m=>h`<span>${mName(m)}</span>`):h`<span class="lcempty">No Pokémon on hand</span>`}</div></div>
+        <div class="lcgrid">${lbl('Class',t.cls||'—')}${lbl('Role',t.adv||'—')}${lbl('Hometown',t.hometown||'—')}${lbl('Pokémon',mons.length)}</div>
+        ${t.quote?h`<p class="lcq">“${t.quote}”</p>`:''}
+      </div>
+      <div class="lcfoot"><span>Sinnoh Region · Trainer ID</span><span>${idn}</span></div>`
+    :h`<div class="lchead"><span class="lcbrand"><svg width="18" height="21" viewBox="0 0 26 30" aria-hidden="true"><path d="M13 1 L25 6 V15 C25 22 19 27 13 29 C7 27 1 22 1 15 V6 Z" fill="none" stroke="currentColor" stroke-width="2.4"></path><path d="M13 8 L18 15 L13 22 L8 15 Z" fill="var(--acc)"></path></svg>SINNOH REGION</span><span class="lcsm">TRAINER ID</span></div>
+      <div class="lcphoto"><button class="pbtn" data-act="view" data-uid="${uid}" data-tab="trainer" aria-label="Open sheet for ${tName(t)}">${pimg(t.img,tName(t),'tall',t.imgc)}</button>
+        <div class="lctags"><span class="on">${String(t.cls||'Trainer').toUpperCase()}</span></div></div>
+      <div class="lcstripe"></div>
+      <div class="lcbody">
+        <div class="row sp lcname"><h3>${tName(t)}</h3><span class="sub">${t.hometown||''}</span></div>
+        <div class="lcstats">${[['ID No.',idn.replace('No. ','')],['Class',t.cls||'—'],['Role',t.adv||'—']].map(([k,v])=>h`<div><span>${k}</span><b>${v}</b></div>`)}</div>
         <div class="lcpartner"><span class="lck">Partner</span>${lead?h`${monIcon(lead)}<b>${mName(lead)}</b>${typeChips(lead)}`:h`<span class="sub">None yet</span>`}</div>
         <div class="hpline">${hpBar(t.hp)}<span class="mono">${num(t.hp&&t.hp.cur)}/${num(t.hp&&t.hp.max)} HP</span></div>
       </div>`}
@@ -9722,8 +9753,9 @@ function kitPanel(uid,t,ro){
       ${fSel('Accent color','t',uid,'kitCol',t,LC_ACC,{ro,blank:'Pick one'})}
       ${fText('Endorsed by','t',uid,'endorser',t,{ro,ph:'Who backed your entry'})}
       ${fText('Signature play','t',uid,'sigPlay',t,{ro,ph:'A move fans know you for'})}
-      ${fText('Card quote','t',uid,'quote',t,{ro,cls:'wide',ph:'A line from an interview'})}</div>
-    <p class="sub">These fill in the League Card on the Overview. The number and accent are on your kit too.</p></section>`;
+      ${fText('Card quote','t',uid,'quote',t,{ro,cls:'wide',ph:'A line from an interview'})}
+      <div class="fld wide"><span class="fl">Circuits</span><span class="row">${fCheck('Not on the Gym circuit','t',uid,'noGym',t,ro)}${fCheck('Not on the Contest circuit','t',uid,'noCon',t,ro)}</span></div></div>
+    <p class="sub">These fill in the League Card on the Overview. The number and accent are on your kit too. Tick a circuit your trainer is not on and they leave that Rankings list. Tick both and the Overview shows a Trainer ID instead of the League Card. Their points are kept if you untick it later.</p></section>`;
 }
 function feedItems(){
   const out=[];
@@ -11565,7 +11597,8 @@ function rkRows(){
   const EN=rkEngine(),W=EN.W,log=rkLog();
   const lab=rkD().lab||{},b=rkB(),met=b.met||{},gone=b.gone||{};
   const field=b.seed?rkGenField(num(b.seed),num(b.n)||300):[];
-  const rows=entriesOf(S.trainers).filter(t=>t.name).map(t=>{const m=log.filter(e=>e.u===t.id),p=rkPtsAt(m,W);return {id:t.id,name:tName(t),pts:p,wk:W?p-rkPtsAt(m,W-1):0,lab:lab[t.id]||'',kind:'pc',bd:badgeCount(t),rb:ribCount(t)};})
+  const conB=rkC()===RK_C.con;
+  const rows=entriesOf(S.trainers).filter(t=>t.name&&(conB?onCon(t):onGym(t))).map(t=>{const m=log.filter(e=>e.u===t.id),p=rkPtsAt(m,W);return {id:t.id,name:tName(t),pts:p,wk:W?p-rkPtsAt(m,W-1):0,lab:lab[t.id]||'',kind:'pc',bd:badgeCount(t),rb:ribCount(t)};})
     .concat(rkNpcs().map(n=>{const x=EN.E['n_'+n.k]||{pts:0,prev:0,badges:0};return {id:'n_'+n.k,k:n.k,name:n.n||'Unnamed rival',pts:x.pts,wk:x.pts-x.prev,lab:n.s||'',kind:'rival',home:n.h||'',bd:x.badges};}))
     .concat(field.filter(f=>!gone[f.i]&&EN.E['b'+f.i]).map(f=>{const x=EN.E['b'+f.i];return {id:'b'+f.i,i:f.i,kind:'bg',name:f.name,home:f.home,lab:f.lab,pts:x.pts,wk:x.pts-x.prev,bd:x.badges};}));
   rows.forEach(r=>{r.met=r.kind!=='pc'&&!!met[r.id];r.rec=EN.REC[r.id]||null;r.con=EN.CON[r.id]||null;});
@@ -11587,7 +11620,7 @@ function rkStreak(seq){
 }
 /* a lookup from any id on the board (or a Gym) to a display name */
 function rkNamer(rows){
-  const m={};rows.forEach(r=>{m[r.id]=r.name;});
+  const m={};entriesOf(S.trainers).forEach(t=>{if(t.name)m[t.id]=tName(t);});rows.forEach(r=>{m[r.id]=r.name;});
   RK_GYMS.forEach(g=>{m[g.id]=rkGymName(g)+' ('+g.badge+' Gym)';});
   return id=>m[id]||'Someone no longer listed';
 }

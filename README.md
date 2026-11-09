@@ -705,3 +705,14 @@ Players see **Add to** only work for a Pokémon that can learn the move, and the
 **Needs a re-import.** Open the GM Desk, choose **Import again** under Handbook data, and pick the newest `pta-handbook-data.json`. It now carries the rules. If you change rules in the GM Desk and later import a file that has its own rules, the file's rules replace yours. Keep the JSON off GitHub.
 
 Struggle is now typeless, as in the book.
+
+## Circuits and the Trainer ID (Update 38)
+
+Not every trainer is on the Gym or Contest circuit. On a trainer's sheet, under **League kit & card**, two boxes say **Not on the Gym circuit** and **Not on the Contest circuit**. Players can set their own, and the GM can set anyone's by opening the sheet.
+
+- A trainer who is not on a circuit leaves that Rankings list. The other trainers' places move up. Their points and history are kept, so unticking the box puts them back where they were.
+- A trainer on only one circuit keeps the League Card, but it shows only that circuit: Badges, Wins and Rank for the Gym circuit, or Ribbons, Contests and Rank for the Contest circuit. Contest-only trainers get a coordinator card without the badge band.
+- A trainer on neither circuit gets a **Trainer ID** on the Overview instead of the League Card: photo, name, hometown, an ID number, class and role, and the partner with its HP bar. The back shows the team, class, role and hometown.
+- Everyone starts on both circuits, so nothing changes until someone ticks a box.
+
+No new import is needed. If the database rules limit which trainer fields can be saved, the two new boxes (`noGym` and `noCon`) may need adding to them.
