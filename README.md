@@ -700,9 +700,9 @@ Every move now has a rule for who can learn it. The rule shows on each card in t
 
 Players see **Add to** only work for a Pokémon that can learn the move, and the TM and tutor machines use the same rules. As GM, the Add button always works and says **Add anyway (GM)** when the Pokémon would not normally learn the move.
 
-**GM Desk, Who can learn each move.** Type a move, then change its rule: groups, species, types, anyone or by GM decision. **Back to the handbook lists** removes your rule. The rules are saved with the other handbook data, so no database rules change.
+**GM Desk, Who can learn each move.** Type a move, then change its rule: groups, species, types, anyone or by GM decision. **Undo my change** puts back the rule that came with the data file. The rules are saved with the other handbook data, so no database rules change.
 
-**Needs a re-import.** Open the GM Desk, choose **Import again** under Handbook data, and pick the newest `pta-handbook-data.json`. It now carries the rules. If you change rules in the GM Desk and later import a file that has its own rules, the file's rules replace yours. Keep the JSON off GitHub.
+**Needs a re-import.** Open the GM Desk, choose **Import again** under Handbook data, and pick the newest `pta-handbook-data.json`. It now carries the rules. Importing again later updates the default rules and keeps the changes you made in the GM Desk. Keep the JSON off GitHub.
 
 Struggle is now typeless, as in the book.
 
@@ -716,3 +716,11 @@ Not every trainer is on the Gym or Contest circuit. On a trainer's sheet, under 
 - Everyone starts on both circuits, so nothing changes until someone ticks a box.
 
 No new import is needed. If the database rules limit which trainer fields can be saved, the two new boxes (`noGym` and `noCon`) may need adding to them.
+
+## Update 39: tested, with two fixes
+
+Updates 36 to 38 were run in a browser against a test copy of the database: the Moves tab (search, filters, the Add button for players and the GM), the GM Desk move-rule editor, importing again, the circuit toggles and the four card styles, and every page on both a player and a GM login.
+
+- **Undo my change** in the move-rule editor now puts back the rule that came with the data file. Before, it fell back to the old 3.0 lists, which for about 30 moves meant no rule at all.
+- **Importing again** now updates the default rules and keeps the changes you made in the GM Desk. Rules already saved by Update 37 stay as they are until you import again.
+- The ID number on the Trainer ID no longer wraps onto two lines.

@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-09 · Circuits and ID';
+const BUILD='2026-11-09 · Tested build';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -1639,7 +1639,7 @@ async function ptaImport(file){
       await S.db.collection('meta').doc('pta_'+L).set({v:1,j:JSON.stringify(groups[L])});
       im.done++;scheduleRender();
     }
-    await S.db.collection('meta').doc('pta_lists').set({v:1,j:JSON.stringify({moves:d.moves||[],passives:d.passives||[],skills:d.skills||[],megas:d.megas||[],learn:d.learn||(PTA.lists&&PTA.lists.learn)||null})});
+    await S.db.collection('meta').doc('pta_lists').set({v:1,j:JSON.stringify({moves:d.moves||[],passives:d.passives||[],skills:d.skills||[],megas:d.megas||[],learn:(()=>{const pv=PTA.lists&&PTA.lists.learn;return d.learn?{v:1,base:d.learn.mv||{},mv:(pv&&pv.base&&pv.mv)||{}}:pv||null;})()})});
     im.done++;
     if(cm){await S.db.collection('meta').doc('pta_contest').set({v:1,j:JSON.stringify(cm)});im.done++;}
     await S.db.collection('meta').doc('pta_idx').set({v:num(d.v)||1,t:Date.now(),j:JSON.stringify(d.species.map(s=>s.n))});
@@ -4762,7 +4762,8 @@ function ctExView(){
 }
 
 /* ----- Who can learn what (Update 37): rules per move on top of the proficiency groups -----
-   learn.mv[moveKey] = {n, m:'g'|'sp'|'any'|'ty'|'gm', g:[groups], sp:[species], ty:[types]}
+   learn = {v:1, base:{...}, mv:{...}}: base holds the rules that came with the data file, mv the GM's own changes (they win).
+   Each rule is moveKey: {n, m:'g'|'sp'|'any'|'ty'|'gm', g:[groups], sp:[species], ty:[types]}
    g: the move joins those proficiency groups. sp: only those species (and the evolutions listed with them). any: every Pokémon.
    ty: Pokémon of those types. gm: nobody, unless the GM adds it. Kept inside meta/pta_lists, so the database rules do not change. */
 S.ui.ln=S.ui.ln||{mv:'',m:'g',txt:'',msg:'',bad:false};
@@ -4771,9 +4772,10 @@ function lnApply(){
   PX.lists={};Object.keys(PX.lists0).forEach(g=>{PX.lists[g]=new Set(PX.lists0[g]);});
   PX.sig=new Set(PX.sig0);PX.ln=new Map();PX.lnSet=new Map();
   const ln=PTA.lists&&PTA.lists.learn;
-  if(ln&&ln.mv){
-    Object.keys(ln.mv).forEach(mk=>{
-      const e=ln.mv[mk];if(!e)return;
+  const eff=ln?Object.assign({},ln.base||{},ln.mv||{}):null;
+  if(eff){
+    Object.keys(eff).forEach(mk=>{
+      const e=eff[mk];if(!e)return;
       Object.keys(PX.lists).forEach(g=>PX.lists[g].delete(mk));
       PX.sig.delete(mk);
       if(e.n&&!PX.names[mk])PX.names[mk]=e.n;
@@ -4826,7 +4828,7 @@ function lnBody(){
       ${u.m==='g'||u.m==='sp'||u.m==='ty'?h`<label class="fld wide"><span class="fl">${u.m==='g'?'Groups':u.m==='sp'?'Species':'Types'}</span><textarea rows="${u.m==='sp'?6:2}" data-u="ln.txt" data-nr>${u.txt||''}</textarea></label>`:''}
       <p class="sub">${hint}</p>
       ${u.msg?h`<p class="sub ${u.bad?'bad':'good'}" role="status">${u.msg}</p>`:''}
-      <div class="row"><button class="btn sm primary" data-act="ln_save">Save</button><button class="btn sm ghost" data-act="ln_revert">Back to the handbook lists</button></div>`:''}`;
+      <div class="row"><button class="btn sm primary" data-act="ln_save">Save</button><button class="btn sm ghost" data-act="ln_revert">Undo my change</button></div>`:''}`;
 }
 function lnDesk(){
   if(!PTA.idx)return '';
@@ -4834,7 +4836,7 @@ function lnDesk(){
   if(!PTA.lists)ptaLists().then(()=>scheduleRender());
   const u=S.ui.ln;
   return h`<section class="panel"><div class="ph"><h2>Who can learn each move</h2><span class="pill gm">GM only</span></div>
-    <p class="sub">Every move is learnable through proficiency groups, a list of species, a type, by anyone, or only by your decision. Pick a move to see and change its rule. Changes apply to everyone at once. Importing the handbook data file again keeps your changes unless the file has its own rules.</p>
+    <p class="sub">Every move is learnable through proficiency groups, a list of species, a type, by anyone, or only by your decision. Pick a move to see and change its rule. Changes apply to everyone at once. Importing the handbook data file again updates the defaults and keeps your changes.</p>
     ${PX.d&&PTA.lists?h`<label class="fld"><span class="fl">Move</span><input type="search" data-u="ln.mv" data-nr list="dl-moves" value="${u.mv||''}" placeholder="Move name" autocomplete="off"></label>
       <div id="lnbody">${lnBody()}</div>
       <p class="sub">Groups: ${Object.keys(PX.lists).sort().join(', ')}.</p>`:h`<p class="sub" role="status">Loading…</p>`}
@@ -4850,7 +4852,7 @@ function lnInput(key,t){
 async function lnAct(b){
   const d=b.dataset,u=S.ui.ln;
   if(!S.me.admin||!u.cur||!PTA.lists)return;
-  const L=PTA.lists,learn={v:1,mv:Object.assign({},(L.learn&&L.learn.mv)||{})},mk=dexKey(u.cur);
+  const L=PTA.lists,learn={v:1,base:(L.learn&&L.learn.base)||{},mv:Object.assign({},(L.learn&&L.learn.mv)||{})},mk=dexKey(u.cur);
   const items=String(u.txt||'').split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean);
   if(d.act==='ln_revert'){
     delete learn.mv[mk];
@@ -4877,7 +4879,7 @@ async function lnAct(b){
   try{await lnWrite(learn);}
   catch(err){u.msg='That did not save ('+((err&&err.code)||'error')+'). Try again.';u.bad=true;lnRefresh();return;}
   lnLoadMove(u);
-  u.msg=d.act==='ln_revert'?'Back to the handbook lists.':'Saved.';u.bad=false;
+  u.msg=d.act==='ln_revert'?'Back to the default rule.':'Saved.';u.bad=false;
   lnRefresh();toast('Saved the rule for '+u.cur+'.',true);
 }
 
