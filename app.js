@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-09 · Style moves';
+const BUILD='2026-11-09 · Moves tab';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -68,10 +68,10 @@ const DEF_META={campaign:'Sinnoh Trainer Log',subtitle:'Post-game Sinnoh · ten 
 const NAV=[
   ['Narrative',[['overview','Overview'],['journal','Journal'],['timeline','Timeline'],['cal','Calendar']]],
   ['World',[['people','People'],['leads','Leads'],['map','Map']]],
-  ['Table',[['trainer','Trainer'],['pokemon','Pokémon'],['dex','Pokédex'],['battle','Battle'],['contest','Contests'],['rank','Rankings'],['shop','Shop']]]
+  ['Table',[['trainer','Trainer'],['pokemon','Pokémon'],['dex','Pokédex'],['battle','Battle'],['moves','Moves'],['contest','Contests'],['rank','Rankings'],['shop','Shop']]]
 ];
 const GM_NAV=['Game Master',[['gm','GM Desk'],['npc','NPC Trainers']]];
-const PAGE_LABEL={cal:'Calendar',overview:'Overview',journal:'Journal',timeline:'Timeline',people:'People',leads:'Leads',map:'Map',place:'Place',trainer:'Trainer sheet',pokemon:'Pokémon',dex:'Pokédex',battle:'Battle',contest:'Contests',rank:'Rankings',shop:'Shop',gm:'GM Desk',npc:'NPC Trainers',account:'Account'};
+const PAGE_LABEL={cal:'Calendar',overview:'Overview',journal:'Journal',timeline:'Timeline',people:'People',leads:'Leads',map:'Map',place:'Place',trainer:'Trainer sheet',pokemon:'Pokémon',dex:'Pokédex',battle:'Battle',moves:'Moves',contest:'Contests',rank:'Rankings',shop:'Shop',gm:'GM Desk',npc:'NPC Trainers',account:'Account'};
 const PIN_KINDS=[['place','Place'],['party','Party'],['danger','Danger'],['lead','Lead']];
 const AWARD_TYPES=['Gym Badge','Trial Medal','Frontier Symbol','Contest Ribbon','Certificate','Emblem of Recognition','Loyal Partner','Moment of Destiny','Other'];
 
@@ -4751,6 +4751,115 @@ function ctExView(){
     <h3 class="refg">What this example shows</h3>
     <ul class="reful">${X.lessons.map(l=>h`<li><b>${l[0]}</b> ${l[1]}</li>`)}</ul>
   </div>`;
+}
+
+/* ----- Moves tab (Update 36): every move in the Players Handbook, with its contest entry, and an Add button ----- */
+S.ui.mvx=S.ui.mvx||{q:'',type:'',kind:'',freq:'',ct:'',kw:'',mon:'',page:1,arm:''};
+const MVX_PAGE=40;
+const mvxAll=()=>((PTA.lists&&PTA.lists.moves)||[]).filter(m=>m&&m.ph);
+function mvxFiltered(){
+  const o=S.ui.mvx,q=dexKey(o.q);
+  return mvxAll().filter(m=>{
+    if(q&&dexKey(m.n).indexOf(q)<0)return false;
+    if(o.type&&m.t!==o.type)return false;
+    if(o.kind&&m.k!==o.kind)return false;
+    if(o.freq&&m.f!==o.freq)return false;
+    if(o.ct||o.kw){
+      const e=ctOf(m.n);
+      if(!e)return false;
+      if(o.ct&&e.t!==o.ct)return false;
+      if(o.kw&&e.k!==o.kw)return false;
+    }
+    return true;
+  });
+}
+function mvxMons(){
+  const uid=dxUid();
+  if(!uid||!S.trainers[uid])return {uid:null,mons:[],can:false};
+  return {uid,mons:partyOf(uid).concat(boxOf(uid)),can:canEditT(uid)};
+}
+function mvxCard(m,mx){
+  const o=S.ui.mvx;
+  const e=ctOf(m.n),kw=e?ctKw(e.k):null;
+  const mon=mx.mons.find(z=>z.id===o.mon)||null;
+  const known=mon&&(mon.moves||[]).some(z=>dexKey(z.name)===dexKey(m.n));
+  const sty=m.k==='Style';
+  const armed=o.arm===m.n;
+  return h`<article class="move mvxc ${sty?'mvstyle':''}">
+    <div class="mvxh"><b class="mvxn">${m.n}</b>${chipsOf([m.t])}<span class="pill ${sty?'sty':''}">${m.k}</span></div>
+    <p class="sub mvxm">${m.f||''}${m.r?' · '+m.r:''}${m.d?' · Damage '+m.d:''}</p>
+    ${m.x?h`<p class="mvxx">${m.x}</p>`:''}
+    <p class="mvxct">${e?h`${ctChip(e.t)} <b>${e.k}</b>${kw?h` <span class="sub">${kw.hp}</span>`:''}${e.note?h` <span class="sub">${e.note}</span>`:''}${kw&&kw.fx?h`<br><span class="sub">${kw.fx}</span>`:''}`:h`<span class="sub">${CT.list?'Not on the contest list. If a tutor teaches it, it is an Appeal move.':'Contest entry not loaded.'}</span>`}</p>
+    ${mx.can?h`<div class="row"><button class="btn sm ${armed?'danger armed':''}" data-act="mvx_add" data-n="${m.n}" ${mon&&!known?'':raw('disabled')}>${known?'Already known':armed?'Tap again to add anyway':mon?'Add to '+mName(mon):'Pick a Pokémon above'}</button></div>`:''}
+  </article>`;
+}
+function mvxResults(){
+  const o=S.ui.mvx,mx=mvxMons();
+  const all=mvxFiltered(),shown=all.slice(0,o.page*MVX_PAGE);
+  const filt=!!(o.q||o.type||o.kind||o.freq||o.ct||o.kw);
+  return h`<p class="sub" id="mvxcount" aria-live="polite">${all.length===1?'1 move':all.length+' moves'}${all.length>shown.length?' · showing '+shown.length:''}</p>
+    ${all.length?h`<div class="mvxlist">${shown.map(m=>mvxCard(m,mx))}</div>`:h`<p class="sub">Nothing matches.${filt?h` <button class="btn sm" data-act="mvx_clear">Clear the filters</button>`:''}</p>`}
+    ${all.length>shown.length?h`<div class="row"><button class="btn" data-act="mvx_more">Show ${Math.min(MVX_PAGE,all.length-shown.length)} more</button></div>`:''}`;
+}
+function mvxRefresh(){const el=$('#mvxres');if(el)el.innerHTML=mvxResults().s;}
+const mvxSel=(key,label,opts,cur)=>h`<label class="fld"><span class="fl">${label}</span><select data-u="mvx.${key}">${opts.map(op=>h`<option value="${op[0]}" ${String(op[0])===String(cur)?raw('selected'):''}>${op[1]}</option>`)}</select></label>`;
+function mvxTab(){
+  ctWarm();
+  if(PTA.idx&&!PTA.lists)ptaLists().then(()=>scheduleRender());
+  const o=S.ui.mvx,mx=mvxMons(),all=mvxAll();
+  let body;
+  if(!PTA.lists){
+    body=PTA.idx?h`<p class="sub" role="status">Loading the moves…</p>`:h`<div class="banner">The handbook data has not been added yet. ${S.me.admin?'Open the GM Desk and import the newest pta-handbook-data.json.':'Ask your GM to import it.'}</div>`;
+  }else if(!all.length){
+    body=h`<div class="banner">The handbook moves are not in the data yet. ${S.me.admin?'Open the GM Desk, choose Import again under Handbook data, and pick the newest pta-handbook-data.json.':'Ask your GM to import the newest handbook data.'}</div>`;
+  }else{
+    if(mx.mons.length&&!mx.mons.some(z=>z.id===o.mon))o.mon='';
+    body=h`${CT.list?'':h`<p class="sub">Contest entries are not loaded, so only battle details show.</p>`}
+      <div class="dxf">
+        <label class="fld dxq"><span class="fl">Search</span><input type="search" data-u="mvx.q" data-nr value="${o.q||''}" placeholder="Move name" autocomplete="off"></label>
+        ${mvxSel('type','Type',[['','All types']].concat(TYPES.map(t=>[t,t])),o.type)}
+        ${mvxSel('kind','Kind',[['','All kinds'],['Physical','Physical'],['Special','Special'],['Effect','Effect'],['Style','Style']],o.kind)}
+        ${mvxSel('freq','Frequency',[['','Any frequency'],['At-Will','At-Will'],['3/day','3/day'],['1/day','1/day']],o.freq)}
+        ${CT.list?mvxSel('ct','Contest type',[['','All contest types']].concat(CT_TYPES.concat(['Any']).map(t=>[t,t==='Any'?'Any type':t])),o.ct):''}
+        ${CT.list?mvxSel('kw','Contest keyword',[['','All keywords']].concat(CT_KW.map(x=>[x.k,x.k])),o.kw):''}
+      </div>
+      ${mx.can&&mx.mons.length?h`<div class="dxf">${mvxSel('mon','Add moves to',[['','Pick a Pokémon']].concat(mx.mons.map(z=>[z.id,mName(z)+' ('+((z.moves||[]).length)+' moves)'])),o.mon)}</div>`:mx.can?h`<p class="sub">Add a Pokémon to your party or box to use the Add buttons.</p>`:''}
+      <div id="mvxres">${mvxResults()}</div>`;
+  }
+  return h`<section class="panel mvxp"><div class="ph"><h2>Moves</h2>${all.length?h`<span class="pill">${all.length} moves</span>`:''}</div>
+    ${S.me.admin?trainerPicker():''}
+    ${body}
+  </section>`;
+}
+function mvxInput(key,t){
+  const o=S.ui.mvx;
+  if(key==='q'){o.page=1;o.arm='';mvxRefresh();return true;}
+  if(key==='mon'){o.arm='';return false;}
+  o.page=1;o.arm='';
+  return false;
+}
+function mvxAct(b){
+  const d=b.dataset,o=S.ui.mvx;
+  if(d.act==='mvx_more'){o.page++;mvxRefresh();return;}
+  if(d.act==='mvx_clear'){o.q='';o.type='';o.kind='';o.freq='';o.ct='';o.kw='';o.page=1;o.arm='';render();return;}
+  if(d.act!=='mvx_add')return;
+  const mx=mvxMons();
+  if(!mx.uid||!mx.can)return;
+  const m=mx.mons.find(z=>z.id===o.mon);
+  if(!m){toast('Pick a Pokémon first.');return;}
+  const def=PTA.lists&&PTA.lists.moveMap.get(dexKey(d.n));
+  if(!def)return;
+  const mv=(m.moves||[]).slice();
+  if(mv.some(z=>dexKey(z.name)===dexKey(def.n))){toast(mName(m)+' already knows '+def.n+'.');return;}
+  const t=S.trainers[mx.uid],cap=/move tutor/i.test([t.cls,t.adv].join(' '))?8:TPL_MAX.moves;
+  if(mv.length>=cap){toast(mName(m)+' already knows '+cap+' moves. Remove one on the Pokémon page first.');return;}
+  if(def.k==='Style'&&styleCount(m)>=1&&!hasPassive(m,'luckycharm')&&o.arm!==def.n){
+    o.arm=def.n;render();toast(mName(m)+' already has a Style move. Tap again to add this one anyway.');return;
+  }
+  mv.push({name:def.n,freq:def.f||'At-Will',kind:def.k||'Physical',range:def.r||'',type:def.t||'Normal',dice:def.d||'',text:def.x||'',used:0});
+  edit('p',mx.uid+'/'+m.id,'moves',mv);
+  o.arm='';
+  toast(mName(m)+' learned '+def.n+'.',true);render();
 }
 
 function ctTab(){
@@ -9506,7 +9615,7 @@ function heroHtml(){
   </section>`;
 }
 /* phone home: app tiles (Update 30); hidden on wide screens by CSS */
-const TILES=[['trainer','Trainer'],['pokemon','Pokémon'],['dex','Pokédex'],['map','Map'],['journal','Journal'],['people','People'],['leads','Leads'],['battle','Battle'],['contest','Contests'],['shop','Shop']];
+const TILES=[['trainer','Trainer'],['pokemon','Pokémon'],['dex','Pokédex'],['map','Map'],['journal','Journal'],['people','People'],['leads','Leads'],['battle','Battle'],['moves','Moves'],['contest','Contests'],['shop','Shop']];
 function appTiles(){
   const tl=TILES.concat(S.me.admin?[['npc','NPCs'],['gm','GM Desk']]:[]);
   return h`<nav class="apptiles" aria-label="Apps">${tl.map(([k,l])=>h`<button class="at" data-act="tab" data-tab="${k}"><span class="atic" aria-hidden="true"></span><b>${l}</b>${tabCount(k)?h`<span class="n">${tabCount(k)}</span>`:''}</button>`)}</nav>`;
@@ -12326,7 +12435,7 @@ function mainHtml(){
   if(S.noDb)return emptyState('This tracker needs a signed-in view','Open it from your claude.ai link while signed in. The shared table is stored with the page, so it cannot load anywhere else.');
   if(!S.ready)return h`<p class="loading">OPENING THE TABLE…</p>`;
   if(S.mapWin)return bmWinHtml();
-  const views={cal:calTab,overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,dex:dexTab,battle:battleTab,contest:ctTab,rank:rkTab,shop:shopTab,gm:gmTab,npc:npcTab,account:accountTab};
+  const views={cal:calTab,overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,dex:dexTab,battle:battleTab,moves:mvxTab,contest:ctTab,rank:rkTab,shop:shopTab,gm:gmTab,npc:npcTab,account:accountTab};
   let tab=S.tab;
   if((tab==='gm'||tab==='npc')&&!S.me.admin)tab='overview';
   if(tab==='account'&&!CFG)tab='overview';
@@ -12542,6 +12651,7 @@ function act(b,e){
   if(d.act&&d.act.indexOf('b_')===0){batAct(b,e);return;}
   if(d.act&&d.act.indexOf('dx_')===0){dxAct(b,e);return;}
   if(d.act&&d.act.indexOf('ct_')===0){ctAct(b,e);return;}
+  if(d.act&&d.act.indexOf('mvx_')===0){mvxAct(b);return;}
   if(d.act&&d.act.indexOf('en_')===0){encAct(b);return;}
   if(d.act&&d.act.indexOf('cc_')===0){ccAct(b);return;}
   if(d.act&&d.act.indexOf('hpx_')===0){hpxAct(b);return;}
@@ -12885,6 +12995,7 @@ document.addEventListener('input',e=>{
     if(k[0]==='dx'&&k[1]==='lq'){const q=dexKey(t.value);document.querySelectorAll('#lcanlist .lmv').forEach(el=>{el.classList.toggle('hit',!!q&&dexKey(el.textContent).includes(q));});return;}
     if(k[0]==='dx'){S.ui.dx.page=1;if(k[1]==='q'){dxRefresh();return;}}
     if(k[0]==='ct'&&ctInput(k[1],t))return;
+    if(k[0]==='mvx'&&mvxInput(k[1],t))return;
     if(k[0]==='shop'&&k[1]==='q'){shRefresh();return;}
     if(k[0]==='clf'&&k[1]==='q'){clListRefresh();return;}
     if(k[0]==='rk'&&k[1]==='q'){rkListRefresh();return;}

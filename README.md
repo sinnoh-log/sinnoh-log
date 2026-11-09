@@ -677,3 +677,13 @@ Renaming a ribbon keeps everything trainers have already ticked. Removing a ribb
 
 ## NPC packs (2026-11-05)
 NPC trainers → **Import NPC pack** reads a `sinnoh-npc-pack` JSON file (for example `sinnoh-circuit-rivals.json`). Each entry becomes a GM-only NPC trainer with its team, moves filled from the handbook data. Entries with a `board` and `rp` also join the Gym (or Contest) rankings as rivals. Importing the same pack twice skips names that already exist. Keep pack files out of this public repo.
+
+## Moves tab (Update 36)
+
+A new **Moves** tab sits between Battle and Contests, open to everyone at the table. It lists every move from the Players Handbook with its type, kind, frequency, range, damage dice and effect text, and beside each one its contest type and keyword (with the keyword's Heart Point dice and effect).
+
+- Search by name, or filter by type, kind (Physical, Special, Effect, Style), frequency, contest type and contest keyword.
+- Pick one of your Pokémon in **Add moves to**, then press **Add to** on any move. The move is copied onto its sheet. It will not add a move the Pokémon already knows, it stops at the move limit (6, or 8 for a Move Tutor), and it asks for a second tap before giving a second Style move to a Pokémon without Lucky Charm.
+- The GM sees the same page for the trainer chosen at the top.
+
+**Needs a re-import.** Open the GM Desk, choose **Import again** under Handbook data, and pick the newest `pta-handbook-data.json` (it now marks which moves are in the handbook). Until then the tab shows a note instead of the list. Keep the JSON file off GitHub; no new database rules are needed.
