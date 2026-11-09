@@ -743,3 +743,13 @@ A move written NdM in the handbook, such as Aqua Tail at 3dM, now rolls in battl
 - **Not set means no roll.** If the Pokémon has no Monster die, the roll stops with "Set … Monster die first". Set it in the Monster die box on the Pokémon sheet (it now says Not set until you pick one).
 - **Foes** have a Monster die box in the foe editor, set by the GM. Capturing a foe carries its die over to the new Pokémon.
 - **Mega forms have their own die.** Open the Mega form editor and use **Mega Monster die**. While a Pokémon is Mega Evolved, that die is used, and if it is blank the roll stops. It does not fall back to the base form's die.
+
+## Updating NPC teams to the 3.5 handbook (Update 42)
+
+NPC teams were filled in from the handbook when they were imported, so they still carry the old stats. The GM Desk now has an **NPC teams and the handbook** panel under Pokémon HP.
+
+1. **Scan NPC teams** checks every NPC Pokémon, including each growth stage, against the handbook you imported. Nothing is written yet. It lists each Pokémon that differs and what differs (types, base stats, HP, size or weight, passives, skills, moves), and any species or moves the handbook does not have.
+2. **Download a backup first** saves all NPC teams to a file, in case you want to compare.
+3. **Update** writes the changes.
+
+What changes: types, base stats, HP, size, weight, skills, passives and the numbers on each move (frequency, kind, range, type, damage dice, text). What stays: nickname, notes, held item, Mega details, the moves each NPC chose, and how many uses of a move are spent. Moves or species the handbook doesn't list are left as they are and shown in the scan. HP uses the table's multiplier, and damage already taken stays in proportion.

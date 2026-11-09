@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-09 · Monster die rolls';
+const BUILD='2026-11-09 · NPC refresh';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -1607,6 +1607,132 @@ function hpxDesk(){
       <button class="btn primary" data-act="hpx_apply">Set all ${list.length} to ×${want} HP</button></div>`
       :h`<p class="sub"><b>Every Pokémon on the site is at ×${want} HP.</b> New ones filled in from the handbook use it automatically.</p>`}
   </section>`;
+}
+
+/* ---------- GM Desk: bring NPC teams up to the current handbook ----------
+   NPC teams were filled in from the handbook when they were imported, so they keep whatever that book said then.
+   This scans every team (and each growth stage), shows what would change, and only then writes it. A Pokémon keeps its
+   nickname, notes, held item, Mega details and the moves the NPC chose; each of those moves takes its numbers from the handbook. */
+S.ui.nr=S.ui.nr||{};
+function nrTeams(){
+  const out=[];
+  Object.keys(S.gmNt||{}).forEach(nid=>{
+    const nt=S.gmNt[nid];
+    if(!nt)return;
+    if(Array.isArray(nt.team)&&nt.team.length)out.push({nid,nt,stage:-1,label:'',list:nt.team});
+    (Array.isArray(nt.stages)?nt.stages:[]).forEach((st,j)=>{if(st&&Array.isArray(st.team)&&st.team.length)out.push({nid,nt,stage:j,label:String(st.label||'')||(num(st.bd)+' badges'),list:st.team});});
+  });
+  return out;
+}
+async function nrRec(sp){
+  const pr=ptaResolve(sp);
+  if(!pr)return null;
+  return ptaRec(pr)||await ptaChunk(ptaLetter(ptaKey(pr))).then(()=>ptaRec(pr));
+}
+/* the Pokémon as the current handbook has it, and what differs */
+function nrRefresh(m,rec){
+  const F=ptaFields(rec);
+  const bits=[];
+  const curT=[(m.ty||[])[0]||'',(m.ty||[])[1]||''];
+  const typeCh=!sameArr(curT,F.types);
+  const stCh=!sameArr(baseList(m.base),baseList(F.base));
+  const oldMax=num(m.hp&&m.hp.max),oldCur=num(m.hp&&m.hp.cur);
+  const hpCh=oldMax!==F.hp;
+  const szCh=(m.sz||'Medium')!==F.size||(m.wt||'Medium')!==F.weight;
+  const psCh=namesOf((m.ps||[]).map(x=>({name:x.name})))!==namesOf(F.passives);
+  const skCh=String(m.sk||'')!==F.skills;
+  const nat=new Map(F.moves.map(x=>[dexKey(x.name),x]));
+  const L=PTA.lists;
+  let mvCh=0,mvMiss=[];
+  const mv=(m.mv||[]).map(x=>{
+    const k=dexKey(x.name);
+    const def=nat.get(k)||(L&&L.moveMap&&L.moveMap.get(k)?(d=>({name:d.n,freq:d.f||'At-Will',kind:d.k||'Physical',range:d.r||'',type:d.t||'Normal',dice:d.d||'',text:d.x||''}))(L.moveMap.get(k)):null);
+    if(!def){mvMiss.push(x.name);return x;}
+    const nx=Object.assign({},x,{name:def.name,freq:def.freq,kind:def.kind,range:def.range,type:def.type,dice:def.dice,text:def.text});
+    if(sigMv([x])!==sigMv([nx]))mvCh++;
+    return nx;
+  });
+  if(typeCh)bits.push('types '+curT.filter(Boolean).join('/')+' → '+F.types.filter(Boolean).join('/'));
+  if(stCh)bits.push('base stats');
+  if(hpCh)bits.push('HP '+oldMax+' → '+F.hp);
+  if(szCh)bits.push('size or weight');
+  if(psCh)bits.push('passives');
+  if(skCh)bits.push('skills');
+  if(mvCh)bits.push(mvCh+' move'+(mvCh===1?'':'s')+' updated');
+  const mon=Object.assign({},m,{sp:rec.n,ty:F.types.slice(),sz:F.size,wt:F.weight,base:Object.assign({},m.base||{},F.base),sk:F.skills,ps:F.passives.map(x=>Object.assign({},x)),mv,hpx:hpx(),
+    hp:Object.assign({},m.hp||{},{max:F.hp,cur:oldCur<=0?0:(oldMax>0&&oldCur<oldMax?clamp(Math.round(oldCur*F.hp/oldMax),1,F.hp):F.hp)})});
+  return {mon,bits,miss:mvMiss};
+}
+async function nrScan(){
+  const u=S.ui.nr;
+  if(u.busy||!S.me.admin)return;
+  u.busy=true;u.msg='';render();
+  try{
+    if(!PTA.lists)await ptaLists();
+    const rows=[],unk=[];let total=0,same=0;
+    for(const g of nrTeams()){
+      for(const m of g.list){
+        if(!m||!String(m.sp||'').trim())continue;
+        total++;
+        const rec=await nrRec(m.sp);
+        if(!rec){unk.push(String(m.sp)+' ('+ntName(g.nt)+')');continue;}
+        const r=nrRefresh(m,rec);
+        if(!r.bits.length&&!r.miss.length){same++;continue;}
+        rows.push({who:ntName(g.nt)+(g.label?' · '+g.label:''),sp:m.nick?m.nick+' ('+rec.n+')':rec.n,bits:r.bits,miss:r.miss});
+      }
+    }
+    Object.assign(u,{rows,unk,total,same,done:true});
+  }catch(e){u.msg='The scan stopped. Try again.';u.bad=true;}
+  u.busy=false;render();
+}
+async function nrApply(){
+  const u=S.ui.nr;
+  if(u.busy||!S.me.admin)return;
+  u.busy=true;render();
+  let n=0,npcs=0;
+  try{
+    if(!PTA.lists)await ptaLists();
+    const fix=async list=>{const out=[];for(const m of list){const rec=m&&String(m.sp||'').trim()?await nrRec(m.sp):null;if(!rec){out.push(m);continue;}const r=nrRefresh(m,rec);if(r.bits.length)n++;out.push(r.mon);}return out;};
+    for(const nid of Object.keys(S.gmNt||{})){
+      const nt=S.gmNt[nid];
+      if(!nt)continue;
+      let touched=false;
+      if(Array.isArray(nt.team)&&nt.team.length){edit('gt',nid,'team',await fix(nt.team));touched=true;}
+      if(Array.isArray(nt.stages)&&nt.stages.length){const st=[];for(const s of nt.stages)st.push(s&&Array.isArray(s.team)?Object.assign({},s,{team:await fix(s.team)}):s);edit('gt',nid,'stages',st);touched=true;}
+      if(touched)npcs++;
+    }
+    u.msg='Updated '+n+' Pokémon on '+npcs+' NPCs from the current handbook.';u.bad=false;u.done=false;u.rows=[];
+  }catch(e){u.msg='The update stopped part way ('+((e&&e.code)||'error')+'). Scan again to see what is left.';u.bad=true;}
+  u.busy=false;render();
+}
+function nrBackup(){
+  if(!S.dl)return;
+  const npcs={};
+  Object.keys(S.gmNt||{}).forEach(id=>{const nt=S.gmNt[id];if(nt&&(ntTeam(nt).length||(nt.stages||[]).length))npcs[id]={name:nt.name||'',team:nt.team||[],stages:nt.stages||[]};});
+  S.dl.save({filename:'sinnoh-npc-teams-backup.json',data:JSON.stringify({format:'sinnoh-npc-teams-backup',v:1,npcs})}).then(()=>{S.ui.nr.msg='Backup saved.';S.ui.nr.bad=false;render();}).catch(e=>{if(!e||e.code!=='declined'){S.ui.nr.msg='The backup could not be saved.';S.ui.nr.bad=true;render();}});
+}
+function nrAct(b){
+  switch(b.dataset.act){
+    case 'nr_scan':nrScan();break;
+    case 'nr_apply':nrApply();break;
+    case 'nr_backup':nrBackup();break;
+  }
+}
+function nrDesk(){
+  const u=S.ui.nr;
+  const teams=nrTeams().reduce((a,g)=>a+g.list.length,0);
+  return h`<section class="panel"><div class="ph"><h2>NPC teams and the handbook</h2><span class="pill gm">GM only</span>
+      <div class="acts"><button class="btn sm" data-act="nr_scan" ${u.busy||!PTA.idx?raw('disabled'):''}>${u.busy?'Working…':u.done?'Scan again':'Scan NPC teams'}</button></div></div>
+    <p class="sub">NPC teams keep the stats, passives and move details from when they were imported. This checks every NPC Pokémon (${teams} on the site, including growth stages) against the current handbook and shows what would change before anything is written. Nicknames, notes, held items, Mega details and each NPC’s chosen moves are kept.</p>
+    ${PTA.idx?'':h`<p class="sub">Import the handbook data above first.</p>`}
+    ${u.msg?h`<p class="sub ${u.bad?'bad':''}" role="status">${u.msg}</p>`:''}
+    ${u.done?(u.rows.length||u.unk.length?h`<div class="hpxgo" role="status">
+      <p><b>${u.rows.length}</b> of ${u.total} NPC Pokémon differ from the handbook${u.same?'; '+u.same+' already match':''}.</p>
+      ${u.rows.length?h`<ul class="mini-list">${u.rows.slice(0,40).map(r=>h`<li><b>${r.sp}</b> <span class="sub">${r.who}: ${r.bits.join(', ')||'no changes'}${r.miss.length?'. Not in the handbook, kept as is: '+r.miss.join(', '):''}</span></li>`)}</ul>${u.rows.length>40?h`<p class="sub">…and ${u.rows.length-40} more.</p>`:''}`:''}
+      ${u.unk.length?h`<p class="sub">Not found in the handbook, left alone: ${u.unk.slice(0,12).join(', ')}${u.unk.length>12?' and '+(u.unk.length-12)+' more':''}.</p>`:''}
+      ${u.rows.length?h`<div class="row"><button class="btn sm" data-act="nr_backup" ${S.dl?'':raw('disabled')}>Download a backup first</button><button class="btn primary" data-act="nr_apply" ${u.busy?raw('disabled'):''}>Update ${u.rows.length} Pokémon</button></div><p class="sub">Their HP uses the table’s ×${hpx()} multiplier, and damage already taken stays in proportion.</p>`:''}</div>`
+      :h`<p class="sub"><b>Every NPC Pokémon already matches the handbook.</b></p>`):''}
+  </section>`
 }
 
 function ptaDesk(){
@@ -10670,6 +10796,7 @@ function gmTab(){
     </div>
     <p class="sub">The banner is changed from the Overview page, the map from the Map page, and NPCs with portraits are added on the People page. Their secret notes are only visible to you.</p></section>
   ${hpxDesk()}
+  ${nrDesk()}
   ${CFG?tableAccess():''}
   ${awardForm()}${awardHistory()}
   ${megaDesk()}
@@ -12883,6 +13010,7 @@ function act(b,e){
   if(d.act&&d.act.indexOf('en_')===0){encAct(b);return;}
   if(d.act&&d.act.indexOf('cc_')===0){ccAct(b);return;}
   if(d.act&&d.act.indexOf('hpx_')===0){hpxAct(b);return;}
+  if(d.act&&d.act.indexOf('nr_')===0){nrAct(b);return;}
   if(d.act&&d.act.indexOf('cd_')===0){cdAct(b);return;}
   if(d.act&&d.act.indexOf('cl_')===0){clAct(b);return;}
   if(d.act&&d.act.indexOf('rk_')===0){rkAct(b);return;}
