@@ -753,3 +753,13 @@ NPC teams were filled in from the handbook when they were imported, so they stil
 3. **Update** writes the changes.
 
 What changes: types, base stats, HP, size, weight, skills, passives and the numbers on each move (frequency, kind, range, type, damage dice, text). What stays: nickname, notes, held item, Mega details, the moves each NPC chose, and how many uses of a move are spent. Moves or species the handbook doesn't list are left as they are and shown in the scan. HP uses the table's multiplier, and damage already taken stays in proportion.
+
+## Alpha, Totem and Titan foes (Update 43)
+
+Open a foe's sheet in the battle. The GM sees a **Kind** row with **Normal / Alpha / Totem / Titan**. Pick one and the PTA GM Guide rules are applied; pick Normal to undo it. Players never see the label.
+
+- **Alpha:** HP ×2, +5 Atk and Sp. Atk, the better of Def and Sp. Def raised to 15, Alpha moves and the Alpha Tenacity passive.
+- **Totem:** same stat boost, with Totemic Spirit and the Totemic Power, Call and Guardian moves.
+- **Titan:** max HP ×10, size at least Huge, weight Superweight, Titan moves and Titanic Vitality. Only a Master Ball can capture it.
+- Switching kinds keeps the foe's current HP in proportion.
+- **Capture or Give to a trainer:** Alpha gets the passive Alpha, Totem gets the move Totem Memory, Titan shrinks one size above its species, gains the Titanic passive and +18 max HP.

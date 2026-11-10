@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-09 · NPC refresh';
+const BUILD='2026-11-10 · Alpha, Totem, Titan';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -3242,7 +3242,7 @@ async function btAddFoe(){
   u.foeSp='';u.foeNick='';u.foeN=1;
   render();
 }
-/* ----- alpha Pokémon (PTA GM Guide): the wild aura, doubled HP and stronger stats while wild ----- */
+/* ----- Alpha, Totem and Titan Pokémon (PTA GM Guide, Encounter Building). The GM can set a kind on any foe, even one already in the battle, and undo it. ----- */
 const ALPHA_PS=[
   {name:'Wild Alpha Aura',text:'While wild, this Pokémon has Alpha Beam, Alpha Impact and Alpha Restoration, the passive Alpha Tenacity and the stat passive Wild Might. It loses the aura if it is captured.'},
   {name:'Alpha Tenacity',text:'Cannot be captured by non-Master Poké Balls unless it is at half of its max HP or lower. It is always treated as at full HP when working out the capture rate.'},
@@ -3253,27 +3253,105 @@ const ALPHA_MV=[
   {name:'Alpha Impact',freq:'1/day',kind:'Physical',range:'Melee (10ft burst)',type:'Normal',dice:'5d20',text:'Needs a recharge turn afterwards. −2 on the Accuracy Check.',used:0},
   {name:'Alpha Restoration',freq:'3/day',kind:'Effect',range:'Self',type:'Normal',dice:'',text:'You are healed 1d12 HP. Your uses of Alpha Beam and Alpha Impact are restored as if you had rested.',used:0}
 ];
-const ALPHA_NAMES=new Set(['Wild Alpha Aura','Alpha Tenacity','Wild Might','Alpha Beam','Alpha Impact','Alpha Restoration']);
-function foeMakeAlpha(f){
-  if(!f||f.alpha)return f;
+const TOTEM_PS=[
+  {name:'Wild Totem Spirit',text:'While wild, this Pokémon has Totemic Power, Totemic Call and Totemic Guardian, the passive Totemic Tenacity and the stat passive Totemic Spirit. It loses them if it is captured.'},
+  {name:'Totemic Tenacity',text:'Cannot be captured by non-Master Poké Balls unless it is at half of its max HP or lower. It is always treated as at full HP when working out the capture rate.'},
+  {name:'Totemic Spirit',text:'HP doubled, +5 Attack, +5 Special Attack, and Defense or Special Defense raised to 15.'}
+];
+const TOTEM_MV=[
+  {name:'Totemic Power',freq:'1/day',kind:'Effect',range:'Ranged (25ft burst)',type:'Normal',dice:'',text:'All allies (up to 10 including yourself) within range have their Attack and Special Attack raised +2 for 10 minutes. Totemic Power can stack.',used:0},
+  {name:'Totemic Call',freq:'At-Will',kind:'Effect',range:'Self',type:'Normal',dice:'',text:'If you have 2 or more allies with you in combat, Totemic Call fails. Summon 1d4 allies to the encounter. The allies who show up have their Attack and Special Attack raised 2 for 10 minutes.',used:0},
+  {name:'Totemic Guardian',freq:'3/day',kind:'Special',range:'Ranged (25ft burst)',type:'Normal',dice:'3d8',text:'Attack or Special Attack. All allies (up to 10 including yourself) within range are healed HP equal to the amount of damage Totemic Guardian would have dealt.',used:0}
+];
+const TITAN_PS=[
+  {name:'Titan Mystica',text:'Cannot be captured by non-Master Poké Balls. Size and weight are increased to at least Huge.'},
+  {name:'Massive Impacts',text:'Single-target melee attacks have their range changed to Ranged (15ft Burst), and ranged attacks gain (15ft Blast) if they did not already have a Blast radius or any other special range modifier.'},
+  {name:'Titanic Vitality',text:'Max HP is multiplied by 10.'}
+];
+const KIND_DEF={
+  alpha:{label:'Alpha',ps:ALPHA_PS,mv:ALPHA_MV,mul:2,stat:1,title:'Wild Might'},
+  totem:{label:'Totem',ps:TOTEM_PS,mv:TOTEM_MV,mul:2,stat:1,title:'Totemic Spirit'},
+  titan:{label:'Titan',ps:TITAN_PS,mv:[],mul:10,stat:0,title:'Titanic Vitality'}
+};
+const ALPHA_NAMES=new Set([].concat(ALPHA_PS,TOTEM_PS,TITAN_PS,ALPHA_MV,TOTEM_MV).map(x=>x.name));
+const FOE_SIZES=['Tiny','Small','Medium','Large','Huge','Gigantic'];
+/* which kind a foe is: alpha, totem, titan or '' (older foes only have the alpha flag) */
+const foeKind=f=>f?(KIND_DEF[f.kind]?f.kind:(f.alpha?'alpha':'')):'';
+/* takes a kind off a foe: HP, stat adjustments, size, passives, moves, name and note go back */
+function foeKindUndo(f){
+  const k=foeKind(f);
+  if(!k)return f;
+  const d=KIND_DEF[k],kd=f.kd&&typeof f.kd==='object'?f.kd:{};
+  const mul=num(kd.mul)||d.mul;
+  const hp=f.hp||{cur:20,max:20};
+  let mx=Math.max(1,Math.round(num(hp.max)/mul));
+  if(!num(kd.mul)&&num(f.alMax)>0)mx=num(f.alMax);
+  const cu=num(hp.cur);
+  f.hp={cur:cu<=0?0:Math.max(1,Math.min(mx,Math.round(cu/mul))),max:mx};
+  if(d.stat){
+    const bn=Object.assign(zeroStats(),f.bonus||{});
+    bn.atk=num(bn.atk)-5;bn.spa=num(bn.spa)-5;
+    if(kd.dk&&num(kd.da))bn[kd.dk]=num(bn[kd.dk])-num(kd.da);
+    f.bonus=bn;
+  }
+  if(kd.sz)f.sz=kd.sz;
+  if(kd.wt)f.wt=kd.wt;
+  f.ps=(f.ps||[]).filter(x=>!ALPHA_NAMES.has(x.name));
+  f.mv=(f.mv||[]).filter(x=>!ALPHA_NAMES.has(x.name));
+  if(kd.nick){if(f.nick===kd.nick)f.nick='';}
+  else if(k==='alpha'&&f.nick==='Alpha '+(f.sp||''))f.nick='';
+  let nt=String(f.notes||'');
+  if(kd.note)nt=nt.replace('\n'+kd.note,'').replace(kd.note,'');
+  else nt=nt.split('\n').filter(x=>x.indexOf('ALPHA. Wild Might')!==0).join('\n');
+  f.notes=nt;
+  f.kind='';f.kd={};f.alpha=0;f.alMax=0;
+  return f;
+}
+/* sets a kind on a foe. Any kind it already has is taken off first, so switching is clean. */
+function foeKindApply(f,k){
+  const d=KIND_DEF[k];
+  if(!f||!d)return f;
+  foeKindUndo(f);
+  const kd={mul:d.mul};
+  const hp=f.hp||{cur:20,max:20};
+  const mx=Math.max(1,num(hp.max)),cu=Math.max(0,num(hp.cur));
+  f.hp={cur:cu*d.mul,max:mx*d.mul};
   const bs=f.base||{};
   const bn=Object.assign(zeroStats(),f.bonus||{});
-  const hp=f.hp||{cur:20,max:20};
-  const mx=Math.max(1,num(hp.max));
-  f.alMax=mx;
-  f.hp={cur:mx*2,max:mx*2};
-  bn.atk=num(bn.atk)+5;bn.spa=num(bn.spa)+5;
-  /* Wild Might raises Defense or Special Defense to 15. The better one is raised, and the GM can change the Adj boxes. */
-  const dk=num(bs.def)+num(bn.def)>=num(bs.spd)+num(bn.spd)?'def':'spd';
-  const cur=num(bs[dk])+num(bn[dk]);
-  if(cur<15)bn[dk]=num(bn[dk])+15-cur;
+  let note=k==='titan'?'TITAN. Titanic Vitality: max HP ×10, size and weight at least Huge, melee attacks become 15 ft bursts. It cannot be caught with a normal ball.':'';
+  if(d.stat){
+    bn.atk=num(bn.atk)+5;bn.spa=num(bn.spa)+5;
+    /* the better of Defense and Special Defense is raised to 15; change the Adj boxes if you want the other one */
+    const dk=num(bs.def)+num(bn.def)>=num(bs.spd)+num(bn.spd)?'def':'spd';
+    const cur=num(bs[dk])+num(bn[dk]);
+    if(cur<15){bn[dk]=num(bn[dk])+15-cur;kd.dk=dk;kd.da=15-cur;}
+    note=k.toUpperCase()+'. '+d.title+': HP doubled, +5 Attack and Special Attack, '+(dk==='def'?'Defense':'Special Defense')+' raised to 15 (change the Adj boxes if you want the other one).';
+  }
   f.bonus=bn;
-  f.ps=(f.ps||[]).concat(ALPHA_PS.map(x=>Object.assign({},x)));
-  f.mv=(f.mv||[]).concat(ALPHA_MV.map(x=>Object.assign({},x)));
-  f.alpha=1;
-  if(!String(f.nick||'').trim())f.nick='Alpha '+(f.sp||'');
-  f.notes=(f.notes?f.notes+'\n':'')+'ALPHA. Wild Might: HP doubled, +5 Attack and Special Attack, '+(dk==='def'?'Defense':'Special Defense')+' raised to 15 (change the Adj boxes if you want the other one).';
+  if(k==='titan'){
+    kd.sz=f.sz||'Medium';kd.wt=f.wt||'Medium';
+    if(FOE_SIZES.indexOf(f.sz||'Medium')<4)f.sz='Huge';
+    if(WEIGHTS.indexOf(f.wt||'Medium')<4)f.wt='Superweight';
+  }
+  f.ps=(f.ps||[]).concat(d.ps.map(x=>Object.assign({},x)));
+  f.mv=(f.mv||[]).concat(d.mv.map(x=>Object.assign({},x)));
+  if(!String(f.nick||'').trim()){f.nick=d.label+' '+(f.sp||'');kd.nick=f.nick;}
+  if(note){kd.note=note;f.notes=(f.notes?f.notes+'\n':'')+note;}
+  f.kind=k;f.kd=kd;f.alpha=d.stat?1:0;f.alMax=d.stat?mx:0;
   return f;
+}
+function foeMakeAlpha(f){return f&&!foeKind(f)?foeKindApply(f,'alpha'):f;}
+/* the GM's switch on a foe's sheet */
+function foeSetKind(cid,k){
+  if(!S.me.admin)return;
+  const f=foeOf(cid);
+  if(!f)return;
+  const nf=JSON.parse(JSON.stringify(f));
+  if(k&&KIND_DEF[k])foeKindApply(nf,k);else foeKindUndo(nf);
+  edit('gb','battle','foes.'+cid,nf);
+  foePublish(cid);
+  toast((nf.nick||nf.sp||'The foe')+(k&&KIND_DEF[k]?' is now a '+KIND_DEF[k].label+'.':' is back to normal.'),true);
+  render();
 }
 /* n hidden foes of one species, from the handbook data when it has the species. note goes on each foe's secret sheet. */
 async function btAddFoeSp(sp,n,nick,note,opts){
@@ -3286,7 +3364,7 @@ async function btAddFoeSp(sp,n,nick,note,opts){
     const cid=newCid();
     const base=foeFromRec(rec,si,sp);
     const f=Object.assign({nick:nick||'',bonus:zeroStats(),stages:zeroStats(),st:'',notes:note||'',sh:Object.assign({},SHOW_NONE),pn:foeLetter()},base);
-    if(opts&&opts.alpha)foeMakeAlpha(f);
+    if(opts&&opts.alpha)foeKindApply(f,'alpha');else if(opts&&opts.kind)foeKindApply(f,opts.kind);
     edit('gb','battle','foes.'+cid,f);
     btInsert(cid,{s:'f',pub:foePub(f)},fSpd(f)+(b.mode==='d20'?rnd(20):0),rnd(20));
   }
@@ -3474,26 +3552,34 @@ function foeGive(cid){
   const uid=S.ui.bt.giveTo&&S.trainers[S.ui.bt.giveTo]?S.ui.bt.giveTo:tids()[0];
   if(!f||!uid)return;
   const id=S.db.collection('trainers').doc(uid).collection('pokemon').doc().id;
-  let hp=f.hp||{cur:20,max:20};
-  let nick=f.nick||'',ps=(f.ps||[]).map(x=>Object.assign({},x)),mv=(f.mv||[]).map(x=>Object.assign({},x,{used:0}));
-  const wasAlpha=!!f.alpha;
-  if(wasAlpha){
-    /* a captured alpha loses its aura and its doubled HP, and gains the stat passive Alpha */
-    const mx=Math.max(1,num(f.alMax)||Math.round(num(hp.max)/2));
-    hp={cur:Math.min(num(hp.cur),mx),max:mx};
-    ps=ps.filter(x=>!ALPHA_NAMES.has(x.name));
-    mv=mv.filter(x=>!ALPHA_NAMES.has(x.name));
+  /* a captured Alpha, Totem or Titan loses what the wild gave it (GM Guide) and gains the small thing it keeps */
+  const g=JSON.parse(JSON.stringify(f));
+  const k0=foeKind(g);
+  if(k0)foeKindUndo(g);
+  let hp=g.hp||{cur:20,max:20};
+  let nick=g.nick||'',ps=(g.ps||[]).map(x=>Object.assign({},x)),mv=(g.mv||[]).map(x=>Object.assign({},x,{used:0}));
+  let sz=g.sz||'Medium',note='';
+  if(k0==='alpha'){
     ps.push({name:'Alpha',text:'+1 Attack or +1 Special Attack, and +1 Defense or +1 Special Defense. Once chosen, the bonuses cannot be changed.'});
-    if(nick==='Alpha '+(f.sp||''))nick='';
+    note=' It lost the alpha aura and has the passive Alpha: choose its +1 bonuses on its sheet. If it now has four stat passives, one must go.';
+  }else if(k0==='totem'){
+    mv.push({name:'Totem Memory',freq:'1/day',kind:'Effect',range:'Ranged (25ft burst)',type:'Normal',dice:'',text:'All allies (up to 10 including yourself) within range have their Attack or Special Attack raised +2 for 10 minutes. If you ever replace Totem Memory on your move list, it can never be learned again.',used:0});
+    note=' It lost its totem powers and has the move Totem Memory.';
+  }else if(k0==='titan'){
+    ps.push({name:'Titanic',text:'Your Max HP is increased by 18. If Titanic is ever removed, it can never be learned again.'});
+    hp={cur:num(hp.cur)>0?num(hp.cur)+18:0,max:num(hp.max)+18};
+    const i=FOE_SIZES.indexOf(sz);
+    if(i>=0&&i<FOE_SIZES.length-1)sz=FOE_SIZES[i+1];
+    note=' It shrank to one size above its species and has the passive Titanic (+18 max HP). If it now has four stat passives, one must go.';
   }
   newDoc('p',uid+'/'+id,blankMon(uid,Object.assign({
-    nick,species:f.sp||'',types:[(f.ty||[])[0]||'',(f.ty||[])[1]||''],size:f.sz||'Medium',weight:f.wt||'Medium',
+    nick,species:f.sp||'',types:[(f.ty||[])[0]||'',(f.ty||[])[1]||''],size:sz,weight:g.wt||'Medium',
     hp:{cur:Math.max(1,num(hp.cur)),max:Math.max(1,num(hp.max))},base:Object.assign({atk:3,def:3,spa:3,spd:3,spe:3},f.base),
     skills:f.sk||'',passives:ps,moves:mv,
     item:f.item||'',up:f.up||'',down:f.down||'',natureName:f.natureName||'',gender:f.gender||'',die:f.die||'',shiny:f.shiny===true,mega:f.mega?JSON.parse(JSON.stringify(f.mega)):null,
     caught:'Caught in the wild, session '+(num(S.meta.session)||1)
   },f.hpx?{hpx:num(f.hpx)}:{})));
-  toast((f.sp||'The foe')+' now belongs to '+tName(S.trainers[uid])+'.'+(wasAlpha?' It lost the alpha aura and has the passive Alpha: choose its +1 bonuses on its sheet. If it now has four stat passives, one must go.':''),true);
+  toast((f.sp||'The foe')+' now belongs to '+tName(S.trainers[uid])+'.'+note,true);
   btRemove(cid);
 }
 
@@ -3525,7 +3611,7 @@ function btRow(cid,idx,gm,turn){
     <div class="bmain">
       <span class="bn" aria-label="Position ${idx+1}">${idx+1}</span>
       <span class="bpic"><span class="spr bs ${v.side==='f'&&!v.pic?'unk':''}" ${v.side==='a'?typeVars(v.m):typeVars({types:v.types||[]})}>${v.side==='a'?monPic(v.m):foePic(v)}</span></span>
-      <div class="btx"><b class="bnm">${v.name}</b>${turn?h` <span class="pill good">Acting</span>`:''}${secret&&v.f.alpha?h` <span class="pill encal">Alpha</span>`:''}${v.down?h` <span class="pill">Down</span>`:''}
+      <div class="btx"><b class="bnm">${v.name}</b>${turn?h` <span class="pill good">Acting</span>`:''}${secret&&foeKind(v.f)?h` <span class="pill encal">${KIND_DEF[foeKind(v.f)].label}</span>`:''}${v.down?h` <span class="pill">Down</span>`:''}
         <span class="sub">${sub}${ini!=null&&ini!==0?' · initiative '+ini:''}</span>
         <div class="types">${types}${hidden?h`<span class="pill">Types unknown</span>`:''}${v.mega||v.mg?h`<span class="pill mega">Mega</span>`:''}${v.itemTxt&&v.side==='f'?h`<span class="pill">Holding ${v.itemTxt}</span>`:''}${v.status?h`<span class="pill status">${v.status}</span>`:''}${v.stages?stgPills({stages:v.stages}):''}${secret?h`<span class="pill gm">GM sheet</span>`:''}</div></div>
       <div class="bhp">${btHpView(v)}</div>
@@ -3596,6 +3682,9 @@ function btFoeBody(cid,v,idx){
       ${fSel('Nature raises','gb','battle',P+'up',S.battleGm,STAT_OPTS,{blank:'None'})}
       ${fSel('Nature lowers','gb','battle',P+'down',S.battleGm,STAT_OPTS,{blank:'None'})}
     </div>
+    <div class="mgd secret fkind"><span class="fl">GM only · Alpha, Totem or Titan</span>
+      <div class="row evchips" role="group" aria-label="Kind of wild Pokémon">${[['','Normal'],['alpha','Alpha'],['totem','Totem'],['titan','Titan']].map(([k,l])=>h`<button class="btn sm chk" data-act="b_kind" data-cid="${cid}" data-k="${k}" aria-pressed="${String(foeKind(f)===k)}">${l}</button>`)}</div>
+      <p class="sub">${foeKind(f)?'Doubled HP, stat bonuses, new passives and moves are in place (Titan: HP ×10 and Huge size). Choose Normal to undo them.':'Choose a kind to apply the PTA GM Guide rules to this foe. You can undo it at any time.'}</p></div>
     <div class="stats">${STATS.map(s=>h`<div class="stat lcd"><span class="sl">${s[2]}</span><span class="sv">${fStat(f,s[0])}</span><span class="sm"><span>mod ${sgn(mod(fStat(f,s[0])))}</span>${megaBonus(f,s[0])?h`<span class="mbn">Mega ${sgn(megaBonus(f,s[0]))}</span>`:''}</span>
       <div class="mini"><label>Base<input type="number" ${bd('gb','battle',P+'base.'+s[0])} value="${num(f.base&&f.base[s[0]])}"></label><label>Adj<input type="number" ${bd('gb','battle',P+'bonus.'+s[0])} value="${num(f.bonus&&f.bonus[s[0]])}"></label></div></div>`)}</div>
     <div class="fl">Status</div>${afflChips('gb','battle',P+'st',f.st,false,cid)}${afflNotes(f.st)}
@@ -3743,6 +3832,7 @@ function batAct(b,e){
       edit('gb','battle','foes.'+d.cid+'.sh',Object.assign({},d.v==='all'?SHOW_ALL:SHOW_NONE));
       foePublish(d.cid);render();break;}
     case 'b_give':foeGive(d.cid);break;
+    case 'b_kind':foeSetKind(d.cid,d.k||'');break;
     case 'b_mgadd':case 'b_mgform':case 'b_mgreset':case 'b_mgdrop':case 'b_mgo':case 'b_mgr':mgAct('foe',d.act.slice(2),d);break;
     case 'b_giveMon':giveMon();break;
     case 'b_apply':applyRoll(d.src,d.id);break;
@@ -6457,7 +6547,7 @@ function ccFillFrom(f){
   c.cur=String(num(f.hp&&f.hp.cur));c.max=String(num(f.hp&&f.hp.max));
   c.aff={};
   afflList(f.st).forEach(a=>{const k=Object.keys(CC_AFF).find(x=>dexKey(x)===dexKey(a));if(k)c.aff[k]=true;});
-  c.alpha=!!f.alpha;
+  c.alpha=foeKind(f)==='alpha'||foeKind(f)==='totem';c.titan=foeKind(f)==='titan';
   c.res=null;
 }
 function ccInput(opts){
@@ -6520,7 +6610,7 @@ function ccFoeLine(cid,f){
   const r=(()=>{
     const ra=ccRarityOf(f.sp),sg=ccStageOf(f.sp);
     const aff={};afflList(f.st).forEach(a=>{const k=Object.keys(CC_AFF).find(x=>dexKey(x)===dexKey(a));if(k)aff[k]=true;});
-    return ccCalc(Object.assign({},sv,{rar:ra||sv.rar,stage:sg||sv.stage,hpm:'num',cur:String(num(f.hp&&f.hp.cur)),max:String(num(f.hp&&f.hp.max)),aff,alpha:!!f.alpha,titan:false}));
+    return ccCalc(Object.assign({},sv,{rar:ra||sv.rar,stage:sg||sv.stage,hpm:'num',cur:String(num(f.hp&&f.hp.cur)),max:String(num(f.hp&&f.hp.max)),aff,alpha:foeKind(f)==='alpha'||foeKind(f)==='totem',titan:foeKind(f)==='titan'}));
   })();
   return h`<div class="row cc1"><span class="sub">Catch chance now with ${r.ballName}: <b class="mono">${ccPct(r.chance)}</b>${r.blocked?' (not with this ball)':''}</span><button class="btn sm" data-act="cc_use" data-cid="${cid}">Open in calculator</button></div>`;
 }
