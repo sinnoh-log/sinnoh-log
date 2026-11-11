@@ -763,3 +763,23 @@ Open a foe's sheet in the battle. The GM sees a **Kind** row with **Normal / Alp
 - **Titan:** max HP ×10, size at least Huge, weight Superweight, Titan moves and Titanic Vitality. Only a Master Ball can capture it.
 - Switching kinds keeps the foe's current HP in proportion.
 - **Capture or Give to a trainer:** Alpha gets the passive Alpha, Totem gets the move Totem Memory, Titan shrinks one size above its species, gains the Titanic passive and +18 max HP.
+
+## Monster die filled in from the handbook (Update 44)
+
+The handbook lists a Monster die for most species (1d4 to 1d12). It is now filled in for you:
+
+- **Foes** added to a battle start with their species' die. Capturing or giving the foe to a trainer carries it over.
+- **NPC team Pokémon** get the die when the team is imported or refreshed.
+- **Players' Pokémon** take the die when the species is filled in. A blank die or the untouched d6 follows the handbook, and so does a die the handbook set earlier, for example after an evolution. A die the player picked stays. The **Fill** button replaces it, like the other fields.
+- **Existing Pokémon:** open the sheet. If the handbook die differs from the one set, a **Handbook die** button shows next to the Monster die box. Tap it to use it.
+- Species the handbook has no die for (Mewtwo, Mew, Silvally and some others), and Mega forms, are left as they are.
+
+## Trainers in the turn order (Update 45)
+
+Players' trainers now take a turn of their own on the Battle page, next to their Pokémon.
+
+- In **Who is fighting**, each trainer has a **(trainer)** button, and **Add trainer and party** adds the trainer and all of their Pokémon in one tap.
+- Initiative follows the battle's mode, as for Pokémon: highest Speed first in Speed mode, or a d20 plus Speed in d20 mode. A trainer's Speed is the **Spe** number on their trainer sheet.
+- A trainer's row shows their picture, HP and initiative. A player sees **Your turn** when it is their trainer's turn, and can change their own trainer's HP from the row. The GM can move them up or down, set **Acts now** or remove them, like any other row.
+- Damage applied from a roll to a trainer lowers the trainer's HP on their sheet.
+- On the map, the trainer's token lights up on their turn.

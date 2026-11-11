@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const BUILD='2026-11-10 · Alpha, Totem, Titan';
+const BUILD='2026-11-11 · Trainers in the turn order';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -1427,6 +1427,12 @@ function ptaResyncMegas(){
 }
 
 /* ---------- a handbook entry as the fields of a Pokémon sheet ---------- */
+/* the handbook writes a Monster die as 1d6, 1d8…; a sheet holds it as d6, d8… ('' when the handbook has none) */
+function ptaDie(r){
+  const m=/^\s*1?\s*d\s*(\d+)\s*$/i.exec(String(r&&r.dm||''));
+  const d=m?'d'+m[1]:'';
+  return DICE.indexOf(d)>=0?d:'';
+}
 function ptaFields(r){
   const t=(r.ty||[]).slice(0,2);
   const gloss=x=>x.t&&x.t.length<=48?x.n+' ('+x.t+')':x.n;
@@ -1434,6 +1440,7 @@ function ptaFields(r){
     types:[t[0]||'',t[1]||''],
     base:{atk:num(r.at),def:num(r.df),spa:num(r.sa),spd:num(r.sd),spe:num(r.sp)},
     hp:Math.round(num(r.hp)*hpx()),
+    die:ptaDie(r),
     size:SIZES.indexOf(r.sz)>=0?r.sz:'Medium',
     weight:WEIGHTS.indexOf(r.wt)>=0?r.wt:'Medium',
     skills:(r.sk||[]).map(gloss).join(', '),
@@ -1480,7 +1487,9 @@ function ptaApply(uid,pid,rec,force){
     wt:force||!m.weight||m.weight==='Medium'||was('wt',m.weight),
     sk:force||!String(m.skills||'').trim()||was('sk',String(m.skills||'')),
     ps:force||!ps.length||sig.ps===sigPs(ps),
-    mv:force||!mv.length||sig.mv===sigMv(mv)
+    mv:force||!mv.length||sig.mv===sigMv(mv),
+    /* a die that is blank, the sheet's untouched d6, or the one a fill set earlier is the handbook's to change; a die the player picked stays */
+    di:!!F.die&&(force||!m.die||was('di',String(m.die))||(m.die==='d6'&&!sig.di))
   };
   const kept=[];
   if(ok.ty){edit('p',id,'types',F.types.slice());sig.ty=hsh(F.types.join('/'));}else kept.push('types');
@@ -1490,6 +1499,7 @@ function ptaApply(uid,pid,rec,force){
     edit('p',id,'hp',Object.assign({},hp,{cur,max:F.hp}));sig.hp=hsh(String(F.hp));
     edit('p',id,'hpx',hpx());
   }else kept.push('HP');
+  if(ok.di){edit('p',id,'die',F.die);sig.di=hsh(F.die);}else if(F.die&&m.die!==F.die)kept.push('Monster die');
   if(ok.sz){edit('p',id,'size',F.size);sig.sz=hsh(F.size);}else kept.push('size');
   if(ok.wt){edit('p',id,'weight',F.weight);sig.wt=hsh(F.weight);}else kept.push('weight');
   if(ok.sk){edit('p',id,'skills',F.skills);sig.sk=hsh(F.skills);}else kept.push('skills');
@@ -1500,7 +1510,7 @@ function ptaApply(uid,pid,rec,force){
   edit('p',id,'autoPta',ptaKey(rec.n));
   if(si&&num(m.autoSid)!==si.sid)edit('p',id,'autoSid',si.sid);
   const mf=syncMega(uid,pid);
-  const bits=['Filled in '+rec.n+' from the handbook: '+F.types.filter(Boolean).join(' / ')+' · HP '+F.hp+' · '+F.passives.length+' passive'+(F.passives.length===1?'':'s')+' · '+F.moves.length+' move'+(F.moves.length===1?'':'s')+'.'];
+  const bits=['Filled in '+rec.n+' from the handbook: '+F.types.filter(Boolean).join(' / ')+' · HP '+F.hp+(F.die?' · Monster die '+F.die:'')+' · '+F.passives.length+' passive'+(F.passives.length===1?'':'s')+' · '+F.moves.length+' move'+(F.moves.length===1?'':'s')+'.'];
   if(kept.length)bits.push('Kept your '+kept.join(', ')+'.');
   if(mf)bits.push(mf+' details added.');
   toast(bits.join(' '),true);
@@ -3068,6 +3078,12 @@ function btInfo(cid,full){
       stat:{def:effStat(m,'def'),spd:effStat(m,'spd'),spe:spdOf(m)},stage:{def:stg(m,'def'),spd:stg(m,'spd')},
       hp:m.hp||{cur:0,max:0},down:num(m.hp&&m.hp.cur)<=0,status:m.status||'',stages:stgObj(m),showHp:2,pic:true};
   }
+  if(c.s==='t'){
+    const t=S.trainers[c.u];
+    if(!t)return null;
+    const hp=t.hp&&num(t.hp.max)>0?{cur:num(t.hp.cur),max:num(t.hp.max)}:null;
+    return {cid,side:'t',uid:c.u,tr:t,name:tName(t),owner:tName(t),types:[],stat:null,stage:null,hp,down:!!hp&&hp.cur<=0,status:'',stages:null,showHp:hp?2:0,pic:true};
+  }
   const f=full&&S.me.admin?foeOf(cid):null;
   if(f){
     return {cid,side:'f',f,name:foeLabel(f),pubName:foePub(f).n,types:foeTypes(f),mega:megaOn(f),ms:megaOn(f)?num(f.mega.sid):0,itemTxt:String(f.item||'').trim(),
@@ -3087,7 +3103,7 @@ function btOrder(){
   return (b.order||[]).filter(cid=>{
     const c=b.c&&b.c[cid];
     if(!c)return false;
-    return c.s==='a'?!!getLocal('p',c.r):true;
+    return c.s==='a'?!!getLocal('p',c.r):c.s==='t'?!!S.trainers[c.u]:true;
   });
 }
 const btIsDown=cid=>{
@@ -3098,6 +3114,7 @@ function btSpeed(cid){
   const c=btC(cid);
   if(!c)return 0;
   if(c.s==='a'){const m=getLocal('p',c.r);return m?spdOf(Object.assign({id:''},m)):0;}
+  if(c.s==='t'){const t=S.trainers[c.u];return t?num(t.stats&&t.stats.spe):0;}
   const f=foeOf(cid);
   return f?fSpd(f):0;
 }
@@ -3105,20 +3122,20 @@ function btSpeed(cid){
 function btIni(cid){
   const c=btC(cid);
   if(!c)return 0;
-  if(c.s==='a')return num(c.ini);
+  if(c.s==='a'||c.s==='t')return num(c.ini);
   const f=foeOf(cid);
   return f?num(f.ini):0;
 }
 function btSetIni(cid,ini,tb){
   const c=btC(cid);
   if(!c)return;
-  if(c.s==='a'){edit('bt','battle','c.'+cid+'.ini',ini);edit('bt','battle','c.'+cid+'.tb',tb);}
+  if(c.s==='a'||c.s==='t'){edit('bt','battle','c.'+cid+'.ini',ini);edit('bt','battle','c.'+cid+'.tb',tb);}
   else{edit('gb','battle','foes.'+cid+'.ini',ini);edit('gb','battle','foes.'+cid+'.tb',tb);}
 }
 function btTb(cid){
   const c=btC(cid);
   if(!c)return 0;
-  if(c.s==='a')return num(c.tb);
+  if(c.s==='a'||c.s==='t')return num(c.tb);
   const f=foeOf(cid);
   return f?num(f.tb):0;
 }
@@ -3214,15 +3231,27 @@ function btAddAlly(uid,pid,quiet){
   btInsert(cid,{s:'a',r:ref},sp+(b.mode==='d20'?rnd(20):0),rnd(20));
   if(!quiet)render();
 }
+/* a trainer takes a turn of their own: initiative from their Speed stat, the same way as a Pokémon */
+const btTrainerIn=uid=>Object.keys(BT().c||{}).some(k=>BT().c[k].s==='t'&&BT().c[k].u===uid);
+function btAddTrainer(uid,quiet){
+  if(!S.me.admin)return;
+  const t=S.trainers[uid];
+  if(!t||btTrainerIn(uid))return;
+  const b=BT();
+  const cid=newCid();
+  btInsert(cid,{s:'t',u:uid},num(t.stats&&t.stats.spe)+(b.mode==='d20'?rnd(20):0),rnd(20));
+  if(!quiet)render();
+}
 function btAddParty(uid){
   if(!S.me.admin)return;
+  btAddTrainer(uid,true);
   partyOf(uid).forEach(m=>btAddAlly(uid,m.id,true));
   render();
 }
 function foeFromRec(rec,si,sp){
   if(rec){
     const F=ptaFields(rec);
-    return {sp:rec.n,ty:F.types,sz:F.size,wt:F.weight,hp:{cur:F.hp,max:F.hp},hpx:hpx(),base:F.base,sk:F.skills,ps:F.passives,mv:F.moves};
+    return {sp:rec.n,ty:F.types,sz:F.size,wt:F.weight,hp:{cur:F.hp,max:F.hp},hpx:hpx(),base:F.base,sk:F.skills,ps:F.passives,mv:F.moves,die:F.die};
   }
   if(si)return {sp:si.name,ty:si.types.slice(),sz:'Medium',wt:'Medium',hp:{cur:20,max:20},base:Object.assign({},si.base),sk:'',ps:[],mv:[]};
   return {sp,ty:['',''],sz:'Medium',wt:'Medium',hp:{cur:20,max:20},base:{atk:3,def:3,spa:3,spd:3,spe:3},sk:'',ps:[],mv:[]};
@@ -3386,7 +3415,7 @@ function btRemove(cid){
   edit('bt','battle','c',nc);
   edit('bt','battle','order',ord);
   if(c.s==='f'){const nf=Object.assign({},foesOf());delete nf[cid];edit('gb','battle','foes',nf);}
-  else{const m=getLocal('p',c.r);if(m&&m.bpos)edit('p',c.r,'bpos',null);}
+  else if(c.s==='a'){const m=getLocal('p',c.r);if(m&&m.bpos)edit('p',c.r,'bpos',null);}
   delete S.ui.bt.open[cid];
   if(S.ui.bm&&S.ui.bm.sel===cid)S.ui.bm.sel='';
   bmSync();
@@ -3420,6 +3449,11 @@ function btHp(cid,delta){
     if(!m||!canEditT(String(c.r).split('/')[0]))return;
     const hp=m.hp||{cur:0,max:0};
     edit('p',c.r,'hp.cur',clamp(num(hp.cur)+delta,0,Math.max(0,num(hp.max))));
+  }else if(c.s==='t'){
+    const t=S.trainers[c.u];
+    if(!t||!canEditT(c.u))return;
+    const hp=t.hp||{cur:0,max:0};
+    edit('t',c.u,'hp.cur',clamp(num(hp.cur)+delta,0,Math.max(0,num(hp.max))));
   }else{
     const f=foeOf(cid);
     if(!f||!S.me.admin)return;
@@ -3599,25 +3633,25 @@ function btRow(cid,idx,gm,turn){
   const v=btInfo(cid,gm);
   if(!v)return '';
   const open=!!S.ui.bt.open[cid];
-  const mine=v.side==='a'&&canEditT(v.uid);
+  const mine=(v.side==='a'||v.side==='t')&&canEditT(v.uid);
   const canOpen=gm||mine;
   const secret=v.side==='f'&&gm&&v.f;
-  const ini=v.side==='a'?num(btC(cid).ini):(gm?btIni(cid):null);
+  const ini=v.side==='a'||v.side==='t'?num(btC(cid).ini):(gm?btIni(cid):null);
   const own=secret?ntFoeOwner(v.f):(v.pub&&v.pub.o)||'';
-  const sub=v.side==='a'?v.owner:'Foe'+(own?' · '+own:'')+(secret?' · players see “'+v.pubName+'”':'');
+  const sub=v.side==='a'?v.owner:v.side==='t'?'Trainer':'Foe'+(own?' · '+own:'')+(secret?' · players see “'+v.pubName+'”':'');
   const types=v.types&&v.types.length?chipsOf(v.types):'';
   const hidden=v.side==='f'&&!secret&&!v.types;
-  return h`<li class="brow ${v.side==='a'?'ally':'foe'} ${turn?'turn':''} ${v.down?'down':''}" data-cid="${cid}">
+  return h`<li class="brow ${v.side==='a'||v.side==='t'?'ally':'foe'} ${turn?'turn':''} ${v.down?'down':''}" data-cid="${cid}">
     <div class="bmain">
       <span class="bn" aria-label="Position ${idx+1}">${idx+1}</span>
-      <span class="bpic"><span class="spr bs ${v.side==='f'&&!v.pic?'unk':''}" ${v.side==='a'?typeVars(v.m):typeVars({types:v.types||[]})}>${v.side==='a'?monPic(v.m):foePic(v)}</span></span>
+      <span class="bpic"><span class="spr bs ${v.side==='f'&&!v.pic?'unk':''}" ${v.side==='a'?typeVars(v.m):typeVars({types:v.types||[]})}>${v.side==='a'?monPic(v.m):v.side==='t'?pimg((v.tr&&v.tr.img)||'',v.name,'thumb'):foePic(v)}</span></span>
       <div class="btx"><b class="bnm">${v.name}</b>${turn?h` <span class="pill good">Acting</span>`:''}${secret&&foeKind(v.f)?h` <span class="pill encal">${KIND_DEF[foeKind(v.f)].label}</span>`:''}${v.down?h` <span class="pill">Down</span>`:''}
         <span class="sub">${sub}${ini!=null&&ini!==0?' · initiative '+ini:''}</span>
         <div class="types">${types}${hidden?h`<span class="pill">Types unknown</span>`:''}${v.mega||v.mg?h`<span class="pill mega">Mega</span>`:''}${v.itemTxt&&v.side==='f'?h`<span class="pill">Holding ${v.itemTxt}</span>`:''}${v.status?h`<span class="pill status">${v.status}</span>`:''}${v.stages?stgPills({stages:v.stages}):''}${secret?h`<span class="pill gm">GM sheet</span>`:''}</div></div>
       <div class="bhp">${btHpView(v)}</div>
       ${canOpen?h`<button class="btn sm" data-act="b_open" data-cid="${cid}" aria-expanded="${String(open)}">${open?'Close':'Details'}</button>`:''}
     </div>
-    ${open&&canOpen?(v.side==='a'?btAllyBody(cid,v,gm,idx):btFoeBody(cid,v,idx)):''}
+    ${open&&canOpen?(v.side==='a'?btAllyBody(cid,v,gm,idx):v.side==='t'?btTrainerBody(cid,v,gm,idx):btFoeBody(cid,v,idx)):''}
   </li>`;
 }
 function btAmt(cid,canHeal){
@@ -3639,6 +3673,13 @@ function btAllyBody(cid,v,gm,idx){
     <div class="fl">Status</div>${afflChips('p',id,'status',v.status,false,'')}${afflNotes(v.status)}
     <div class="fl">Combat stages</div>${stagePanel('p',id,'stages',v.m,false,'')}
     <div class="row"><button class="btn sm" data-act="b_card" data-uid="${v.uid}" data-pid="${v.pid}">Open the card</button></div>
+    ${gm?btOrderBtns(cid,idx):''}
+  </div>`;
+}
+function btTrainerBody(cid,v,gm,idx){
+  return h`<div class="bbody">
+    ${v.hp?btAmt(cid):h`<p class="sub">Set ${v.name}’s HP on the trainer sheet to track it here.</p>`}
+    <div class="row"><button class="btn sm" data-act="b_trainer" data-uid="${v.uid}">Open the trainer</button></div>
     ${gm?btOrderBtns(cid,idx):''}
   </div>`;
 }
@@ -3717,7 +3758,8 @@ function btAddPanel(){
   return h`<section class="panel"><div class="ph"><h2>Who is fighting</h2><span class="pill gm">GM only</span></div>
     ${ids.length?ids.map(uid=>{
       const pt=partyOf(uid);
-      return h`<div class="mgd"><div class="row sp"><b>${tName(S.trainers[uid])}</b><button class="btn sm" data-act="b_addparty" data-uid="${uid}" ${pt.length&&!pt.every(m=>inB(uid+'/'+m.id))?'':raw('disabled')}>Add whole party</button></div>
+      return h`<div class="mgd"><div class="row sp"><b>${tName(S.trainers[uid])}</b><button class="btn sm" data-act="b_addparty" data-uid="${uid}" ${(!btTrainerIn(uid))||(pt.length&&!pt.every(m=>inB(uid+'/'+m.id)))?'':raw('disabled')}>Add trainer and party</button></div>
+        <div class="row evchips"><button class="btn sm chk" data-act="b_addtrainer" data-uid="${uid}" aria-pressed="${String(btTrainerIn(uid))}" ${btTrainerIn(uid)?raw('disabled'):''}>${tName(S.trainers[uid])} (trainer)</button></div>
         ${pt.length?h`<div class="row evchips">${pt.map(m=>h`<button class="btn sm chk" data-act="b_addally" data-uid="${uid}" data-pid="${m.id}" aria-pressed="${String(inB(uid+'/'+m.id))}" ${inB(uid+'/'+m.id)?raw('disabled'):''}>${monIcon(m)}${mName(m)}</button>`)}</div>`:h`<p class="sub">No Pokémon in the party.</p>`}</div>`;
     }):h`<p class="sub">No trainers yet.</p>`}
     <div class="mgd"><b>Add a foe</b>
@@ -3744,7 +3786,7 @@ function battleOrderTab(){
   const cur=b.turn&&ord.indexOf(b.turn)>=0?b.turn:'';
   const cv=cur?btInfo(cur,gm):null;
   const ask=S.ui.confirm==='bt|end';
-  const mineNow=cv&&cv.side==='a'&&canEditT(cv.uid);
+  const mineNow=cv&&(cv.side==='a'||cv.side==='t')&&canEditT(cv.uid);
   return h`<section class="panel btl"><div class="ph"><h2>Battle</h2>${b.on?h`<span class="pill good">Round ${num(b.round)||1}</span>`:h`<span class="pill">${ord.length?'Setting up':'No battle'}</span>`}
       ${gm?h`<div class="acts"><button class="btn primary sm" data-act="b_init" ${ord.length?'':raw('disabled')}>${b.on?'Roll initiative again':'Roll initiative'}</button><button class="btn sm" data-act="b_next" ${b.on?'':raw('disabled')}>Next turn</button>${b.on&&b.mode!=='d20'?h`<button class="btn sm" data-act="b_resort">Re-sort by Speed</button>`:''}<button class="btn sm danger ${ask?'armed':''}" data-act="b_end">${ask?'Tap again to end it for everyone':'End battle'}</button></div>`:''}</div>
     ${gm?h`<div class="row"><div class="seg" role="group" aria-label="How turn order is decided"><button data-act="b_mode" data-v="speed" aria-pressed="${String(b.mode!=='d20')}">Highest Speed first</button><button data-act="b_mode" data-v="d20" aria-pressed="${String(b.mode==='d20')}">d20 + Speed</button></div></div>`:''}
@@ -3807,6 +3849,8 @@ function batAct(b,e){
     case 'b_ord':btMove(d.cid,num(d.d));break;
     case 'b_addally':btAddAlly(d.uid,d.pid);break;
     case 'b_addparty':btAddParty(d.uid);break;
+    case 'b_addtrainer':btAddTrainer(d.uid);break;
+    case 'b_trainer':S.viewUid=d.uid;setTab('trainer');break;
     case 'b_addfoe':btAddFoe();break;
     case 'b_rm':{
       const key='bt|'+d.cid;
@@ -8347,6 +8391,7 @@ function bmTokens(cfg){
   btOrder().forEach(cid=>{
     const c=b.c[cid],v=btInfo(cid,gm);
     if(!v)return;
+    if(c.s==='t')return;   /* a trainer's token is made below, from their sheet */
     if(c.s==='a'){
       const m=getLocal('p',c.r)||{},bp=m.bpos;
       const ok=!!bp&&num(bp.v)===cfg.v&&num(bp.x)>=0&&num(bp.y)>=0;
@@ -8370,6 +8415,7 @@ function bmTrainerToks(cfg,out){
   Object.keys(c).forEach(cid=>{
     const x=c[cid];
     if(x.s==='a'){const uid=String(x.r||'').split('/')[0];if(S.trainers[uid])pcs.add(uid);}
+    else if(x.s==='t'){if(S.trainers[x.u])pcs.add(x.u);}
     else if(gm){const f=foeOf(cid);if(f&&f.nt&&NTS()[f.nt])nts.add(f.nt);}
   });
   pcs.forEach(uid=>{
@@ -8401,7 +8447,8 @@ function bmTok(cfg,t){
   const mx=hp?Math.max(1,num(hp.max)):0;
   const ratio=hp?clamp(num(hp.cur)/mx,0,1):null;
   const b=BT(),sel=S.ui.bm.sel===t.cid;
-  const turn=!!b.on&&b.turn===t.cid;
+  const bc=b.on?btC(b.turn):null;
+  const turn=!!b.on&&(b.turn===t.cid||(t.side==='t'&&!!bc&&bc.s==='t'&&'tr_'+bc.u===t.cid));
   const cls=['bmt',t.side==='a'?'ally':t.side==='t'?'ally tr':t.side==='n'?'foe tr':'foe',turn?'turn':'',v.down?'down':'',t.vis?'':'hid',sel?'sel':'',t.mine?'mine':''].filter(Boolean).join(' ');
   const pic=t.side==='a'?monPic(v.m):t.side==='t'?pimg((v.tr&&v.tr.img)||'',v.name,'thumb'):t.side==='n'?pimg('',v.name,'thumb'):foePic(v);
   const label=v.name+(t.side==='a'?', '+v.owner:t.side==='t'?', trainer':t.side==='n'?', NPC trainer':', foe')+(hp&&v.down?', down':'')+(hp?(v.showHp===1?', about '+Math.round(ratio*100)+' percent health':', '+num(hp.cur)+' of '+mx+' HP'):'')+(t.vis?'':', hidden from players')+', column '+(t.x+1)+', row '+(t.y+1)+(t.mine?'. Drag to move it, or use the arrow keys.':'');
@@ -8819,7 +8866,7 @@ function bmTurnBar(){
   const b=BT(),gm=!!S.me.admin,ord=btOrder();
   const cur=b.turn&&ord.indexOf(b.turn)>=0?b.turn:'';
   const cv=cur?btInfo(cur,gm):null;
-  const mine=cv&&cv.side==='a'&&canEditT(cv.uid);
+  const mine=cv&&(cv.side==='a'||cv.side==='t')&&canEditT(cv.uid);
   return h`<div class="row sp bmturn">${b.on&&cv?h`<p class="bnow ${mine?'mine':''}"><b>Round ${num(b.round)||1}</b> · ${mine?'Your turn: ':''}<b>${cv.name}</b> is acting${cv.side==='a'?' · '+cv.owner:''}</p>`:h`<span class="sub">${ord.length?(b.on?'':(gm?'Roll initiative on the Turn order page to start.':'The GM is setting up the battle.')):'No battle is running.'}</span>`}${gm&&b.on?h`<button class="btn sm" data-act="b_next">Next turn</button>`:''}</div>`;
 }
 function bmGridSvg(cfg){
@@ -10400,6 +10447,7 @@ function monBody(uid,m,ro,pos,len){
       ${fSel('Size','p',id,'size',m,SIZES,{ro})}
       ${fSel('Weight','p',id,'weight',m,WEIGHTS,{ro})}
       ${fSel('Monster die','p',id,'die',m,DICE,{ro,blank:'Not set'})}
+      ${(()=>{const r=ro?null:evoRecOf(m),hd=r?ptaDie(r):'';return hd&&hd!==m.die?h`<div class="fld"><span class="fl">Handbook die</span><button class="btn sm" data-act="p_die" data-id="${id}" data-v="${hd}">Use ${hd}</button></div>`:'';})()}
       ${fText('Held item','p',id,'item',m,{ro,list:'dl-items'})}
       ${fText('Nature','p',id,'natureName',m,{ro})}
       ${fSel('Nature raises','p',id,'up',m,STAT_OPTS,{ro,blank:'None'})}
@@ -13357,6 +13405,7 @@ function act(b,e){
     case 'evoAny':evoAny(d.uid,d.pid);break;
     case 'psAdj':if(canEditT(d.uid))psAdj(d.uid,d.pid);break;
     case 'psKeep':if(canEditT(d.uid))psKeep(d.uid,d.pid);break;
+    case 'p_die':if(/^d\d+$/.test(d.v||'')&&DICE.indexOf(d.v)>=0){edit('p',d.id,'die',d.v);const m=getLocal('p',d.id);if(m){const sg=Object.assign({},m.autoSig||{});sg.di=hsh(d.v);edit('p',d.id,'autoSig',sg);}toast('Monster die set to '+d.v+'.',true);}render();break;
     case 'autofill':{
       if(!canEditT(d.uid))break;
       fillClick(d.uid,d.pid);
