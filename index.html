@@ -227,6 +227,22 @@ progress.hp.bad::-moz-progress-bar{background:var(--bad)}
 .slot.on small{color:#C9D3F5}
 .slot.on .medal{color:#fff;background:radial-gradient(circle at 34% 28%,color-mix(in srgb,var(--bc) 50%,#fff),var(--bc) 52%,color-mix(in srgb,var(--bc) 60%,#000));border-color:#F0CF67;box-shadow:0 0 0 2px #7A5D12,0 3px 8px rgba(0,0,0,.6),0 0 18px color-mix(in srgb,var(--bc) 65%,transparent)}
 .slot.on .medal::before{content:'';position:absolute;inset:0;border-radius:50%;background:linear-gradient(140deg,rgba(255,255,255,.55) 0,rgba(255,255,255,0) 42%)}
+.case.pz{display:block;padding:14px 14px 12px}
+.pzwrap{position:relative;width:100%;max-width:400px;margin:0 auto;aspect-ratio:1}
+.pzbase,.pzp,.pzp svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.pzp{appearance:none;background:none;border:0;padding:0;margin:0;pointer-events:none;color:inherit}
+.pzp svg *{pointer-events:none}.pzp svg path.hit{pointer-events:auto;cursor:pointer}
+.pzp:disabled svg path.hit{cursor:default}
+.pzp svg{overflow:visible;transition:filter .15s}
+.pzp:not(:disabled):hover svg{filter:brightness(1.18)}
+.pzp:focus-visible{outline:none}.pzp:focus-visible svg path.hit{stroke:#fff;stroke-width:3}
+.pzp.on svg{filter:drop-shadow(0 0 3px rgba(255,235,160,.35))}
+@media (prefers-reduced-motion:no-preference){.pzp.pop svg{animation:pzFlash .95s ease-out both}}
+@keyframes pzFlash{0%{filter:brightness(3) drop-shadow(0 0 8px #FFF3B0)}100%{filter:drop-shadow(0 0 3px rgba(255,235,160,.35))}}
+.case.full .pzbase{filter:drop-shadow(0 0 10px rgba(240,200,80,.55))}
+.pzkey{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 8px;list-style:none;margin:12px 0 0;padding:0;font-size:12px;line-height:1.25;text-align:center;color:#6E7EB0}
+.pzkey li.on{color:#C9D3F5}.pzkey b{display:block;font-size:12.5px;letter-spacing:.03em}
+@media (max-width:470px){.pzkey{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .slot.on .medal .gl{opacity:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5))}
 @media (prefers-reduced-motion:no-preference){
   .slot.pop .medal{animation:medalPop .85s cubic-bezier(.2,1.4,.4,1) both}
@@ -1438,5 +1454,5 @@ input,select,textarea{border-radius:9px}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-11-11-trainers"></script>
+<script src="app.js?v=2026-11-11-puzzle"></script>
 </body></html>

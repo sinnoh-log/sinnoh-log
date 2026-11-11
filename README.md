@@ -783,3 +783,19 @@ Players' trainers now take a turn of their own on the Battle page, next to their
 - A trainer's row shows their picture, HP and initiative. A player sees **Your turn** when it is their trainer's turn, and can change their own trainer's HP from the row. The GM can move them up or down, set **Acts now** or remove them, like any other row.
 - Damage applied from a roll to a trainer lowers the trainer's HP on their sheet.
 - On the map, the trainer's token lights up on their turn.
+
+## New badge art and names (Update 46)
+
+- **The badge case now shows the ornate Sinnoh League medallions** instead of the small coloured coins. A badge a trainer has not won yet is dark and grey; a won badge lights up in colour with a glow.
+- **Two badges have new names to match the new gyms.** Marina's Flying badge, from Sunyshore, is now the **Gull Badge** (it was Beacon). Klevin's Fairy badge, from Pastoria, is now the **Ring Badge** (it was Fen). Their art is a gull flying over the Sunyshore lighthouse, and a ring of mushrooms around a sparkle.
+- **Nothing saved is lost.** Badges already won, and their dates, are stored under the old names behind the scenes, so every trainer keeps what they earned. Only the names on screen changed: the badge case, the badge band on the trainer card, Awards, Rankings and the map's gym notes.
+
+## Badge puzzle (Update 47)
+
+The badge case is now one round Sinnoh League medal made of eight interlocking jigsaw pieces around a League crest. It replaces the separate medallions from Update 46.
+
+- **Each badge is a piece.** The pieces fit together, each with its engraved emblem and name. A piece the trainer has won is lit in its gym's colour with a glow. A piece they have not won is a dark, empty slot, so the shape is visible but incomplete.
+- **Winning a badge.** Tap a piece (the GM, or the player on their own sheet) to mark it won or take it back, the same as before. A newly won piece flashes. Tap the middle of the crest and nothing changes.
+- **The crest** is dim until all eight badges are won, then it lights up and the whole medal glows.
+- **Under the medal** a short list gives each badge's name and its leader. On a phone the list is two columns.
+- Nothing saved changed. Badges already won and their dates stay under the same internal names. On the trainer sheet the medal is under **Honors & career** on narrow screens, and in the same place as before on wide ones.
