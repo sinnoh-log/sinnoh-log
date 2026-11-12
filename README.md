@@ -826,3 +826,36 @@ Cards used to be forms: every value sat in an input box all the time. Now a card
 - **Other players' cards.** Someone looking at a sheet they cannot change sees the same read view with no Edit button and no live controls, instead of a greyed-out form.
 - **Phones.** Stat tiles sit three across with HP on its own row, and the fact list is two columns.
 - Nothing saved changed, and who can change what is the same as before.
+
+## Split files, a test suite and the Battle helper (Update 50)
+
+### The app is now several files
+
+`app.js` (one 1.2 MB file) is gone. The same code now lives in the `js/` folder as eleven files, loaded in order by `index.html`:
+
+`01-core` · `02-species` · `03-rolls` · `04-battle` · `04b-battle-helper` · `05-pokedex-contests` · `06-world` · `07-npc` · `08-battlemap` · `09-sheets` · `10-calendar-main`
+
+- **Uploading.** Upload `index.html` and the whole `js/` folder, and **delete the old `app.js`** from the repository. Nothing loads it any more.
+- The files share one scope and must load in the order `index.html` lists them. There is no build step.
+- Nothing about the saved data or the database rules changed.
+
+### Tests
+
+`tests/` holds a headless-browser test suite. It opens the real page against an in-memory database, so it never touches the live table.
+
+- Run it with `node tests/run.js` (needs Node and Playwright with Chromium). `node tests/run.js helper` runs only the files whose name contains "helper".
+- `tests/fixtures/` holds the handbook lists the tests need. The `tests/` folder is not needed on the website; uploading it is optional.
+
+### Battle helper
+
+On the Battle page, a **Battle helper** box appears above the turn order when the site has worked something out. Nothing changes until someone presses a button. The GM can accept anything; a player can accept for their own Pokémon.
+
+- **Hits waiting.** After an attack roll that hit (or a damage-only roll) with a target, a card offers **Apply** or **Skip**. Players can now apply hits to their own Pokémon; before, only the GM could. The button in the roll log still works and shows Applied or Skipped.
+- **Start of turn.** For the Pokémon acting now, the helper lists what its statuses do: Burned (Attack ▼, 1d6), Frostbitten (Sp. Attack ▼, 1d6), Paralyzed (Speed ▼), Poisoned (1d10) and Toxified (1d8, then 2d8, 3d8...). Each has its own Accept and Skip. A type that is immune gets a Remove button instead.
+- **Cure check.** One a turn: pick the status, the site rolls d20 against its number (16; 11 for Burned on Ice or Water types and Frostbitten on Fire types; Drowsy steps down 16, 14, 12...) and removes the status on a success. The roll goes in the table log.
+- **Reminders.** Paralysis and Confusion checks, Drowsy, Bound, Entranced, Dazed and Disabled show as a reminder line with no button.
+- **Recharge.** A move whose text says Recharge marks its user **Must recharge**. On its next turn the helper shows the Recharge card; press Recharged to clear it.
+- **Alpha Beam and Alpha Impact.** The site counts each combatant's Normal-type moves during the fight. With 3 or more other Normal-type moves used, the Alpha move rolls two extra dice (4d12 becomes 6d12) and says so.
+- **Move uses.** Roll attack on a daily move fills in one use dot. With no uses left the roll is refused; tap a dot to clear it if that is wrong. Damage only never spends a use.
+- The counts start again with each new battle (Roll initiative after End battle).
+- Not automated: the Paralysis and Confusion checks made when attacking, Bound's contested check, and field conditions (those keep their own panel).

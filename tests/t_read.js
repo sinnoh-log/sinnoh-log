@@ -1,0 +1,74 @@
+const {open,ROOT}=require('./lib');
+let fails=0;const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)fails++;};
+const click=(p,a)=>p.evaluate(a=>{const b=document.createElement('button');Object.entries(a).forEach(([k,v])=>b.dataset[k]=v);b.hidden=true;document.body.appendChild(b);b.click();},a);
+const upd=(p,path,o)=>p.evaluate(([a,b])=>window.__db.doc(a).set(b,{merge:true}),[path,o]);
+const get=(p,path)=>p.evaluate(a=>window.__store.get(a),path);
+const seedFn=S=>{Object.assign(S['trainers/u1/pokemon/p1'],{nick:'Volt',gender:'Male',item:'Magnet',natureName:'Adamant',up:'atk',down:'spa',notes:'A note',status:'',passives:[{name:'Intimidate',text:'Lowers Attack.'}],
+  moves:[{name:'Bite',freq:'At-Will',kind:'Physical',range:'Melee',type:'Dark',dice:'2d6',text:'Bite text here',used:0},{name:'Crunch',freq:'3/day',kind:'Physical',range:'Melee',type:'Dark',dice:'3d8',text:'Crunch text',used:1}]});return S;};
+(async()=>{
+  // PLAYER on own Pokémon
+  let {b,p,errs}=await open({admin:false,uid:'u1',tab:'pokemon',seedFn});
+  const K='pu1/p1';
+  await click(p,{act:'toggle',key:K});await p.waitForTimeout(600);
+  const card=()=>p.evaluate(()=>{const a=[...document.querySelectorAll('article.mon.open')][0];if(!a)return null;return {rd:!!a.querySelector('.mb.rd'),inputs:a.querySelectorAll('.mb input:not([type=checkbox]),.mb select,.mb textarea').length,text:a.innerText,pips:a.querySelectorAll('.pip').length,spent:a.querySelectorAll('.pip.spent').length,ed:!!a.querySelector('.edbar'),edbtn:!!a.querySelector('.edbtn')};});
+  let c=await card();
+  ok(c&&c.rd&&!c.ed&&c.edbtn,'player: card opens in the read view with an Edit button');
+  ok(c.inputs<=3,'player read view: only the HP inputs are fields ('+c.inputs+')');
+  ok(/Adamant \(raises Attack, lowers Special Attack\)|Adamant \(raises Attack, lowers Sp/.test(c.text)&&/Magnet/.test(c.text)&&/Intimidate/.test(c.text)&&/A note/.test(c.text),'player read view: nature, held item, passive and notes shown as text');
+  ok(c.pips===3&&c.spent===1,'player read view: Crunch shows 3 use dots, 1 spent');
+  ok(!/Bite text here/.test(c.text),'move text hidden until tapped');
+  await click(p,{act:'toggle',key:'mx'+K+'#0'});await p.waitForTimeout(400);c=await card();
+  ok(/Bite text here/.test(c.text),'tap a move: its text shows');
+  await p.click('article.mon.open .pip:not(.spent)');await p.waitForTimeout(500);
+  ok((await get(p,'trainers/u1/pokemon/p1')).moves[1].used===2,'tap a dot: a use is spent');
+  await p.click('article.mon.open .evchips button[data-a]');await p.waitForTimeout(500);
+  ok(!!(await get(p,'trainers/u1/pokemon/p1')).status,'tap a status chip: status set ('+(await get(p,'trainers/u1/pokemon/p1')).status+')');
+  await p.click('article.mon.open .stg button[data-d="1"]');await p.waitForTimeout(500);
+  ok(((await get(p,'trainers/u1/pokemon/p1')).stages||{}).atk===1,'stage stepper works in the read view');
+  await click(p,{act:'toggle',key:'it'+K});await p.waitForTimeout(400);
+  ok(await p.evaluate(()=>!!document.querySelector('article.mon.open .rditem input')),'held item: Change shows an input');
+  await p.screenshot({path:ROOT+'/tests/out/rd_mon.png',fullPage:true});
+  await click(p,{act:'toggle',key:'ed'+K});await p.waitForTimeout(600);c=await card();
+  ok(c&&c.ed&&!c.rd&&c.inputs>25,'Edit details: full form with Done bar ('+c.inputs+' fields)');
+  await p.screenshot({path:ROOT+'/tests/out/ed_mon.png',fullPage:true});
+  await click(p,{act:'toggle',key:'ed'+K});await p.waitForTimeout(500);c=await card();
+  ok(c.rd,'Done: back to the read view');
+  await click(p,{act:'newMon'});await p.waitForTimeout(800);
+  ok(await p.evaluate(()=>document.querySelectorAll('article.mon.open .edbar').length===1),'a new Pokémon opens in the form');
+  ok(errs.length===0,'player: no page errors ('+errs.slice(0,3).join(' | ')+')');await b.close();
+  // PLAYER viewing someone else's Pokémon
+  ({b,p,errs}=await open({admin:false,uid:'u2',tab:'pokemon',seedFn}));
+  await p.evaluate(()=>{try{localStorage.setItem('stl.view','u1');}catch(e){}});
+  await click(p,{act:'view',uid:'u1'});await p.waitForTimeout(500);
+  await click(p,{act:'toggle',key:K});await p.waitForTimeout(600);
+  const o=await p.evaluate(()=>{const a=document.querySelector('article.mon.open');return a?{rd:!!a.querySelector('.mb.rd'),edbtn:!!a.querySelector('.edbtn'),live:a.querySelectorAll('.mb button:not([disabled])[data-act="pip"],.mb [data-act="b_aff"],.mb [data-act="hp"]').length}:null;});
+  ok(o===null||(o.rd&&!o.edbtn&&o.live===0),'another player Pokémon: read view, no Edit button, no live controls ('+JSON.stringify(o)+')');
+  ok(errs.length===0,'viewer: no page errors ('+errs.slice(0,3).join(' | ')+')');await b.close();
+  // GM foe
+  ({b,p,errs}=await open({admin:true,uid:'u1',tab:'battle',seedFn}));
+  await p.fill('input[data-u="bt.foeSp"]','Rattata');await p.dispatchEvent('input[data-u="bt.foeSp"]','input');await click(p,{act:'b_addfoe'});await p.waitForTimeout(1500);
+  const CID=Object.keys(((await get(p,'gm/battle'))||{}).foes)[0];
+  await upd(p,'gm/battle',{foes:{[CID]:{sp:'Rattata',nick:'',ty:['Normal'],sz:'Small',wt:'Light',hp:{cur:20,max:20},base:{atk:3,def:3,spa:3,spd:5,spe:3},mv:[{name:'Tackle',freq:'At-Will',kind:'Physical',range:'Melee',type:'Normal',dice:'2d6',text:'Tackle text',used:0}],ps:[{name:'Run Away',text:'x'}],notes:'GM note here',sh:{},stages:{atk:0,def:0,spa:0,spd:0,spe:0},ini:5,bonus:{atk:0,def:0,spa:0,spd:0,spe:0}}}});
+  await click(p,{act:'b_kind',cid:CID,k:'alpha'});await p.waitForTimeout(700);
+  await click(p,{act:'b_open',cid:CID});await p.waitForTimeout(700);
+  const fs=()=>p.evaluate(()=>{const a=document.querySelector('.fsheet');return a?{rd:a.classList.contains('rd'),inputs:a.querySelectorAll('input[data-b],select[data-b],textarea[data-b],input[type=text],textarea').length,kind:!!a.querySelector('.fkind'),pips:a.querySelectorAll('.pip').length,text:a.innerText,fold:!!a.querySelector('.rdfold'),mini:a.querySelectorAll('.mini').length}:null;});
+  let f=await fs();
+  ok(f&&f.rd&&!f.kind&&f.mini===0,'foe: read view, no Kind row or base/adjust boxes');
+  ok(f.pips===5,'foe read view: use dots for Alpha Beam, Impact and Restoration ('+f.pips+')');
+  ok(f.fold&&/Passives \(4\)/.test(f.text)&&/GM note here/.test(f.text)&&/Roll attack/.test(f.text)&&/Give to trainer/.test(f.text),'foe read view: passives folded, notes as text, roll and give buttons present');
+  await p.click('.fsheet .pip');await p.waitForTimeout(500);
+  ok(((await get(p,'gm/battle')).foes[CID].mv.find(x=>x.name==='Alpha Beam')||{}).used===1,'foe: tap a dot spends Alpha Beam');
+  await p.click('.fsheet .rdfold');await p.waitForTimeout(400);f=await fs();
+  ok(/Temporary Passive/.test(f.text),'foe: passives unfold');
+  await p.screenshot({path:ROOT+'/tests/out/rd_foe.png',fullPage:true});
+  await click(p,{act:'toggle',key:'edf'+CID});await p.waitForTimeout(600);f=await fs();
+  ok(f&&!f.rd&&f.kind&&f.mini===5,'foe Edit details: Kind row and base/adjust boxes back');
+  await p.screenshot({path:ROOT+'/tests/out/ed_foe.png',fullPage:true});
+  ok(errs.length===0,'GM: no page errors ('+errs.slice(0,3).join(' | ')+')');await b.close();
+  // phone
+  ({b,p,errs}=await open({admin:false,uid:'u1',tab:'pokemon',seedFn,w:390,h:844}));
+  await click(p,{act:'toggle',key:K});await p.waitForTimeout(600);
+  ok(await p.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'phone: no sideways scroll');
+  await p.screenshot({path:ROOT+'/tests/out/rd_mon_phone.png',fullPage:true});
+  await b.close();console.log(fails?fails+' FAILED':'ALL PASSED');
+})();
