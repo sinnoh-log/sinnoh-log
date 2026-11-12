@@ -812,3 +812,17 @@ The PTA GM Guide is a 3.0 book, so its Alpha, Totem and Titan rules used 3.0 num
 - **Foes already set to a kind** keep their older text. Their Kind row shows "This foe has the older 3.0 text". Tap the same kind again to refresh them to 3.5; current HP stays in proportion.
 - **Capture notes now last.** The note shown when a foe is caught or given ("one Passive must go", "starts at Loyalty 0") used to be replaced by "Saving…" almost at once. It now shows after the save starts, and a copy is kept in the Pokémon's GM-only private notes so you can read it again.
 - Nothing else changed. The capture calculator already treated these foes as at full HP and blocked non-Master balls unless they were at half HP or lower.
+
+## Read-first cards (Update 49)
+
+Cards used to be forms: every value sat in an input box all the time. Now a card opens as a clean **read view**, and a pencil button switches that one card to the form.
+
+- **What stays live in the read view.** Only the things that change in play: HP, status chips, combat stage steppers, the dots for daily move uses, the held item (with a **Change** link), rolls, and item counts in the bag. Everything else is plain text.
+- **Edit details / Edit sheet.** The pencil opens the full form for that one card, with a **Done** button at the top to go back. Changes still save as you type. A new Pokémon, a new trainer sheet and a new NPC open in the form straight away.
+- **Pokémon cards.** Species, nature, size, die, ball and where it came from show as a short fact list. Moves are one line each (uses, kind, range, damage, type); tap a move's name to read its effect. Passives, notes and contest stats show as text. Evolution, the handbook fill-in, base and adjust numbers, moving to the box and deleting are under Edit details.
+- **Foes in battle (GM).** The same read view, plus use dots on the foe's daily moves (new), Roll attack and Damage only on each move, and passives folded to one line that opens on a tap. The "what the players see" box is one line with **Show everything** and **Hide everything**; the tick boxes, the Kind row (Alpha, Totem, Titan), types, base and adjust numbers and GM notes are under Edit details.
+- **Trainer sheets.** Details, features and the bag show as text. Stats, HP, skill rolls, talents, badges and item counts work as before. League kit and agency fields show as plain text until you press Edit sheet. Deleting the sheet is under Edit sheet.
+- **NPC trainers (GM).** Role, place, notes and your secret show as text. Stats, HP, rolls, item counts and the team list stay live. The reveal tick boxes, portrait, rankings, team growth, adding a Pokémon and deleting are under Edit details.
+- **Other players' cards.** Someone looking at a sheet they cannot change sees the same read view with no Edit button and no live controls, instead of a greyed-out form.
+- **Phones.** Stat tiles sit three across with HP on its own row, and the fact list is two columns.
+- Nothing saved changed, and who can change what is the same as before.

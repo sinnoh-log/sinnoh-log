@@ -1420,6 +1420,49 @@ input,select,textarea{border-radius:9px}
 .shtab{flex:1 0 auto;min-height:44px;padding:0 14px;border:0;border-radius:9px;background:transparent;color:var(--muted,#4F6485);font:700 14px var(--f-body);white-space:nowrap;cursor:pointer}
 .shtab[aria-pressed=true]{background:var(--panel);color:var(--accent);box-shadow:0 1px 3px rgba(20,30,70,.25)}
 .shtab:focus-visible{outline:3px solid var(--gold,#FFB736);outline-offset:1px}
+
+/* ----- read-first cards (Update 49): a card opens as a read view; the pencil switches it to the form ----- */
+.edbtn{gap:6px;align-self:flex-start;white-space:nowrap;border-color:var(--accent);color:var(--accent)}
+.edbar{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 10px;border:2px solid var(--accent);border-radius:10px;background:var(--accent-soft)}
+.edbar>div{display:flex;flex-direction:column;min-width:0}
+.edbar b{font:700 16px var(--f-display)}
+.rdtop{display:flex;gap:12px;align-items:flex-start}
+.rdtop .rdtx{flex:1;min-width:0}
+.rdtop .spr.big{width:96px;height:96px;flex:none;aspect-ratio:auto}
+.rdsec.rditem .fld .fl{display:none}
+.rdtop.foe{align-items:center}
+.rdfacts{margin:0;display:grid;gap:4px 16px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.rdfacts>div{display:flex;flex-direction:column;min-width:0}
+.rdfacts dt{font:800 11.5px var(--f-body);color:var(--muted)}
+.rdfacts dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.rdsec{display:flex;flex-direction:column;gap:4px}
+.rdsec.rditem{flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px}
+.rdsec.rditem .rdval{font-weight:700}
+.rdsec.rditem .fld{flex:1;min-width:160px}
+.rdnote{margin:0;white-space:pre-line;overflow-wrap:anywhere}
+.move.rdmv{gap:6px;padding:8px 10px}
+.rdm1{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.rdmname{appearance:none;background:transparent;border:0;padding:4px 0;margin:0;min-height:40px;flex:1 1 180px;min-width:0;text-align:left;color:inherit;font:inherit;cursor:pointer;display:flex;flex-direction:column;gap:0;border-radius:6px}
+.rdmname b{font-weight:800;font-size:15.5px}
+.rdmname:hover b{color:var(--accent)}
+.rdmname:focus-visible,.rdfold:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.rddice{font:400 24px/1 var(--f-num)}
+.rdmtxt{margin:0;padding:6px 8px;border-radius:8px;background:var(--panel);white-space:pre-line;overflow-wrap:anywhere}
+.rd .pips .pip{min-width:26px;min-height:26px}
+.rdps li{gap:0}
+.rdfold{appearance:none;display:flex;gap:10px;align-items:center;width:100%;min-height:44px;text-align:left;font:inherit;color:inherit;cursor:pointer;background:var(--raised);border:2px solid var(--line);border-radius:10px;padding:6px 12px}
+.rdfold .sub{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rdfold:hover{border-color:var(--accent)}
+.rdsee{gap:6px}
+.rdbar{padding:6px 2px;gap:10px;flex-wrap:wrap}
+.sheet.rd .fld input:disabled:not([type=checkbox]),.sheet.rd .fld select:disabled,.sheet.rd .fld textarea:disabled{border-color:transparent;background:transparent;box-shadow:none;padding-left:0;opacity:1;color:var(--ink);-webkit-text-fill-color:var(--ink);appearance:none;-webkit-appearance:none;background-image:none;resize:none;cursor:default;font-weight:600}
+.item.rdit{gap:6px}
+.rdirow{display:flex;gap:10px;align-items:center}
+.rdirow .itile{flex:none;width:44px;height:44px}
+.rdirow .rditx{flex:1;min-width:0;display:flex;flex-direction:column}
+.rdirow .fld{width:84px;flex:none}
+.rdqty{font:400 22px/1 var(--f-num)}
+@media (max-width:520px){.rdtop{flex-wrap:wrap}.rdtop .spr.big{width:72px;height:72px}.rdtop .edbtn{order:2;margin-left:auto}.rdtop .rdtx{order:3;flex:1 1 100%}.rdfacts{grid-template-columns:repeat(2,minmax(0,1fr))}.rd .stats{grid-template-columns:repeat(3,minmax(0,1fr))}.rd .stats .hpbox{grid-column:1/-1}}
 </style>
 <script>try{var __t=localStorage.getItem('stl.theme');if(__t==='light'||__t==='dark')document.documentElement.setAttribute('data-theme',__t);}catch(e){}</script>
 <div class="dev"><div class="dev-top" aria-hidden="true"><span>SINNOH · TRAINER GEAR</span><span class="dev-on"><i></i>ONLINE</span></div><div class="dev-frame"><div class="shell" id="shell">
@@ -1454,5 +1497,5 @@ input,select,textarea{border-radius:9px}
 <script src="vendor/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
-<script src="app.js?v=2026-11-12-alpha35"></script>
+<script src="app.js?v=2026-11-12-readfirst"></script>
 </body></html>
