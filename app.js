@@ -3271,31 +3271,31 @@ async function btAddFoe(){
   u.foeSp='';u.foeNick='';u.foeN=1;
   render();
 }
-/* ----- Alpha, Totem and Titan Pokémon (PTA GM Guide, Encounter Building). The GM can set a kind on any foe, even one already in the battle, and undo it. ----- */
+/* ----- Alpha, Totem and Titan Pokémon (PTA GM Guide, Encounter Building, converted to the 3.5 rules in Update 48: Alpha Beam and Alpha Impact are the 3.5 Hyper Beam and Giga Impact, the aura's Passives are temporary Passives, healing is a flat number). The GM can set a kind on any foe, even one already in the battle, and undo it. ----- */
 const ALPHA_PS=[
-  {name:'Wild Alpha Aura',text:'While wild, this Pokémon has Alpha Beam, Alpha Impact and Alpha Restoration, the passive Alpha Tenacity and the stat passive Wild Might. It loses the aura if it is captured.'},
-  {name:'Alpha Tenacity',text:'Cannot be captured by non-Master Poké Balls unless it is at half of its max HP or lower. It is always treated as at full HP when working out the capture rate.'},
-  {name:'Wild Might',text:'HP doubled, +5 Attack, +5 Special Attack, and Defense or Special Defense raised to 15.'}
+  {name:'Wild Alpha Aura',text:'While wild, this Pokémon has Alpha Beam, Alpha Impact and Alpha Restoration and the temporary Passives Alpha Tenacity and Wild Might. Temporary Passives do not count toward the limit of four Passives. It loses the aura if it is captured.'},
+  {name:'Alpha Tenacity',text:'Temporary Passive. Cannot be captured by non-Master Poké Balls unless it is at half of its max HP or lower. It is always treated as at full HP when working out the capture rate.'},
+  {name:'Wild Might',text:'Temporary Passive. HP doubled, +5 Attack, +5 Special Attack, and Defense or Special Defense raised to 15.'}
 ];
 const ALPHA_MV=[
-  {name:'Alpha Beam',freq:'1/day',kind:'Special',range:'Ranged (25ft beam)',type:'Normal',dice:'5d20',text:'Needs a recharge turn afterwards. −2 on the Accuracy Check.',used:0},
-  {name:'Alpha Impact',freq:'1/day',kind:'Physical',range:'Melee (10ft burst)',type:'Normal',dice:'5d20',text:'Needs a recharge turn afterwards. −2 on the Accuracy Check.',used:0},
-  {name:'Alpha Restoration',freq:'3/day',kind:'Effect',range:'Self',type:'Normal',dice:'',text:'You are healed 1d12 HP. Your uses of Alpha Beam and Alpha Impact are restored as if you had rested.',used:0}
+  {name:'Alpha Beam',freq:'1/day',kind:'Special',range:'Ranged (35ft beam)',type:'Normal',dice:'4d12',text:'If you have used at least 3 other Normal-type moves this combat, +2d power. Must Recharge: you cannot act next round, and attacks against you have advantage.',used:0},
+  {name:'Alpha Impact',freq:'1/day',kind:'Physical',range:'Melee (10ft burst)',type:'Normal',dice:'4d12',text:'If you have used at least 3 other Normal-type moves this combat, +2d power. Must Recharge: you cannot act next round, and attacks against you have advantage.',used:0},
+  {name:'Alpha Restoration',freq:'3/day',kind:'Effect',range:'Self',type:'Normal',dice:'',text:'You heal 15 HP. Your uses of Alpha Beam and Alpha Impact are restored as if you had rested.',used:0}
 ];
 const TOTEM_PS=[
-  {name:'Wild Totem Spirit',text:'While wild, this Pokémon has Totemic Power, Totemic Call and Totemic Guardian, the passive Totemic Tenacity and the stat passive Totemic Spirit. It loses them if it is captured.'},
-  {name:'Totemic Tenacity',text:'Cannot be captured by non-Master Poké Balls unless it is at half of its max HP or lower. It is always treated as at full HP when working out the capture rate.'},
-  {name:'Totemic Spirit',text:'HP doubled, +5 Attack, +5 Special Attack, and Defense or Special Defense raised to 15.'}
+  {name:'Wild Totem Spirit',text:'While wild, this Pokémon has Totemic Power, Totemic Call and Totemic Guardian and the temporary Passives Totemic Tenacity and Totemic Spirit. Temporary Passives do not count toward the limit of four Passives. It loses them if it is captured.'},
+  {name:'Totemic Tenacity',text:'Temporary Passive. Cannot be captured by non-Master Poké Balls unless it is at half of its max HP or lower. It is always treated as at full HP when working out the capture rate.'},
+  {name:'Totemic Spirit',text:'Temporary Passive. HP doubled, +5 Attack, +5 Special Attack, and Defense or Special Defense raised to 15.'}
 ];
 const TOTEM_MV=[
-  {name:'Totemic Power',freq:'1/day',kind:'Effect',range:'Ranged (25ft burst)',type:'Normal',dice:'',text:'All allies (up to 10 including yourself) within range have their Attack and Special Attack raised +2 for 10 minutes. Totemic Power can stack.',used:0},
-  {name:'Totemic Call',freq:'At-Will',kind:'Effect',range:'Self',type:'Normal',dice:'',text:'If you have 2 or more allies with you in combat, Totemic Call fails. Summon 1d4 allies to the encounter. The allies who show up have their Attack and Special Attack raised 2 for 10 minutes.',used:0},
+  {name:'Totemic Power',freq:'1/day',kind:'Effect',range:'Ranged (25ft burst)',type:'Normal',dice:'',text:'All allies (up to 10 including yourself) within range get a flat +2 to Attack and Special Attack (not ▲) for 10 minutes. Totemic Power can stack.',used:0},
+  {name:'Totemic Call',freq:'At-Will',kind:'Effect',range:'Self',type:'Normal',dice:'',text:'If you have 2 or more allies with you in combat, Totemic Call fails. Summon 1d4 allies to the encounter. The allies who show up get a flat +2 to Attack and Special Attack (not ▲) for 10 minutes.',used:0},
   {name:'Totemic Guardian',freq:'3/day',kind:'Special',range:'Ranged (25ft burst)',type:'Normal',dice:'3d8',text:'Attack or Special Attack. All allies (up to 10 including yourself) within range are healed HP equal to the amount of damage Totemic Guardian would have dealt.',used:0}
 ];
 const TITAN_PS=[
-  {name:'Titan Mystica',text:'Cannot be captured by non-Master Poké Balls. Size and weight are increased to at least Huge.'},
-  {name:'Massive Impacts',text:'Single-target melee attacks have their range changed to Ranged (15ft Burst), and ranged attacks gain (15ft Blast) if they did not already have a Blast radius or any other special range modifier.'},
-  {name:'Titanic Vitality',text:'Max HP is multiplied by 10.'}
+  {name:'Titan Mystica',text:'Temporary Passive. Cannot be captured by non-Master Poké Balls. Size and weight are increased to at least Huge.'},
+  {name:'Massive Impacts',text:'Temporary Passive. Single-target melee attacks have their range changed to Ranged (15ft Burst), and ranged attacks gain (15ft Blast) if they did not already have a Blast radius or any other special range modifier.'},
+  {name:'Titanic Vitality',text:'Temporary Passive. Max HP is multiplied by 10. Temporary Passives do not count toward the limit of four Passives.'}
 ];
 const KIND_DEF={
   alpha:{label:'Alpha',ps:ALPHA_PS,mv:ALPHA_MV,mul:2,stat:1,title:'Wild Might'},
@@ -3341,7 +3341,7 @@ function foeKindApply(f,k){
   const d=KIND_DEF[k];
   if(!f||!d)return f;
   foeKindUndo(f);
-  const kd={mul:d.mul};
+  const kd={mul:d.mul,v:2};
   const hp=f.hp||{cur:20,max:20};
   const mx=Math.max(1,num(hp.max)),cu=Math.max(0,num(hp.cur));
   f.hp={cur:cu*d.mul,max:mx*d.mul};
@@ -3595,16 +3595,16 @@ function foeGive(cid){
   let sz=g.sz||'Medium',note='';
   if(k0==='alpha'){
     ps.push({name:'Alpha',text:'+1 Attack or +1 Special Attack, and +1 Defense or +1 Special Defense. Once chosen, the bonuses cannot be changed.'});
-    note=' It lost the alpha aura and has the passive Alpha: choose its +1 bonuses on its sheet. If it now has four stat passives, one must go.';
+    note=' It lost the alpha aura and has the passive Alpha: choose its +1 bonuses on its sheet. If it now has more than four Passives, one must go.'+(num((f.hp||{}).cur)<=0?' It was knocked out when it was caught, so by the 3.5 capture rules it starts at Loyalty 0 (set it on the Loyalty board).':'');
   }else if(k0==='totem'){
-    mv.push({name:'Totem Memory',freq:'1/day',kind:'Effect',range:'Ranged (25ft burst)',type:'Normal',dice:'',text:'All allies (up to 10 including yourself) within range have their Attack or Special Attack raised +2 for 10 minutes. If you ever replace Totem Memory on your move list, it can never be learned again.',used:0});
-    note=' It lost its totem powers and has the move Totem Memory.';
+    mv.push({name:'Totem Memory',freq:'1/day',kind:'Effect',range:'Ranged (25ft burst)',type:'Normal',dice:'',text:'All allies (up to 10 including yourself) within range get a flat +2 to Attack or Special Attack (not ▲) for 10 minutes. If you ever replace Totem Memory on your move list, it can never be learned again.',used:0});
+    note=' It lost its totem powers and has the move Totem Memory.'+(num((f.hp||{}).cur)<=0?' It was knocked out when it was caught, so by the 3.5 capture rules it starts at Loyalty 0 (set it on the Loyalty board).':'');
   }else if(k0==='titan'){
     ps.push({name:'Titanic',text:'Your Max HP is increased by 18. If Titanic is ever removed, it can never be learned again.'});
     hp={cur:num(hp.cur)>0?num(hp.cur)+18:0,max:num(hp.max)+18};
     const i=FOE_SIZES.indexOf(sz);
     if(i>=0&&i<FOE_SIZES.length-1)sz=FOE_SIZES[i+1];
-    note=' It shrank to one size above its species and has the passive Titanic (+18 max HP). If it now has four stat passives, one must go.';
+    note=' It shrank to one size above its species and has the passive Titanic (+18 max HP). If it now has more than four Passives, one must go.'+(num((f.hp||{}).cur)<=0?' It was knocked out when it was caught, so by the 3.5 capture rules it starts at Loyalty 0 (set it on the Loyalty board).':'');
   }
   newDoc('p',uid+'/'+id,blankMon(uid,Object.assign({
     nick,species:f.sp||'',types:[(f.ty||[])[0]||'',(f.ty||[])[1]||''],size:sz,weight:g.wt||'Medium',
@@ -3613,8 +3613,10 @@ function foeGive(cid){
     item:f.item||'',up:f.up||'',down:f.down||'',natureName:f.natureName||'',gender:f.gender||'',die:f.die||'',shiny:f.shiny===true,mega:f.mega?JSON.parse(JSON.stringify(f.mega)):null,
     caught:'Caught in the wild, session '+(num(S.meta.session)||1)
   },f.hpx?{hpx:num(f.hpx)}:{})));
-  toast((f.sp||'The foe')+' now belongs to '+tName(S.trainers[uid])+'.'+note,true);
+  /* the note is also kept in the Pokémon's GM-only private notes, because the status line is overwritten by "Saving…" within a moment */
+  if(note)newDoc('gl',id,Object.assign({uid,pid:id,note:'Capture note:'+note},num((f.hp||{}).cur)<=0?{loyalty:0}:{}));
   btRemove(cid);
+  toast((f.sp||'The foe')+' now belongs to '+tName(S.trainers[uid])+'.'+note+(note?' This is saved in its private GM notes.':''),true);
 }
 
 /* =================== views =================== */
@@ -3725,7 +3727,7 @@ function btFoeBody(cid,v,idx){
     </div>
     <div class="mgd secret fkind"><span class="fl">GM only · Alpha, Totem or Titan</span>
       <div class="row evchips" role="group" aria-label="Kind of wild Pokémon">${[['','Normal'],['alpha','Alpha'],['totem','Totem'],['titan','Titan']].map(([k,l])=>h`<button class="btn sm chk" data-act="b_kind" data-cid="${cid}" data-k="${k}" aria-pressed="${String(foeKind(f)===k)}">${l}</button>`)}</div>
-      <p class="sub">${foeKind(f)?'Doubled HP, stat bonuses, new passives and moves are in place (Titan: HP ×10 and Huge size). Choose Normal to undo them.':'Choose a kind to apply the PTA GM Guide rules to this foe. You can undo it at any time.'}</p></div>
+      <p class="sub">${foeKind(f)?'Doubled HP, stat bonuses, new passives and moves are in place (Titan: HP ×10 and Huge size). Choose Normal to undo them.':'Choose a kind to apply the PTA GM Guide rules, converted to 3.5, to this foe. You can undo it at any time.'}</p>${foeKind(f)&&num(f.kd&&f.kd.v)<2?h`<p class="sub">This foe has the older 3.0 text. Tap its kind again to bring it up to 3.5. Current HP stays in proportion.</p>`:''}</div>
     <div class="stats">${STATS.map(s=>h`<div class="stat lcd"><span class="sl">${s[2]}</span><span class="sv">${fStat(f,s[0])}</span><span class="sm"><span>mod ${sgn(mod(fStat(f,s[0])))}</span>${megaBonus(f,s[0])?h`<span class="mbn">Mega ${sgn(megaBonus(f,s[0]))}</span>`:''}</span>
       <div class="mini"><label>Base<input type="number" ${bd('gb','battle',P+'base.'+s[0])} value="${num(f.base&&f.base[s[0]])}"></label><label>Adj<input type="number" ${bd('gb','battle',P+'bonus.'+s[0])} value="${num(f.bonus&&f.bonus[s[0]])}"></label></div></div>`)}</div>
     <div class="fl">Status</div>${afflChips('gb','battle',P+'st',f.st,false,cid)}${afflNotes(f.st)}

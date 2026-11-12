@@ -754,15 +754,15 @@ NPC teams were filled in from the handbook when they were imported, so they stil
 
 What changes: types, base stats, HP, size, weight, skills, passives and the numbers on each move (frequency, kind, range, type, damage dice, text). What stays: nickname, notes, held item, Mega details, the moves each NPC chose, and how many uses of a move are spent. Moves or species the handbook doesn't list are left as they are and shown in the scan. HP uses the table's multiplier, and damage already taken stays in proportion.
 
-## Alpha, Totem and Titan foes (Update 43)
+## Alpha, Totem and Titan foes (Update 43, converted to 3.5 in Update 48)
 
-Open a foe's sheet in the battle. The GM sees a **Kind** row with **Normal / Alpha / Totem / Titan**. Pick one and the PTA GM Guide rules are applied; pick Normal to undo it. Players never see the label.
+Open a foe's sheet in the battle. The GM sees a **Kind** row with **Normal / Alpha / Totem / Titan**. Pick one and the PTA GM Guide rules are applied, converted to the 3.5 rules; pick Normal to undo it. Players never see the label.
 
-- **Alpha:** HP ×2, +5 Atk and Sp. Atk, the better of Def and Sp. Def raised to 15, Alpha moves and the Alpha Tenacity passive.
-- **Totem:** same stat boost, with Totemic Spirit and the Totemic Power, Call and Guardian moves.
+- **Alpha:** HP ×2, +5 Atk and Sp. Atk, the better of Def and Sp. Def raised to 15. It gets the moves Alpha Beam (4d12, 35 ft beam), Alpha Impact (4d12, 10 ft burst) and Alpha Restoration (heals 15 HP and refreshes the other two). The Alpha Tenacity and Wild Might passives are temporary Passives.
+- **Totem:** same stat boost, with Totemic Spirit and the Totemic Power, Call and Guardian moves. The team boost is a flat +2 to Attack and Special Attack, not a combat stage.
 - **Titan:** max HP ×10, size at least Huge, weight Superweight, Titan moves and Titanic Vitality. Only a Master Ball can capture it.
 - Switching kinds keeps the foe's current HP in proportion.
-- **Capture or Give to a trainer:** Alpha gets the passive Alpha, Totem gets the move Totem Memory, Titan shrinks one size above its species, gains the Titanic passive and +18 max HP.
+- **Capture or Give to a trainer:** Alpha gets the passive Alpha, Totem gets the move Totem Memory, Titan shrinks one size above its species, gains the Titanic passive and +18 max HP. A foe that was knocked out when it was caught starts at Loyalty 0 (set for you).
 
 ## Monster die filled in from the handbook (Update 44)
 
@@ -799,3 +799,16 @@ The badge case is now one round Sinnoh League medal made of eight interlocking j
 - **The crest** is dim until all eight badges are won, then it lights up and the whole medal glows.
 - **Under the medal** a short list gives each badge's name and its leader. On a phone the list is two columns.
 - Nothing saved changed. Badges already won and their dates stay under the same internal names. On the trainer sheet the medal is under **Honors & career** on narrow screens, and in the same place as before on wide ones.
+
+## Alpha rules brought up to 3.5 (Update 48)
+
+The PTA GM Guide is a 3.0 book, so its Alpha, Totem and Titan rules used 3.0 numbers. This update converts them to the 3.5 rules.
+
+- **Alpha Beam and Alpha Impact** are now the 3.5 Hyper Beam and Giga Impact: 4d12 (was 5d20), with +2d power if the Pokémon has used at least 3 other Normal-type moves this combat. They end with a Recharge: the foe cannot act next round and attacks against it have advantage. The old −2 Accuracy penalty is gone. The beam is 35 ft.
+- **Alpha Restoration** heals a flat 15 HP (was 1d12) and still refreshes Alpha Beam and Alpha Impact.
+- **Temporary Passives.** The aura's passives are marked as temporary and do not count toward the limit of four Passives. When a foe is caught or given to a trainer, the note now says "more than four Passives" instead of "four stat passives".
+- **Totem team boost.** Totemic Power, Totemic Call and Totem Memory give a flat +2 to Attack and Special Attack for 10 minutes. It is not a combat stage (▲), so it does not use the ▲/▼ steps. Totemic Power can still stack.
+- **Loyalty 0.** An Alpha, Totem or Titan that was knocked out when it was caught starts at Loyalty 0, and the capture note says so. The note is now also saved in the Pokémon's **GM-only private notes**, and Loyalty is set to 0 on the Loyalty board. One that was subdued awake gets the note but no Loyalty change; set its Loyalty yourself.
+- **Foes already set to a kind** keep their older text. Their Kind row shows "This foe has the older 3.0 text". Tap the same kind again to refresh them to 3.5; current HP stays in proportion.
+- **Capture notes now last.** The note shown when a foe is caught or given ("one Passive must go", "starts at Loyalty 0") used to be replaced by "Saving…" almost at once. It now shows after the save starts, and a copy is kept in the Pokémon's GM-only private notes so you can read it again.
+- Nothing else changed. The capture calculator already treated these foes as at full HP and blocked non-Master balls unless they were at half HP or lower.
