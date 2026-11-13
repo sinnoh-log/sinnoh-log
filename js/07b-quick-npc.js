@@ -9,7 +9,8 @@ const QN_EN=[{"k": "titan", "n": "Titan", "cap": "Giant (You are one size and we
 
 /* ---------- Quick NPCs (Update 52) ----------
    An NPC trainer's sheet can be Full (level, class, stats) or Quick (rank, quick class, templates and features from the document).
-   Its data lives in the NPC's GM-only document under q: {on, r: '1'|'2'|'2s'|'3'|'4', cls, ty, vc, vt, boss, sq, u: {b, k}}.
+   Its data lives in the NPC's GM-only document under q: {on, r: '1'|'2'|'2s'|'3'|'4', cls, ty, vc, vt, boss, sq, ch, u: {b, k}}.
+   ch: the choices some features ask for (a Rule, a Nemesis, a type to teach), as the GM's own words (Update 54).
    When a Quick NPC's Pokémon enter a battle, the plain numbers are applied to them (damage, Defense and Special Defense, bonus moves
    and passives), their natures are neutral, and their 3/day moves become 2 per combat. Everything else shows as text for the GM.
    A foe can also be given a wild rank (q r below) and wild Pokémon can be added as a Swarm. None of it is shown to players. */
@@ -97,6 +98,19 @@ function qnFeatHtml(f,used,attrs){
     <p class="qnx">${f.x}</p></div>`;
 }
 /* ----- the NPC sheet in Quick mode ----- */
+const qnChoices=q=>String((q&&q.ch)||'').trim()?h`<p class="sub qnch"><b>Choices:</b> ${String(q.ch).trim()}</p>`:'';
+/* the Quick NPC settings a pack row may carry (Update 54); anything not in the rules is dropped */
+function qnFromPack(x){
+  if(!x||typeof x!=='object')return null;
+  const r=QN_RANKS.some(z=>z[0]===String(x.r))?String(x.r):'';
+  const cls=qnCls(x.cls)?x.cls:'';
+  if(!r||!cls)return null;
+  const q={on:true,r,cls,ty:TYPES.indexOf(x.ty)>=0?x.ty:'',vc:'',vt:'skilled',boss:'',sq:clamp(Math.round(num(x.sq)),0,20),ch:String(x.ch||'').slice(0,600)};
+  if((r==='3'||r==='4')&&qnCls(x.vc)){q.vc=x.vc;q.vt=x.vt==='exp'?'exp':'skilled';}
+  if(r==='4'&&x.boss&&qnFeats(q).some(f=>f.key===x.boss))q.boss=x.boss;
+  return q;
+}
+const qnPackRank=x=>QN_RANKS.some(z=>z[0]===String(x))?String(x):'';
 function qnClassOpts(){return QN.map(c=>[c.k,c.n+(c.g==='grunt'?' (grunt)':c.g==='spec'?' (specialist)':'')]);}
 function qnSheet(id,nt,ed){
   const q=nt.q||{};
@@ -114,6 +128,7 @@ function qnSheet(id,nt,ed){
       ${q.r==='4'?fSel('Champion or Boss: doubled feature','gt',id,'q.boss',nt,feats.map(f=>[f.key,(f.n||f.cn)+' ('+QN_TIER[f.t]+')']),{blank:'Not a Champion'}):''}
       ${fNum('Squad: number of trainers (0 if not a squad)','gt',id,'q.sq',nt,{min:0,max:20})}
     </div>
+    ${fArea('Choices for their features','gt',id,'q.ch',nt,{rows:2,ph:'A Rule and stat for Good Manners, a Nemesis, the type a Gym Trainer teaches…'})}
     ${q.r?h`<p class="sub">${QN_RANK_TXT[q.r]}</p>`:''}
     ${c?h`<p class="sub"><b>${c.n}</b>${c.u?' · Pokémon used: '+c.u:''}${c.alt?' · Also: '+c.alt:''}</p>`:''}
     ${num(q.sq)>0&&num(q.sq)<3?h`<p class="sub">A Squad needs three or more trainers.</p>`:''}
@@ -126,6 +141,7 @@ function qnSheet(id,nt,ed){
     ${q.r?h`<p class="sub">${QN_RANK_TXT[q.r]}</p>`:h`<p class="sub">Choose a rank and class in Edit details.</p>`}
     <div class="row"><button class="btn sm" data-act="nt_roll" data-label="${who}: skill check" data-bonus="${rn}" data-tal="0">Skill check (d20 + ${rn})</button><button class="btn sm" data-act="nt_roll" data-label="${who}: skill check in their line of work" data-bonus="${rn}" data-tal="3">In their line of work (+3 more)</button><label class="row"><input type="checkbox" data-act="b_secret" ${S.ui.secret?raw('checked'):''}><span>Roll in secret</span></label></div>
     ${feats.length?h`<div class="qnfs">${feats.map(f=>qnFeatHtml(f,qnUsed(nt,f.key),'data-act="nt_qpip" data-id="'+esc(id)+'"'))}</div>`:(q.r==='1'?h`<p class="sub">Novices have no useful features.</p>`:'')}
+    ${qnChoices(q)}
     <p class="sub">Each feature is a free action on the NPC's turn, and an NPC uses at most one feature a round. Dots start again in each battle.</p>
     ${q.r?h`<p class="sub"><b>Their Pokémon in a battle:</b> ${qnAppliedTxt(q).join('; ')}.</p>`:''}
   </div>`;
@@ -253,6 +269,7 @@ function qnFoeBox(cid,f){
     return h`<div class="mgd secret qnbox"><span class="fl">GM only · ${ntName(nt)}: ${qnRankName(q.r)} ${(qnCls(q.cls)||{}).n||''}${sq?' · Squad of '+sq:''}</span>
       ${sq?h`<p class="sub">Only ${qnSquadAct(sq)} of the ${sq} trainers command Pokémon or use features each round; one limited feature a round from the shared pool.</p>`:''}
       ${feats.length?feats.map(x=>qnFeatHtml(x,qnUsed(nt,x.key),'data-act="nt_qpip" data-id="'+esc(f.qn.id)+'"')):h`<p class="sub">No features.</p>`}
+      ${qnChoices(q)}
       <p class="sub">Applied to this Pokémon: ${qnAppliedTxt(q).join('; ')}.</p></div>`;
   }
   if(f.qr){

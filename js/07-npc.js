@@ -422,28 +422,40 @@ async function ntImportPack(file){
   const have=new Set(ntIds().map(id=>ntName(NTS()[id]).toLowerCase()));
   const add={gym:[],con:[]};
   const t0=Date.now(),miss=[];
-  let made=0,skip=0;const cnt={noDex:0},grow=[];
+  let made=0,skip=0,quick=0;const cnt={noDex:0},grow=[];
   for(let i=0;i<d.npcs.length;i++){
     const p=d.npcs[i]||{};
     const name=String(p.name||'').trim();
     if(!name)continue;
     if(have.has(name.toLowerCase())){
       const ex=ntIds().find(x=>ntName(NTS()[x]).toLowerCase()===name.toLowerCase());
+      let did=false;
       if(ex&&Array.isArray(p.stages)&&p.stages.length&&!(Array.isArray(NTS()[ex].stages)&&NTS()[ex].stages.length)){
-        const st=[];for(const g of p.stages)st.push({gain:num(g.gain),label:String(g.label||''),team:await ntPackTeam(g.team,L,miss,cnt)});
-        grow.push({id:ex,st});
-      }else skip++;
+        const st=[];for(const g of p.stages)st.push({gain:num(g.gain),label:String(g.label||''),qr:qnPackRank(g.r),team:await ntPackTeam(g.team,L,miss,cnt)});
+        grow.push({id:ex,st});did=true;
+      }
+      /* an NPC already here becomes a Quick NPC from the pack, unless the GM has already given it a rank (Update 54) */
+      const pq=qnFromPack(p.q),cur=ex&&NTS()[ex];
+      if(pq&&cur&&!(cur.q&&cur.q.r)){
+        edit('gt',ex,'q',Object.assign({},cur.q||{},pq));quick++;did=true;
+        if(!grow.some(g=>g.id===ex)&&Array.isArray(cur.stages)&&cur.stages.length){
+          const byLabel={};(p.stages||[]).forEach(g=>{if(g&&g.label)byLabel[String(g.label)]=qnPackRank(g.r);});
+          edit('gt',ex,'stages',cur.stages.map(s=>Object.assign({},s,{qr:s.label==='Starting team'?pq.r:(byLabel[s.label]||s.qr||'')})));
+        }
+      }
+      if(!did)skip++;
       continue;
     }
     have.add(name.toLowerCase());
     const team=await ntPackTeam(p.team,L,miss,cnt);
     const id=S.db.collection('gm').doc().id;
     const cat=NPC_CATS.concat(NPC_CAT_GM).some(x=>x[0]===p.cat)?p.cat:'';
+    const pq=qnFromPack(p.q);if(pq)quick++;
     newDoc('gt',id,{name,role:String(p.role||''),cat,place:String(p.place||''),notes:String(p.notes||''),secret:String(p.secret||''),cls:'',adv:'',
       level:Math.max(1,Math.round(num(p.level))||1),hp:{cur:20,max:20},stats:{atk:2,def:2,spa:2,spd:2,spe:2},talents:{},features:[],items:[],megaUsed:false,team,
-      rev:{on:false,role:false,place:false,notes:false,pic:false,cls:false,stats:false,items:false},img:'',order:t0+i,createdAt:t0+i});
+      rev:{on:false,role:false,place:false,notes:false,pic:false,cls:false,stats:false,items:false},img:'',order:t0+i,createdAt:t0+i,...(pq?{q:pq}:{})});
     made++;
-    if(Array.isArray(p.stages)&&p.stages.length){const st=[];for(const g of p.stages)st.push({gain:num(g.gain),label:String(g.label||''),team:await ntPackTeam(g.team,L,miss,cnt)});grow.push({id,st});}
+    if(Array.isArray(p.stages)&&p.stages.length){const st=[];for(const g of p.stages)st.push({gain:num(g.gain),label:String(g.label||''),qr:qnPackRank(g.r),team:await ntPackTeam(g.team,L,miss,cnt)});grow.push({id,st});}
     const b=p.board==='con'?'con':p.board==='gym'?'gym':'';
     if(b&&p.rp!=null&&p.rp!==''){
       const cur=(S.cond&&S.cond[RK_C[b].d])||{};
@@ -461,7 +473,7 @@ async function ntImportPack(file){
   const folded=rkFold('gym')+rkFold('con');
   grow.forEach(({id,st})=>ntSetStages(id,st));
   const nr=add.gym.length+add.con.length;
-  toast('Added '+made+' NPC trainer'+(made===1?'':'s')+(nr?', '+nr+' of them as rivals in the rankings'+(folded?' (taking the place of '+folded+' field trainer'+(folded===1?'':'s')+')':''):'')+(grow.length?'. '+grow.length+' can grow their teams':'')+(skip?'. Skipped '+skip+' already here':'')
+  toast('Added '+made+' NPC trainer'+(made===1?'':'s')+(nr?', '+nr+' of them as rivals in the rankings'+(folded?' (taking the place of '+folded+' field trainer'+(folded===1?'':'s')+')':''):'')+(quick?'. '+quick+' set up as Quick NPCs':'')+(grow.length?'. '+grow.length+' can grow their teams':'')+(skip?'. Skipped '+skip+' already here':'')
     +(cnt.noDex?'. '+cnt.noDex+' Pokémon were not in the handbook data, so check their numbers':'')+(miss.length?'. Fill in by hand: '+miss.slice(0,6).join(', ')+(miss.length>6?' and '+(miss.length-6)+' more':''):'')+'.',true);
   render();
 }
@@ -635,6 +647,10 @@ function ntMonBody(id,nt,m,i,len){
   const s=m.sh||{};
   const mvs=m.mv||[],ps=m.ps||[];
   const ask=S.ui.confirm==='ntf|'+m.id,askRm=S.ui.confirm==='ntr|'+m.id;
+  /* the moves as they are used in a battle: the rules in use, or the Quick NPC rules */
+  const holder=Object.assign({},m,{megaOn:false,pc:qnOf(nt)?2:0});
+  const inPlay=x=>{const y=effMove(x,holder);return y!==x?[y.freq!==x.freq?y.freq:'',y.dice!==x.dice?y.dice:''].filter(Boolean).join(' · '):'';};
+  const hbn=qnOf(nt)?'':hbNote(m.die,monDie(holder));
   return h`<div class="bbody fsheet">
     <div class="mgate secret"><span class="fl">GM only · what the players see of this Pokémon (once the NPC is shown, or in a battle)</span>
       <div class="row evchips" role="group" aria-label="Show players">
@@ -650,6 +666,7 @@ function ntMonBody(id,nt,m,i,len){
       ${fNum('HP max','gt',id,P+'hp.max',nt,{min:1})}
       ${fSel('Size','gt',id,P+'sz',nt,SIZES,{})}
       ${fSel('Weight','gt',id,P+'wt',nt,WEIGHTS,{})}
+      ${fSel('Monster die','gt',id,P+'die',nt,DICE,{blank:'Not set'})}
       ${fText('Held item','gt',id,P+'item',nt,{list:'dl-items'})}
       ${fSel('Gender','gt',id,P+'gender',nt,GENDERS,{blank:'Not set'})}
       <div class="fld shn"><span class="fl">Colour</span>${fCheck('Shiny ✦','gt',id,P+'shiny',nt,false)}</div>
@@ -660,10 +677,14 @@ function ntMonBody(id,nt,m,i,len){
     </div>
     <div class="stats">${STATS.map(st=>h`<div class="stat lcd"><span class="sl">${st[2]}</span><span class="sv">${fStat(m,st[0])}</span><span class="sm"><span>mod ${sgn(mod(fStat(m,st[0])))}</span></span>
       <div class="mini"><label>Base<input type="number" ${bd('gt',id,P+'base.'+st[0])} value="${num(m.base&&m.base[st[0]])}"></label><label>Adj<input type="number" ${bd('gt',id,P+'bonus.'+st[0])} value="${num(m.bonus&&m.bonus[st[0]])}"></label></div></div>`)}</div>
+    ${hbn?h`<p class="sub hbn">${hbn}</p>`:''}
+    ${hbOn()&&!dieSides(m.die)?h`<p class="sub hbn">No Monster die set, so the homebrew rules leave this Pokémon as written.</p>`:''}
+    ${m.hp&&num(m.hp.max)>0&&!m.qr&&hpxOf(m)!==hpx(m.die)?h`<p class="sub hbn">Its HP is not yet at the numbers for the rules in use. <button class="btn sm" data-act="hpx_apply">Fix the HP</button></p>`:''}
     ${ntMegaPanel(id,nt,m,i)}
     <div class="list"><div class="ph"><h3>Moves</h3><button class="btn sm" data-act="add" ${bp('gt',id,P+'mv')} data-tpl="move">Add move</button></div>
       ${mvs.length?mvs.map((x,k)=>h`<div class="move"><div class="mv1">${fText('Move','gt',id,P+'mv.'+k+'.name',nt,{list:'dl-moves'})}${fText('Uses','gt',id,P+'mv.'+k+'.freq',nt,{})}<span></span>${rowBtns('gt',id,P+'mv',k,mvs.length,false)}</div>
         <div class="mv2">${fSel('Kind','gt',id,P+'mv.'+k+'.kind',nt,KINDS,{})}${fSel('Type','gt',id,P+'mv.'+k+'.type',nt,TYPES,{})}${fText('Range','gt',id,P+'mv.'+k+'.range',nt,{})}${fText('Damage','gt',id,P+'mv.'+k+'.dice',nt,{ph:'e.g. 3d8'})}</div>
+        ${inPlay(x)?h`<p class="sub hbn">In a battle: ${inPlay(x)}</p>`:''}
         ${fArea('Effect','gt',id,P+'mv.'+k+'.text',nt,{rows:2})}</div>`):h`<p class="sub">No moves yet. Add one, or type a move name to fill it in from the handbook.</p>`}
     </div>
     <div class="list"><div class="ph"><h3>Passives</h3><button class="btn sm" data-act="add" ${bp('gt',id,P+'ps')} data-tpl="passive">Add passive</button></div>
@@ -753,7 +774,8 @@ function ntRankInfo(b,r){
 }
 /* ----- team growth: an NPC keeps several versions of their team, each for a badge count. The starting team is the first.
    When the GM runs a week on the Gym rankings, an NPC whose rival has reached the next mark switches to that team.
-   nt.stages [{id, bd, label, team}]   nt.grown = the stage in use   nt.bd0 = badges when the stages were set ----- */
+   nt.stages [{id, bd, label, team, qr}]   nt.grown = the stage in use   nt.bd0 = badges when the stages were set
+   qr: a Quick NPC's rank with that team; loading the team sets the rank too (Update 54) ----- */
 const ntStages=nt=>(nt&&Array.isArray(nt.stages)?nt.stages:[]).slice().sort((a,b)=>num(a.bd)-num(b.bd));
 const ntStageId=()=>'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 /* the badges this NPC's rival holds on the Gym rankings, or null when it is not on that board */
@@ -768,8 +790,8 @@ const ntCopyTeam=team=>(team||[]).map(m=>Object.assign(JSON.parse(JSON.stringify
 function ntSetStages(id,list){
   const nt=NTS()[id];if(!nt)return;
   const b0=ntBadges(id)||0;
-  const st=[{id:ntStageId(),bd:b0,label:'Starting team',team:ntCopyTeam(ntTeam(nt))}];
-  list.forEach((g,i)=>st.push({id:ntStageId()+i,bd:b0+Math.max(1,num(g.gain)),label:g.label||'',team:g.team}));
+  const st=[{id:ntStageId(),bd:b0,label:'Starting team',team:ntCopyTeam(ntTeam(nt)),qr:(nt.q&&nt.q.r)||''}];
+  list.forEach((g,i)=>st.push({id:ntStageId()+i,bd:b0+Math.max(1,num(g.gain)),label:g.label||'',team:g.team,qr:g.qr||''}));
   edit('gt',id,'stages',st);edit('gt',id,'grown',st[0].id);edit('gt',id,'bd0',b0);
 }
 function ntStageLoad(id,sid,quiet){
@@ -777,6 +799,7 @@ function ntStageLoad(id,sid,quiet){
   if(!nt||!st)return false;
   if(ntTeam(nt).some(m=>ntInBattle(id,m.id))){if(!quiet)toast('Part of this team is in a battle. End the battle first.');return false;}
   edit('gt',id,'team',ntCopyTeam(st.team));edit('gt',id,'grown',sid);
+  if(st.qr&&nt.q&&nt.q.r!==st.qr&&QN_RANKS.some(z=>z[0]===st.qr))edit('gt',id,'q.r',st.qr);
   return true;
 }
 /* after a week: every NPC whose rival has passed the next mark moves up (never down) */
@@ -822,7 +845,7 @@ function ntGrowPanel(id,nt){
   const cur=st.find(x=>x.id===nt.grown);
   return h`<div class="mgate"><span class="fl">Team growth</span>
     <p class="sub">${bd!=null?h`On the Gym rankings with <b>${bd} badge${bd===1?'':'s'}</b>. `:'Not on the Gym rankings, so teams change only when you load them. '}Each saved team has a badge mark. When you run a week on the rankings and this rival has reached the next mark, the team below replaces the current one. Damage, nicknames and changes to the current team are not kept, so save it first if you want them.</p>
-    ${st.length?h`<ul class="mini-list">${st.map(x=>h`<li><div class="row sp"><span><b>${num(x.bd)} badge${num(x.bd)===1?'':'s'}</b>${x.label?h` <span class="sub">${x.label}</span>`:''} ${cur&&cur.id===x.id?h`<span class="pill good">In use</span>`:''}<br><span class="sub">${(x.team||[]).map(m=>m.nick||m.sp).join(', ')||'No Pokémon'}</span></span>
+    ${st.length?h`<ul class="mini-list">${st.map(x=>h`<li><div class="row sp"><span><b>${num(x.bd)} badge${num(x.bd)===1?'':'s'}</b>${x.label?h` <span class="sub">${x.label}</span>`:''}${x.qr&&qnOf(nt)?h` <span class="pill">${qnRankName(x.qr)}</span>`:''} ${cur&&cur.id===x.id?h`<span class="pill good">In use</span>`:''}<br><span class="sub">${(x.team||[]).map(m=>m.nick||m.sp).join(', ')||'No Pokémon'}</span></span>
       <span class="row"><button class="btn sm" data-act="nt_stload" data-id="${id}" data-sid="${x.id}">Load now</button><button class="btn sm ghost" data-act="nt_stsave" data-id="${id}" data-sid="${x.id}" title="Replace this saved team with the current team">Overwrite</button><button class="btn sm ghost" data-act="nt_strm" data-id="${id}" data-sid="${x.id}">Remove</button></span></div></li>`)}</ul>`:''}
     <div class="row"><label class="fld inl"><span class="fl">At badges</span><input type="number" min="0" max="8" data-u="nt.stb_${id}" data-nr value="${u['stb_'+id]==null?'':u['stb_'+id]}" placeholder="${bd!=null?bd:0}"></label><button class="btn sm" data-act="nt_stnew" data-id="${id}">Save the current team at that mark</button></div>
   </div>`;
@@ -831,12 +854,12 @@ function ntGrowAct(d){
   const nt=NTS()[d.id];if(!nt)return;
   const st=ntStages(nt);
   if(d.act==='nt_stload'){if(ntStageLoad(d.id,d.sid))toast(ntName(nt)+' now uses that team.',true);render();return;}
-  if(d.act==='nt_stsave'){edit('gt',d.id,'stages',st.map(x=>x.id===d.sid?Object.assign({},x,{team:ntCopyTeam(ntTeam(nt))}):x));toast('Saved the current team over it.',true);render();return;}
+  if(d.act==='nt_stsave'){edit('gt',d.id,'stages',st.map(x=>x.id===d.sid?Object.assign({},x,{team:ntCopyTeam(ntTeam(nt)),qr:(qnOf(nt)&&nt.q.r)||x.qr||''}):x));toast('Saved the current team over it.',true);render();return;}
   if(d.act==='nt_strm'){edit('gt',d.id,'stages',st.filter(x=>x.id!==d.sid));render();return;}
   if(d.act==='nt_stnew'){
     const raw=S.ui.nt['stb_'+d.id],bd=clamp(Math.round(num(raw===''||raw==null?(ntBadges(d.id)||0):raw)),0,8);
     const sid=ntStageId();
-    edit('gt',d.id,'stages',st.filter(x=>num(x.bd)!==bd).concat([{id:sid,bd,label:'',team:ntCopyTeam(ntTeam(nt))}]));
+    edit('gt',d.id,'stages',st.filter(x=>num(x.bd)!==bd).concat([{id:sid,bd,label:'',team:ntCopyTeam(ntTeam(nt)),qr:(qnOf(nt)&&nt.q.r)||''}]));
     if(!nt.grown||!st.some(x=>x.id===nt.grown))edit('gt',d.id,'grown',sid);
     S.ui.nt['stb_'+d.id]='';
     toast('Saved the current team at '+bd+' badge'+(bd===1?'':'s')+'.',true);render();

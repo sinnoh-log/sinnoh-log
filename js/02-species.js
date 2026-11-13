@@ -862,9 +862,35 @@ function hpxApply(quiet){
   render();
   return list.length;
 }
-function hbSet(on){
+/* every Pokémon on the site with no Monster die: players' Pokémon, NPC teams and foes. The homebrew rules go by the die, so these are left as written. */
+function hbNoDie(){
+  const out=[];
+  const add=(sc,id,path,m,sp,who)=>{if(m&&!dieSides(m.die)&&String(sp||'').trim())out.push({sc,id,path,sp:String(sp).trim(),who});};
+  Object.keys(S.pokemon||{}).forEach(uid=>{const box=S.pokemon[uid]||{};Object.keys(box).forEach(pid=>add('p',uid+'/'+pid,'',box[pid],box[pid].species,(box[pid].nick||box[pid].species)+' ('+tName(S.trainers[uid])+')'));});
+  Object.keys(S.gmNt||{}).forEach(nid=>{const nt=S.gmNt[nid];(Array.isArray(nt&&nt.team)?nt.team:[]).forEach((m,i)=>add('gt',nid,'team.'+i+'.',m,m.sp,(m.nick||m.sp)+' ('+ntName(nt)+')'));});
+  const fo=(S.battleGm&&S.battleGm.foes)||{};
+  Object.keys(fo).forEach(cid=>add('gb','battle','foes.'+cid+'.',fo[cid],fo[cid].sp,(fo[cid].nick||fo[cid].sp)+' (in the battle)'));
+  return out;
+}
+/* fills in a missing Monster die from the Pokédex; returns the ones whose species could not be found */
+async function hbFillDice(){
+  if(!S.me.admin)return [];
+  const list=hbNoDie(),miss=[];
+  for(const x of list){
+    const pr=ptaResolve(x.sp);
+    let rec=null;
+    if(pr)rec=ptaRec(pr)||await ptaChunk(ptaLetter(ptaKey(pr))).then(()=>ptaRec(pr)).catch(()=>null);
+    const d=rec?ptaDie(rec):'';
+    if(d){edit(x.sc,x.id,x.path+'die',d);if(x.sc==='gb')foePublish(x.path.split('.')[1]);}
+    else miss.push(x);
+  }
+  S.ui.hbMiss=miss.map(x=>x.who);
+  return miss;
+}
+async function hbSet(on){
   if(!S.me.admin||hbOn()===!!on)return;
   edit('meta','table','hb',!!on);
+  if(on)await hbFillDice();
   const n=hpxApply(true);
   toast((on?'Homebrew rules are on.':'Rules as written are on.')+(n?' Updated the HP of '+n+' Pokémon; damage taken stays in proportion.':''),true);
   render();
@@ -872,6 +898,7 @@ function hbSet(on){
 function hpxAct(b){
   const a=b.dataset.act;
   if(a==='hpx_apply')hpxApply();
+  else if(a==='hpx_dice')hbFillDice().then(m=>{const n=hpxApply(true);toast((m.length?m.length+' still have no Monster die (their species is not in the Pokédex).':'Every Pokémon now has a Monster die.')+(n?' Updated the HP of '+n+'.':''),true);render();});
   else if(a==='hpx_hb')hbSet(b.dataset.v==='1');
   else if(a==='hpx_rules'){S.ui.open.hbRules=!S.ui.open.hbRules;render();}
 }
@@ -884,6 +911,10 @@ function hpxDesk(){
       <p class="sub">${list.slice(0,8).map(x=>x.who).join(', ')}${list.length>8?' and '+(list.length-8)+' more':''}.</p>
       <p class="sub">This happens when a Pokémon was set up under an older HP multiplier, or its Monster die was changed. Current and maximum HP change together, so damage taken stays in proportion.</p>
       <button class="btn primary" data-act="hpx_apply">Fix the HP of ${list.length} Pokémon</button></div>`:''}
+    ${(()=>{const nd=hbOn()?hbNoDie():[];return nd.length?h`<div class="hpxgo" role="status"><p><b>${nd.length}</b> Pokémon have no Monster die, so the homebrew rules leave them as written.</p>
+      <p class="sub">${nd.slice(0,8).map(x=>x.who).join(', ')}${nd.length>8?' and '+(nd.length-8)+' more':''}.</p>
+      <button class="btn primary" data-act="hpx_dice">Fill in their Monster dice from the Pokédex</button></div>`:'';})()}
+    ${(S.ui.hbMiss||[]).length?h`<p class="sub">Not in the Pokédex, so set their Monster die by hand: ${S.ui.hbMiss.join(', ')}.</p>`:''}
     <button class="btn sm" data-act="hpx_rules" aria-expanded="${String(open)}">${open?'Hide the house rules':'Show the house rules'}</button>
     ${open?h`<div class="hbrules">
       <h3>Evolved Pokémon are stronger (the site applies this)</h3>

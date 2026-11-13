@@ -916,3 +916,25 @@ Quick NPC Pokémon and ranked wilds still get **+1 power** by Monster die, and N
 ### Also fixed
 
 The version label at the foot of each page said "Homebrew rules" in Update 51, which players could see. It now reads "Quick NPCs".
+
+## NPC Pokémon and the homebrew switch, item pictures (Update 53)
+
+### NPC trainers' Pokémon follow the switch
+
+The homebrew rules go by **Monster die**, and many NPC Pokémon had none (made before dice were recorded, or never filled in from the handbook), so the switch left them as written. Now:
+
+- **Turning homebrew on** first fills in every missing Monster die from the Pokédex (players' Pokémon, NPC teams and foes), then updates HP. A Pokémon whose species is not in the Pokédex is left as written and named on the GM Desk.
+- **GM Desk, Rules in use:** while homebrew is on, it lists any Pokémon still without a Monster die, with a **Fill in their Monster dice from the Pokédex** button.
+- **NPC Pokémon sheet:** a **Monster die** field. With homebrew on it shows the GM note ("Homebrew: HP ×1.5, +1 power, 4/day and 2/day uses"), an **In a battle: 4/day · 4d8** line under each move that changes (2/combat on a Quick NPC), a note when no die is set, and a **Fix the HP** button when the die was changed by hand.
+
+### Item pictures
+
+Item pictures were squeezed out of shape in the read-first bag (Update 49) and could shrink beside long descriptions in the Shop. Item tiles now keep their size and every item picture stays square, on a computer and on a phone. `tests/t_items.js` checks the bag (read and Edit), a Pokémon's held item and ball, the Shop and an NPC's inventory at both widths.
+
+## Quick NPC settings in NPC packs (Update 54)
+
+- **Packs can set up Quick NPCs.** A pack row may carry `q: {r, cls, ty, vc, vt, boss, sq, ch}` (rank, class, type, Veteran class and tier, Champion feature, Squad size, Choices). New NPCs from the pack arrive as Quick NPCs.
+- **NPCs already on the site** are set up from the pack when you import it again, unless you have already given them a rank yourself. Nothing else about them changes, and no one is added twice. Their full trainer sheet is kept, hidden behind the Full / Quick switch.
+- **Ranks grow with teams.** Each saved team under Team growth can carry a rank (`r` on a pack stage). Loading that team, by hand or when a rival reaches its badge mark, sets the NPC's rank too. Saving a team keeps the rank in use. Team growth shows each saved team's rank.
+- **Choices.** Some features ask for a choice: a Rule and stat for Good Manners, a Nemesis, the type a Gym Trainer teaches. Quick NPCs have a **Choices for their features** field in Edit details, shown on the sheet and in the GM box in a battle.
+- `tests/t_packs.js` checks this with the real packs, which stay out of the repo: run it with `PACKS=<folder with the packs>`.
