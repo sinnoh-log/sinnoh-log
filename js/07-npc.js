@@ -582,6 +582,8 @@ function ntFoeFrom(id,nt,m){
     sh:{name:num(m.sh&&m.sh.name),pic:num(m.sh&&m.sh.pic),types:num(m.sh&&m.sh.types),st:0,hp:0,item:num(m.sh&&m.sh.item),mega:0},
     pn:foeLetter(),nt:id,ni:m.id,own:ntName(nt)},m.hpx?{hpx:num(m.hpx)}:{});
 }
+/* a Quick NPC's Pokémon get the applied numbers of its features (Update 52) */
+const ntFoeFromQ=(id,nt,m)=>qnFoe(ntFoeFrom(id,nt,m),nt,id);
 function ntToBattle(id,mid,quiet){
   if(!S.me.admin)return;
   const nt=NTS()[id];
@@ -589,7 +591,7 @@ function ntToBattle(id,mid,quiet){
   if(!m||ntInBattle(id,mid))return;
   const b=BT();
   const cid=newCid();
-  const f=ntFoeFrom(id,nt,m);
+  const f=ntFoeFromQ(id,nt,m);
   edit('gb','battle','foes.'+cid,f);
   btInsert(cid,{s:'f',pub:foePub(f)},fSpd(f)+(b.mode==='d20'?rnd(20):0),rnd(20));
   if(!quiet)render();
@@ -687,7 +689,9 @@ function ntSheet(id,nt,ed){
   const st=nt.stats||{},tal=nt.talents||{},it=nt.items||[],fs=nt.features||[];
   const more=!!S.ui.nt.more[id];
   const who=ntName(nt);
-  return h`<div class="ntsheet">
+  const quick=!!qnOf(nt);
+  const style=ed?h`<div class="row evchips qnstyle" role="group" aria-label="Sheet style"><span class="fl">Sheet</span><button class="btn sm chk" data-act="nt_qon" data-id="${id}" data-v="0" aria-pressed="${String(!quick)}">Full trainer sheet</button><button class="btn sm chk" data-act="nt_qon" data-id="${id}" data-v="1" aria-pressed="${String(quick)}">Quick NPC</button></div>`:'';
+  return h`${style}${quick?qnSheet(id,nt,ed):''}<div class="ntsheet ${quick?'qninv':''}">${quick?'':h`
     <div class="ph"><h3>Trainer sheet</h3><span class="sub">Level, class, stats and bag. The table sees them only if you tick them${ed?' above':' in Edit details'}.</span></div>
     ${!ed?'':h`<div class="fgrid">
       ${fNum('Level','gt',id,'level',nt,{min:1,max:20})}
@@ -711,7 +715,7 @@ function ntSheet(id,nt,ed){
               <button class="btn sm" data-act="nt_roll" data-label="${who}: ${name}" data-bonus="${m}" data-tal="${tb}">Roll</button></div>`;})}</div>`;})}
       <div class="list"><div class="ph"><h3>Features</h3>${ed?h`<button class="btn sm" data-act="add" ${bp('gt',id,'features')} data-tpl="feature">Add feature</button>`:''}</div>
         ${!ed?(featRead(fs)||h`<p class="sub">No features written yet.</p>`):fs.length?fs.map((x,i)=>h`<div class="item"><div class="irow two">${fText('Name','gt',id,'features.'+i+'.name',nt,{})}${rowBtns('gt',id,'features',i,fs.length,false)}</div>${fArea('What it does','gt',id,'features.'+i+'.text',nt,{rows:2})}</div>`):h`<p class="sub">Class features, in your own words. Only you see these.</p>`}</div>
-    </div>`:''}
+    </div>`:''}`}
     <div class="list"><div class="ph"><h3>Inventory</h3>${ed?h`<button class="btn sm" data-act="add" ${bp('gt',id,'items')} data-tpl="item">Add item</button>`:''}</div>
       ${!ed&&it.length?itemsRead('gt',id,nt,it,false,(x,i)=>isKeyName(x.name)?h`<div class="kline">${keyChip(nt)}<span class="sub">Lets ${who}'s Pokémon Mega Evolve, once per battle.</span>${nt.megaUsed?h`<button class="btn sm" data-act="nt_recharge" data-id="${id}">Recharge it</button>`:''}</div>`:''):it.length?it.map((x,i)=>h`<div class="item"><div class="irow ic">${itemTile(x.name)}${fText('Item','gt',id,'items.'+i+'.name',nt,{list:'dl-items'})}${fNum('Qty','gt',id,'items.'+i+'.qty',nt,{min:0})}${rowBtns('gt',id,'items',i,it.length,false)}</div>${fText('Note (only you see this)','gt',id,'items.'+i+'.note',nt,{})}${isKeyName(x.name)?h`<div class="kline">${keyChip(nt)}<span class="sub">Lets ${who}'s Pokémon Mega Evolve, once per battle.</span>${nt.megaUsed?h`<button class="btn sm" data-act="nt_recharge" data-id="${id}">Recharge it</button>`:''}</div>`:''}</div>`):h`<p class="sub">Nothing in the bag. A Key Stone here lets this NPC's Pokémon Mega Evolve.</p>`}
     </div>
@@ -909,7 +913,7 @@ function ntBody(id,nt){
   const askDel=S.ui.confirm==='ntd|'+id;
   const ek='n'+id,ed=isEd(ek);
   return h`<div class="ntbody ${ed?'':'rd'}">
-    ${ed?edBar(ek,'Editing '+ntName(nt)):h`<div class="rdtop foe"><div class="rdtx">${rdFacts([['Role or title',nt.role],['Where you met',nt.place],['Category',ntCat(nt)?npcCatName(ntCat(nt)):''],['Level and class',['Level '+(num(nt.level)||1),nt.cls,nt.adv].filter(Boolean).join(' · ')]])}</div>${edBtn(ek)}</div>
+    ${ed?edBar(ek,'Editing '+ntName(nt)):h`<div class="rdtop foe"><div class="rdtx">${rdFacts([['Role or title',nt.role],['Where you met',nt.place],['Category',ntCat(nt)?npcCatName(ntCat(nt)):''],qnOf(nt)?['Quick NPC',[qnRankName(nt.q.r),(qnCls(nt.q.cls)||{}).n,num(nt.q.sq)>=3?'squad of '+num(nt.q.sq):''].filter(Boolean).join(' ')||'not set up yet']:['Level and class',['Level '+(num(nt.level)||1),nt.cls,nt.adv].filter(Boolean).join(' · ')]])}</div>${edBtn(ek)}</div>
     <div class="mgate secret rdsee"><span class="fl">GM only · what the players see</span><p class="sub">${on?h`Shown to the table: ${ntPreview(nt)}.`:'Hidden from the table.'} Change this in Edit details.</p></div>
     ${String(nt.notes||'').trim()?h`<div class="rdsec"><span class="fl">Notes the table learns once you show them</span><p class="rdnote">${nt.notes}</p></div>`:''}
     ${String(nt.secret||'').trim()?h`<div class="rdsec secret"><span class="fl">GM only · Secret</span><p class="rdnote">${nt.secret}</p></div>`:''}`}
@@ -1032,6 +1036,8 @@ function ntAct(b){
       edit('gt',d.id,'talents.'+d.key,(clamp(num((nt.talents||{})[d.key]),0,2)+1)%3);
       render();break;}
     case 'nt_roll':ntRoll(d.label,num(d.bonus),num(d.tal));break;
+    case 'nt_qon':edit('gt',d.id,'q.on',d.v==='1');render();break;
+    case 'nt_qpip':qnSpend(d.id,d.k,num(d.j));break;
     case 'nt_fr0':{const sc=d.sc||'gt';edit(sc,d.id,'imgc',{x:50,y:50,z:1});if(sc==='gt')ntPublish(d.id);render();break;}
     case 'nt_recharge':edit('gt',d.id,'megaUsed',false);render();break;
     case 'nt_mgadd':case 'nt_mgform':case 'nt_mgreset':case 'nt_mgdrop':case 'nt_mgready':mgAct('nt',d.act.slice(3),d);break;

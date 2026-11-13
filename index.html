@@ -1472,6 +1472,27 @@ input,select,textarea{border-radius:9px}
 .auc.note{border-style:dashed;background:transparent}
 .auc .autx{flex:1 1 240px;min-width:0}
 .auc .aub{flex-wrap:wrap;gap:6px}
+
+/* ----- Homebrew rules (Update 51) ----- */
+.hbn{margin:4px 0 0;padding:2px 8px;border:1px dashed var(--line);border-radius:8px;display:inline-block}
+.hbrules{display:flex;flex-direction:column;gap:6px;border-top:2px solid var(--line);padding-top:10px;margin-top:6px}
+.hbrules h3{margin:8px 0 0;font:700 16px var(--f-display)}
+.hbrules ul{margin:0;padding-left:20px}
+.hbrules p{margin:0}
+.hbrules .tblwrap{overflow-x:auto}
+.hbrules table{border-collapse:collapse;width:100%;min-width:420px}
+.hbrules th,.hbrules td{border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}
+.hbrules th{background:var(--panel)}
+
+/* ----- Quick NPCs (Update 52) ----- */
+.qnstyle{align-items:center;gap:6px;margin:4px 0}
+.ntsheet.qn{display:flex;flex-direction:column;gap:8px}
+.qnfs{display:flex;flex-direction:column;gap:6px}
+.qnf{border:2px solid var(--line);border-radius:10px;background:var(--raised);padding:6px 10px}
+.qnf1{gap:6px 10px;align-items:center;flex-wrap:wrap}
+.qnx{margin:4px 0 0;white-space:pre-line;overflow-wrap:anywhere}
+.qnbox{display:flex;flex-direction:column;gap:6px}
+.qninv{margin-top:8px}
 </style>
 <script>try{var __t=localStorage.getItem('stl.theme');if(__t==='light'||__t==='dark')document.documentElement.setAttribute('data-theme',__t);}catch(e){}</script>
 <div class="dev"><div class="dev-top" aria-hidden="true"><span>SINNOH · TRAINER GEAR</span><span class="dev-on"><i></i>ONLINE</span></div><div class="dev-frame"><div class="shell" id="shell">
@@ -1507,15 +1528,16 @@ input,select,textarea{border-radius:9px}
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
 <!-- The app, in load order. These files share one scope; keep the order. -->
-<script src="js/01-core.js?v=2026-11-12-helper"></script>
-<script src="js/02-species.js?v=2026-11-12-helper"></script>
-<script src="js/03-rolls.js?v=2026-11-12-helper"></script>
-<script src="js/04-battle.js?v=2026-11-12-helper"></script>
-<script src="js/04b-battle-helper.js?v=2026-11-12-helper"></script>
-<script src="js/05-pokedex-contests.js?v=2026-11-12-helper"></script>
-<script src="js/06-world.js?v=2026-11-12-helper"></script>
-<script src="js/07-npc.js?v=2026-11-12-helper"></script>
-<script src="js/08-battlemap.js?v=2026-11-12-helper"></script>
-<script src="js/09-sheets.js?v=2026-11-12-helper"></script>
-<script src="js/10-calendar-main.js?v=2026-11-12-helper"></script>
+<script src="js/01-core.js?v=2026-11-13-quicknpc"></script>
+<script src="js/02-species.js?v=2026-11-13-quicknpc"></script>
+<script src="js/03-rolls.js?v=2026-11-13-quicknpc"></script>
+<script src="js/04-battle.js?v=2026-11-13-quicknpc"></script>
+<script src="js/04b-battle-helper.js?v=2026-11-13-quicknpc"></script>
+<script src="js/05-pokedex-contests.js?v=2026-11-13-quicknpc"></script>
+<script src="js/06-world.js?v=2026-11-13-quicknpc"></script>
+<script src="js/07-npc.js?v=2026-11-13-quicknpc"></script>
+<script src="js/07b-quick-npc.js?v=2026-11-13-quicknpc"></script>
+<script src="js/08-battlemap.js?v=2026-11-13-quicknpc"></script>
+<script src="js/09-sheets.js?v=2026-11-13-quicknpc"></script>
+<script src="js/10-calendar-main.js?v=2026-11-13-quicknpc"></script>
 </body></html>

@@ -446,18 +446,19 @@ function dxLegend(r){
     <p class="sub">${c.t} A captured one loses its ${legTag(r)} moves, passives and features, and its HP drops, rarely above 100.</p></div>`;
 }
 function dxRecView(r,many){
-  const stats=[['HP',num(r.hp)*hpx(),false],['Atk',r.at,true],['Def',r.df,true],['SpA',r.sa,true],['SpD',r.sd,true],['Spe',r.sp,true]];
+  const dsd=dieSides(ptaDie(r));
+  const stats=[['HP',Math.round(num(r.hp)*hpx(ptaDie(r))),false],['Atk',r.at,true],['Def',r.df,true],['SpA',r.sa,true],['SpD',r.sd,true],['Spe',r.sp,true]];
   const ps=r.ps||[],mv=r.mv||[],sk=r.sk||[];
   const lt=legTag(r);
   return h`<div class="dxrec">
     ${many?h`<h3 class="refg">${r.n}</h3>`:''}
     <div class="row">${chipsOf(r.ty)}<span class="pill">${r.sz||'Medium'}</span><span class="pill">${r.wt||'Medium'}</span></div>
     ${dxLegend(r)}
-    <div class="dxst">${stats.map(([l,v,m])=>h`<div class="dxs"><span>${l}</span><b>${num(v)}</b>${m?h`<small>${sgn(mod(num(v)))}</small>`:(l==='HP'&&hpx()!==1?h`<small title="The handbook’s HP, before the table’s ×${hpx()} multiplier">book ${num(r.hp)}</small>`:'')}</div>`)}</div>
+    <div class="dxst">${stats.map(([l,v,m])=>h`<div class="dxs"><span>${l}</span><b>${num(v)}</b>${m?h`<small>${sgn(mod(num(v)))}</small>`:(l==='HP'&&S.me.admin&&hpx(ptaDie(r))!==1?h`<small title="GM only: the Pokédex HP, before the homebrew multiplier">book ${num(r.hp)}</small>`:'')}</div>`)}</div>
     ${sk.length?h`<p><b>Skills</b> ${sk.map(x=>x.n+(x.t?' ('+x.t+')':'')).join(', ')}</p>`:''}
     ${ps.length?h`<h3 class="refg">Passives</h3><dl class="refdl">${ps.map(x=>h`<dt>${x.n}${x.lg?h` <span class="pill leg">${lt}</span>`:''}</dt><dd>${x.t||''}</dd>`)}</dl>`:''}
-    ${mv.length?h`<h3 class="refg">Moves</h3><ul class="dxmvs">${mv.map(x=>h`<li><div class="row"><b>${x.n}</b>${tmNo(x.n)?h`<span class="pill tmno" title="TM, TR or HM ${tmPad(tmNo(x.n))} teaches this move">No. ${tmPad(tmNo(x.n))}</span>`:''}${chipsOf([x.t])}<span class="pill">${x.k||''}</span><span class="pill">${x.f||''}</span>${x.lg?h`<span class="pill leg">${lt}</span>`:''}</div>
-      <p class="sub">${[x.r,x.d].filter(Boolean).join(' · ')}</p>${x.x?h`<p>${x.x}</p>`:''}</li>`)}</ul>`:''}
+    ${mv.length?h`<h3 class="refg">Moves</h3><ul class="dxmvs">${mv.map(x=>h`<li><div class="row"><b>${x.n}</b>${tmNo(x.n)?h`<span class="pill tmno" title="TM, TR or HM ${tmPad(tmNo(x.n))} teaches this move">No. ${tmPad(tmNo(x.n))}</span>`:''}${chipsOf([x.t])}<span class="pill">${x.k||''}</span><span class="pill">${hbFreq(x.f||'',dsd)}</span>${x.lg?h`<span class="pill leg">${lt}</span>`:''}</div>
+      <p class="sub">${[x.r,hbDice(x.d,dsd)].filter(Boolean).join(' · ')}</p>${x.x?h`<p>${x.x}</p>`:''}</li>`)}</ul>`:''}
   </div>`;
 }
 function dxEvoLinks(c,r){

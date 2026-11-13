@@ -859,3 +859,60 @@ On the Battle page, a **Battle helper** box appears above the turn order when th
 - **Move uses.** Roll attack on a daily move fills in one use dot. With no uses left the roll is refused; tap a dot to clear it if that is wrong. Damage only never spends a use.
 - The counts start again with each new battle (Roll initiative after End battle).
 - Not automated: the Paralysis and Confusion checks made when attacking, Bound's contested check, and field conditions (those keep their own panel).
+
+## Homebrew rules switch (Update 51)
+
+The GM Desk's old **HP multiplier for every Pokémon** setting is gone. In its place is a GM-only **Rules in use** switch: **Rules as written** or **Homebrew**. Players never see the switch, and nothing on their screens says which rules are on.
+
+**What Homebrew changes, by Monster die**
+
+| Monster die | Max HP | Damaging moves | Daily uses |
+|---|---|---|---|
+| d4 or d6 | as written | as written | as written |
+| d8 | ×1.25 | +1 power | as written |
+| d10 or d12 | ×1.5 | +1 power | 3/day becomes 4/day, 1/day becomes 2/day |
+
+- **+1 power** is one more die of the move's own size: 3d8 rolls 4d8, 2d6 rolls 3d6, 3dM rolls four Monster dice.
+- **Flipping the switch** rescales the HP of every player's Pokémon, NPC team and foe at once. Current HP stays in proportion, and flipping back undoes it. HP is rounded to the nearest whole number.
+- **What players see:** their sheets, use dots, rolls and the Pokédex show the homebrew numbers with no label. Your GM view adds a short "Homebrew: …" note on sheets and foe cards, and the Pokédex shows the book HP next to the new number for you only.
+- **Saved moves are not changed.** A Pokémon's move is still saved as 3/day and 3d8; the extra use and die are added when it is shown or rolled. The Edit details form shows the saved values.
+- **Mega Evolution:** a Mega uses its Mega die for power and uses. HP follows the Pokémon's own die, so Mega Evolving does not move its HP.
+- **Pokémon with no Monster die** are as written.
+- **Alphas act twice:** under Homebrew, an Alpha's row in the turn order shows "Acts twice" (GM only). You run the second action. Totems and Titans act once.
+- **House rules page:** "Show the house rules" on the GM Desk lists the table above plus the table rules the site does not enforce (two commands a round outside League and gym battles, prey fleeing at a quarter HP) and the encounter-sizing guide from the simulations.
+- **Fix HP:** if any Pokémon's HP does not match the rules in use (for example a sheet made under the old ×2 multiplier, or one whose Monster die was changed), the GM Desk lists them with a button to fix them all.
+
+**Battle helper fix:** a Burned, Frostbitten or Paralyzed Pokémon is offered its stat drop only when it does not already have that ▼. A ▼ from the status no longer stacks to ▼▼▼.
+
+## Quick NPCs (Update 52)
+
+The GM's *Quick & Simple NPCs V2* rules are built in, as GM-only tools. They work whichever rules are in use, and players never see any of it. The random team tables are left out; build teams with the usual species picker.
+
+### Quick NPC trainers
+
+- **Full or Quick.** In an NPC's Edit details, **Sheet** switches between the full trainer sheet and **Quick NPC**. Quick hides level, handbook class, stats, skills and features; the team, inventory, reveal settings and battle buttons work as before. Switching back to Full keeps everything you entered.
+- **Rank and class.** Pick a rank (Novice, Skilled, Specialist, Experienced, Ace) and a class: the basic classes, the three grunts, Type Ace (with its type) or any specialist. Features are cumulative by rank; a Specialist has only the Experienced feature. The rank's description is shown as a guide for building the team.
+- **Templates.** Experienced and Ace NPCs can be a **Veteran** (an extra Skilled or Experienced feature from any class). Ace NPCs can be a **Champion or Boss** (pick one feature; its numbers are doubled).
+- **Squads.** Set the number of trainers (3 or more) to make the NPC a Squad. Its Pokémon show "Squad: 2 of 4 command" in the turn order, and its feature dots are one shared pool.
+- **Features** show their exact text, with use dots for 2/combat, 1/combat and 1/day features. The dots belong to the current battle and start again in the next one.
+- **Skill checks:** two buttons roll d20 + Rank, and d20 + Rank + 3 for their line of work.
+
+**What the site applies when a Quick NPC's Pokémon enter a battle:** flat damage (Competitor), Defense and Special Defense (Caretaker), bonus moves (Performer, Idol, Biker, Officer, Artist, Water Type Ace), bonus passives (the grunts', Backpacker, Medic, Ninja and the Type Ace passives), neutral natures, and 3/day moves become 2 per combat. Everything conditional (positions, rules, "last Pokémon", type matchups) shows as text on the foe's sheet for you to rule.
+
+### Wild ranks and Swarms
+
+- **Wild rank** on a foe's Edit details: None, Skilled, Experienced or Ace, a **wild class** (Bruiser, Hunter, Leader, Lurker, Skirmisher, Trickster) and, for Experienced and Ace, an **Enhanced class** (Titan, Alpha, Totem, Ultra Beast, Paradox). A foe can have a wild rank or a GM Guide Alpha, Totem or Titan kind, not both.
+- **HP** comes from the written Pokédex HP: Skilled +8, Experienced ×2, Ace ×2 + 150. Each rank's line is read as its total, not added to the one before. The homebrew HP multiplier does not apply to ranked wilds.
+- **Moves:** 3/day moves are 2 per combat (5 per combat at Ace).
+- **Experienced and Ace:** the Battle helper adds +4 to their Affliction checks, and the catch calculator blocks every ball except a Master Ball until they are below 30 HP.
+- **Turn order (GM only):** "Experienced Bruiser" and, for an Experienced or Ace Enhanced Alpha, "Two turns".
+- **Swarm:** "As a Swarm" on Add a foe adds 2 to 40 members with halved HP and 2-per-combat moves, labelled "Swarm: 2 of 8 act" (a quarter, rounded up).
+- **Capture:** a caught ranked wild loses its rank's HP and features, and the capture note (also saved to its private GM notes) lists the **Captured** passives to choose from.
+
+### With the homebrew rules on
+
+Quick NPC Pokémon and ranked wilds still get **+1 power** by Monster die, and NPC trainers' Pokémon get the homebrew HP. Their move uses follow the Quick NPC rules (2 per combat) instead of the homebrew daily uses.
+
+### Also fixed
+
+The version label at the foot of each page said "Homebrew rules" in Update 51, which players could see. It now reads "Quick NPCs".

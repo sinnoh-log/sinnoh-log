@@ -829,6 +829,7 @@ function ccCalc(o){
   const master=o.ball==='master'&&!(o.cust!==''&&Number.isFinite(cu));
   let blocked='';
   if(o.titan&&!master)blocked='A Titan cannot be caught with anything but a Master Ball.';
+  else if(o.r30&&!master&&num(o.cur)>=30)blocked='An Experienced or Ace wild Pokémon cannot be caught by Poké Balls unless it is below 30 HP.';
   else if(o.alpha&&!master&&!half)blocked='An Alpha, Totem or Titan can only be caught with a Master Ball unless it is at half of its max HP or lower.';
   /* d100 + ball modifier must come out under the rate, with no ties */
   let need=Math.max(0,Math.min(100,rate-bm-1));
@@ -934,7 +935,7 @@ function ccFoeLine(cid,f){
   const r=(()=>{
     const ra=ccRarityOf(f.sp),sg=ccStageOf(f.sp);
     const aff={};afflList(f.st).forEach(a=>{const k=Object.keys(CC_AFF).find(x=>dexKey(x)===dexKey(a));if(k)aff[k]=true;});
-    return ccCalc(Object.assign({},sv,{rar:ra||sv.rar,stage:sg||sv.stage,hpm:'num',cur:String(num(f.hp&&f.hp.cur)),max:String(num(f.hp&&f.hp.max)),aff,alpha:foeKind(f)==='alpha'||foeKind(f)==='totem',titan:foeKind(f)==='titan'}));
+    return ccCalc(Object.assign({},sv,{rar:ra||sv.rar,stage:sg||sv.stage,hpm:'num',cur:String(num(f.hp&&f.hp.cur)),max:String(num(f.hp&&f.hp.max)),aff,r30:qwBig(f),alpha:foeKind(f)==='alpha'||foeKind(f)==='totem',titan:foeKind(f)==='titan'}));
   })();
   return h`<div class="row cc1"><span class="sub">Catch chance now with ${r.ballName}: <b class="mono">${ccPct(r.chance)}</b>${r.blocked?' (not with this ball)':''}</span><button class="btn sm" data-act="cc_use" data-cid="${cid}">Open in calculator</button></div>`;
 }

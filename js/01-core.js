@@ -1,6 +1,6 @@
 'use strict';
 /* Sinnoh Trainer Log · 01-core. The files in js/ are classic scripts that share one scope: load them in order (see index.html). */
-const BUILD='2026-11-12 · Battle helper';
+const BUILD='2026-11-13 · Quick NPCs';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -64,7 +64,7 @@ function npcCatOf(cat,text,gm){
 /* end npc-cats */
 const LEAD_STATES=[['open','Open'],['chasing','Chasing'],['resolved','Resolved'],['dead','Dead end']];
 const LOY_WORDS=['Defiant','Distrustful','Obedient','Trusting','Devoted','Bonded'];
-const DEF_META={campaign:'Sinnoh Trainer Log',subtitle:'Post-game Sinnoh · ten years after Team Galactic',gm:'',session:1,pinned:'',ribbonNeed:5,hpx:2};
+const DEF_META={campaign:'Sinnoh Trainer Log',subtitle:'Post-game Sinnoh · ten years after Team Galactic',gm:'',session:1,pinned:'',ribbonNeed:5,hb:false};
 const NAV=[
   ['Narrative',[['overview','Overview'],['journal','Journal'],['timeline','Timeline'],['cal','Calendar']]],
   ['World',[['people','People'],['leads','Leads'],['map','Map']]],

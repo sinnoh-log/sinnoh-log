@@ -250,7 +250,7 @@ function btAddParty(uid){
 function foeFromRec(rec,si,sp){
   if(rec){
     const F=ptaFields(rec);
-    return {sp:rec.n,ty:F.types,sz:F.size,wt:F.weight,hp:{cur:F.hp,max:F.hp},hpx:hpx(),base:F.base,sk:F.skills,ps:F.passives,mv:F.moves,die:F.die};
+    return {sp:rec.n,ty:F.types,sz:F.size,wt:F.weight,hp:{cur:F.hp,max:F.hp},hpx:hpx(F.die),base:F.base,sk:F.skills,ps:F.passives,mv:F.moves,die:F.die};
   }
   if(si)return {sp:si.name,ty:si.types.slice(),sz:'Medium',wt:'Medium',hp:{cur:20,max:20},base:Object.assign({},si.base),sk:'',ps:[],mv:[]};
   return {sp,ty:['',''],sz:'Medium',wt:'Medium',hp:{cur:20,max:20},base:{atk:3,def:3,spa:3,spd:3,spe:3},sk:'',ps:[],mv:[]};
@@ -265,9 +265,11 @@ async function btAddFoe(){
   const u=S.ui.bt;
   const sp=String(u.foeSp||'').trim();
   if(!sp){toast('Type a species first.');return;}
-  const n=clamp(Math.round(num(u.foeN))||1,1,8);
-  await btAddFoeSp(sp,n,n===1?String(u.foeNick||'').trim():'','');
-  u.foeSp='';u.foeNick='';u.foeN=1;
+  const sw=!!u.foeSw;
+  const n=clamp(Math.round(num(u.foeN))||1,1,sw?40:8);
+  if(sw&&n<2){toast('A Swarm needs at least two Pokémon.');return;}
+  await btAddFoeSp(sp,n,n===1?String(u.foeNick||'').trim():'','',sw?{swarm:{n,g:'w'+Date.now().toString(36)}}:null);
+  u.foeSp='';u.foeNick='';u.foeN=1;u.foeSw=false;
   render();
 }
 /* ----- Alpha, Totem and Titan Pokémon (PTA GM Guide, Encounter Building, converted to the 3.5 rules in Update 48: Alpha Beam and Alpha Impact are the 3.5 Hyper Beam and Giga Impact, the aura's Passives are temporary Passives, healing is a flat number). The GM can set a kind on any foe, even one already in the battle, and undo it. ----- */
@@ -374,6 +376,7 @@ function foeSetKind(cid,k){
   if(!S.me.admin)return;
   const f=foeOf(cid);
   if(!f)return;
+  if(k&&f.qr){toast('This foe has a Quick wild rank. Set its rank to None first: a foe uses one or the other.');return;}
   const nf=JSON.parse(JSON.stringify(f));
   if(k&&KIND_DEF[k])foeKindApply(nf,k);else foeKindUndo(nf);
   edit('gb','battle','foes.'+cid,nf);
@@ -393,6 +396,7 @@ async function btAddFoeSp(sp,n,nick,note,opts){
     const base=foeFromRec(rec,si,sp);
     const f=Object.assign({nick:nick||'',bonus:zeroStats(),stages:zeroStats(),st:'',notes:note||'',sh:Object.assign({},SHOW_NONE),pn:foeLetter()},base);
     if(opts&&opts.alpha)foeKindApply(f,'alpha');else if(opts&&opts.kind)foeKindApply(f,opts.kind);
+    else if(opts&&opts.swarm){qwApply(f,'swarm');f.sw=opts.swarm;}
     edit('gb','battle','foes.'+cid,f);
     btInsert(cid,{s:'f',pub:foePub(f)},fSpd(f)+(b.mode==='d20'?rnd(20):0),rnd(20));
   }
@@ -519,12 +523,12 @@ function foeRoll(cid,i,onlyDmg){
   const u=S.ui.bt;
   if(needDie(x,monDie(f),foeLabel(f)+(megaOn(f)?' (Mega)':'')))return;
   const info=u.tgt&&btC(u.tgt)?btInfo(u.tgt,true):null;
-  const prep=auRollPrep('gb','battle','foes.'+cid+'.mv.'+i,x,cid,!!onlyDmg);
+  const prep=auRollPrep('gb','battle','foes.'+cid+'.mv.'+i,effMove(x,f),cid,!!onlyDmg);
   if(!prep)return;
   const c=atkCalc({
     mv:prep.x,die:monDie(f),aTypes:foeTypes(f),aAcc:isEff(k)?fSpd(f):fStat(f,ks.acc),aDmg:ks.dmg?fStat(f,ks.dmg):0,aStage:ks.dmg?stg(f,ks.dmg):0,
     tTypes:info?info.types:null,tDef:info&&info.stat?(isEff(k)?info.stat.spe:info.stat[fcSwapDef(u.tgt,ks.def)]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
-    eff:u.eff||'auto',adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:false,
+    eff:u.eff||'auto',adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:false,dmgBonus:num(f.qn&&f.qn.dmg),
     aPs:f.ps,aHp:f.hp,tPs:info?(info.side==='a'?(info.m.passives||[]):((info.f&&info.f.ps)||[])):null,tHp:info?(info.side==='a'?info.hp:(info.f&&info.f.hp)):null,tog:psTog(u),
     fcA:fcAt(cid),fcT:u.tgt?fcAt(u.tgt):[]
   });
@@ -591,6 +595,7 @@ function foeGive(cid){
   const id=S.db.collection('trainers').doc(uid).collection('pokemon').doc().id;
   /* a captured Alpha, Totem or Titan loses what the wild gave it (GM Guide) and gains the small thing it keeps */
   const g=JSON.parse(JSON.stringify(f));
+  const qnote=qnStrip(g);
   const k0=foeKind(g);
   if(k0)foeKindUndo(g);
   let hp=g.hp||{cur:20,max:20};
@@ -616,6 +621,7 @@ function foeGive(cid){
     item:f.item||'',up:f.up||'',down:f.down||'',natureName:f.natureName||'',gender:f.gender||'',die:f.die||'',shiny:f.shiny===true,mega:f.mega?JSON.parse(JSON.stringify(f.mega)):null,
     caught:'Caught in the wild, session '+(num(S.meta.session)||1)
   },f.hpx?{hpx:num(f.hpx)}:{})));
+  note+=qnote;
   /* the note is also kept in the Pokémon's GM-only private notes, because the status line is overwritten by "Saving…" within a moment */
   if(note)newDoc('gl',id,Object.assign({uid,pid:id,note:'Capture note:'+note},num((f.hp||{}).cur)<=0?{loyalty:0}:{}));
   btRemove(cid);
@@ -707,7 +713,7 @@ function btFoeBody(cid,v,idx){
   const ek='f'+cid,ed=isEd(ek);
   const psOpen=!!S.ui.open['fps'+cid];
   return h`<div class="bbody fsheet ${ed?'':'rd'}">
-    ${ed?edBar(ek,'Editing '+(f.nick||f.sp||'this foe')):h`<div class="rdtop foe"><div class="rdtx">${rdFacts([['Species',f.sp],['Gender',f.gender],['Size',[f.sz,f.wt].filter(Boolean).join(', ')],['Monster die',f.die],['Nature',natureTxt(f)],['Held item',f.item]])}</div>${edBtn(ek)}</div>`}
+    ${ed?edBar(ek,'Editing '+(f.nick||f.sp||'this foe')):h`<div class="rdtop foe"><div class="rdtx">${rdFacts([['Species',f.sp],['Gender',f.gender],['Size',[f.sz,f.wt].filter(Boolean).join(', ')],['Monster die',f.die],['Nature',natureTxt(f)],['Held item',f.item]])}${hbNote(f.die,monDie(f))&&!f.pc?h`<p class="sub hbn">${hbNote(f.die,monDie(f))}</p>`:''}</div>${edBtn(ek)}</div>${qnFoeBox(cid,f)}`}
     ${ed?'':h`<div class="mgate secret rdsee"><span class="fl">GM only · what the players see</span>
       <p class="sub"><b>${pub.n}</b>${pub.sp?'':' (no picture)'}${pub.ty?' · '+(pub.ty.join(' / ')||'types'):' · types hidden'}${pub.hp?(pub.hp.c!=null?' · health '+pub.hp.c+'/'+pub.hp.m:' · health bar'):' · health hidden'}${pub.it?' · holding '+pub.it:''}${pub.mg?' · Mega-evolved':''}${pub.down?' · Down':''}</p>
       <div class="row"><button class="btn sm" data-act="b_reveal" data-cid="${cid}" data-v="all">Show everything</button><button class="btn sm ghost" data-act="b_reveal" data-cid="${cid}" data-v="none">Hide everything</button></div></div>`}
@@ -737,6 +743,7 @@ function btFoeBody(cid,v,idx){
     <div class="mgd secret fkind"><span class="fl">GM only · Alpha, Totem or Titan</span>
       <div class="row evchips" role="group" aria-label="Kind of wild Pokémon">${[['','Normal'],['alpha','Alpha'],['totem','Totem'],['titan','Titan']].map(([k,l])=>h`<button class="btn sm chk" data-act="b_kind" data-cid="${cid}" data-k="${k}" aria-pressed="${String(foeKind(f)===k)}">${l}</button>`)}</div>
       <p class="sub">${foeKind(f)?'Doubled HP, stat bonuses, new passives and moves are in place (Titan: HP ×10 and Huge size). Choose Normal to undo them.':'Choose a kind to apply the PTA GM Guide rules, converted to 3.5, to this foe. You can undo it at any time.'}</p>${foeKind(f)&&num(f.kd&&f.kd.v)<2?h`<p class="sub">This foe has the older 3.0 text. Tap its kind again to bring it up to 3.5. Current HP stays in proportion.</p>`:''}</div>`}
+    ${!ed?'':qwRow(cid,f)}
     ${!ed&&foeKind(f)&&num(f.kd&&f.kd.v)<2?h`<p class="sub">This foe has the older 3.0 text. Open Edit details and tap its kind again to bring it up to 3.5.</p>`:''}
     <div class="stats">${STATS.map(s=>h`<div class="stat lcd"><span class="sl">${s[2]}</span><span class="sv">${fStat(f,s[0])}</span><span class="sm"><span>mod ${sgn(mod(fStat(f,s[0])))}</span>${megaBonus(f,s[0])?h`<span class="mbn">Mega ${sgn(megaBonus(f,s[0]))}</span>`:''}</span>
       ${!ed?'':h`<div class="mini"><label>Base<input type="number" ${bd('gb','battle',P+'base.'+s[0])} value="${num(f.base&&f.base[s[0]])}"></label><label>Adj<input type="number" ${bd('gb','battle',P+'bonus.'+s[0])} value="${num(f.bonus&&f.bonus[s[0]])}"></label></div>`}</div>`)}</div>
@@ -750,7 +757,7 @@ function btFoeBody(cid,v,idx){
       ${mrPsLine('bt',f,S.ui.bt.tgt&&btC(S.ui.bt.tgt)?((x=>x?(x.side==='a'?x.m:x.f):null)(btInfo(S.ui.bt.tgt,true))):null,null)}
       <div class="row"><div class="seg" role="group" aria-label="Roll mode">${[['normal','Normal'],['adv','Advantage'],['dis','Disadvantage']].map(([k,l])=>h`<button data-act="adv" data-v="${k}" aria-pressed="${String(S.ui.adv===k)}">${l}</button>`)}</div>
         <label class="row"><input type="checkbox" data-act="b_secret" ${S.ui.secret?raw('checked'):''}><span>Roll in secret (not shared)</span></label></div>
-      ${!mvs.length?h`<p class="sub">No moves yet. ${ed?'Add one, or type a move name to fill it in from the handbook.':'Use Edit details to add them.'}</p>`:!ed?mvs.map((x,i)=>mvRead('gb','battle',P+'mv.'+i,x,false,'fmx'+cid+'#'+i,x.kind==='Style'?'':h`<div class="row"><button class="btn primary sm" data-act="b_fmroll" data-cid="${cid}" data-i="${i}">Roll attack</button><button class="btn sm" data-act="b_fmdmg" data-cid="${cid}" data-i="${i}">Damage only</button></div>`)):mvs.map((x,i)=>h`<div class="move ${x.kind==='Style'?'mvstyle':''}"><div class="mv1">${fText('Move','gb','battle',P+'mv.'+i+'.name',S.battleGm,{list:'dl-moves'})}${fText('Uses','gb','battle',P+'mv.'+i+'.freq',S.battleGm,{})}<span></span>${rowBtns('gb','battle',P+'mv',i,mvs.length,false)}</div>
+      ${!mvs.length?h`<p class="sub">No moves yet. ${ed?'Add one, or type a move name to fill it in from the handbook.':'Use Edit details to add them.'}</p>`:!ed?mvs.map((x,i)=>mvRead('gb','battle',P+'mv.'+i,effMove(x,f),false,'fmx'+cid+'#'+i,x.kind==='Style'?'':h`<div class="row"><button class="btn primary sm" data-act="b_fmroll" data-cid="${cid}" data-i="${i}">Roll attack</button><button class="btn sm" data-act="b_fmdmg" data-cid="${cid}" data-i="${i}">Damage only</button></div>`)):mvs.map((x,i)=>h`<div class="move ${x.kind==='Style'?'mvstyle':''}"><div class="mv1">${fText('Move','gb','battle',P+'mv.'+i+'.name',S.battleGm,{list:'dl-moves'})}${fText('Uses','gb','battle',P+'mv.'+i+'.freq',S.battleGm,{})}<span></span>${rowBtns('gb','battle',P+'mv',i,mvs.length,false)}</div>
         <div class="mv2">${fSel('Kind','gb','battle',P+'mv.'+i+'.kind',S.battleGm,KINDS,{})}${fSel('Type','gb','battle',P+'mv.'+i+'.type',S.battleGm,TYPES,{})}${fText('Range','gb','battle',P+'mv.'+i+'.range',S.battleGm,{})}${fText('Damage','gb','battle',P+'mv.'+i+'.dice',S.battleGm,{ph:'e.g. 3d8'})}</div>
         ${fArea('Effect','gb','battle',P+'mv.'+i+'.text',S.battleGm,{rows:2})}
         ${x.kind==='Style'?h`<p class="sub stynote"><span class="pill sty">Style</span> No attack roll and no damage.</p>`:h`<div class="row"><button class="btn primary sm" data-act="b_fmroll" data-cid="${cid}" data-i="${i}">Roll attack</button><button class="btn sm" data-act="b_fmdmg" data-cid="${cid}" data-i="${i}">Damage only</button></div>`}</div>`)}
@@ -779,9 +786,10 @@ function btAddPanel(){
       <div class="fgrid">
         <label class="fld"><span class="fl">Species</span><input type="text" list="dl-species" data-u="bt.foeSp" data-nr value="${u.foeSp}" placeholder="e.g. Houndoom"></label>
         <label class="fld"><span class="fl">Name (optional)</span><input type="text" data-u="bt.foeNick" data-nr value="${u.foeNick}"></label>
-        <label class="fld"><span class="fl">How many</span><input type="number" inputmode="numeric" min="1" max="8" data-u="bt.foeN" data-nr value="${u.foeN}"></label>
+        <label class="fld"><span class="fl">How many</span><input type="number" inputmode="numeric" min="1" max="${u.foeSw?40:8}" data-u="bt.foeN" data-nr value="${u.foeN}"></label>
       </div>
-      <div class="row"><button class="btn primary sm" data-act="b_addfoe">Add foe</button></div></div>
+      <div class="row"><button class="btn primary sm" data-act="b_addfoe">${u.foeSw?'Add swarm':'Add foe'}</button><button class="btn sm chk" data-act="b_swarm" aria-pressed="${String(!!u.foeSw)}" title="Quick NPC rules: halved HP, and a quarter of the swarm acts each round">As a Swarm</button></div>
+      ${u.foeSw?h`<p class="sub">Swarm: each member's max HP is halved, 3/day moves are 2 per combat, and only a quarter of the swarm (rounded up) takes turns each round. Up to 40 members.</p>`:''}</div>
     ${encBattlePanel()}
     ${ccPanel('bat')}
     ${ntBattlePanel()}
@@ -847,6 +855,7 @@ function evoLogDesk(){
 /* ----- actions ----- */
 function batAct(b,e){
   const d=b.dataset;
+  if(qnBattleAct(d))return;
   switch(d.act){
     case 'b_open':S.ui.bt.open[d.cid]=!S.ui.bt.open[d.cid];render();break;
     case 'b_hp':btHp(d.cid,num(d.d));break;

@@ -667,7 +667,7 @@ function ptaFields(r){
   return {
     types:[t[0]||'',t[1]||''],
     base:{atk:num(r.at),def:num(r.df),spa:num(r.sa),spd:num(r.sd),spe:num(r.sp)},
-    hp:Math.round(num(r.hp)*hpx()),
+    hp:Math.round(num(r.hp)*hpx(ptaDie(r))),
     die:ptaDie(r),
     size:SIZES.indexOf(r.sz)>=0?r.sz:'Medium',
     weight:WEIGHTS.indexOf(r.wt)>=0?r.wt:'Medium',
@@ -725,7 +725,7 @@ function ptaApply(uid,pid,rec,force){
   if(ok.hp){
     const cur=num(hp.cur)>=num(hp.max)?F.hp:Math.min(num(hp.cur),F.hp);
     edit('p',id,'hp',Object.assign({},hp,{cur,max:F.hp}));sig.hp=hsh(String(F.hp));
-    edit('p',id,'hpx',hpx());
+    edit('p',id,'hpx',hpx(F.die));
   }else kept.push('HP');
   if(ok.di){edit('p',id,'die',F.die);sig.di=hsh(F.die);}else if(F.die&&m.die!==F.die)kept.push('Monster die');
   if(ok.sz){edit('p',id,'size',F.size);sig.sz=hsh(F.size);}else kept.push('size');
@@ -778,25 +778,55 @@ function ptaRowFill(t){
 }
 
 /* ---------- GM Desk: import ---------- */
-/* ---------- House rule: every Pokémon's HP is the handbook number times a multiplier (the GM sets it; the default is double) ---------- */
-function hpx(){
-  const v=Math.round(Number(S.meta&&S.meta.hpx));
-  return v>=1&&v<=5?v:1;
+/* ---------- Homebrew rules (Update 51) ----------
+   One GM-only switch, meta.hb. Off is the rules as written. On, a Pokémon's Monster die decides what it gains:
+     d8         max HP ×1.25, and +1 power (one more die of the move's own size) on damaging moves
+     d10, d12   max HP ×1.5, +1 power, and 3/day moves become 4/day, 1/day moves become 2/day
+   HP is saved on each sheet, so every sheet also records the multiplier its HP was set up at (`hpx`); the others are worked out when shown or rolled.
+   A Mega uses its Mega die for power and uses; HP follows the Pokémon's own die, so Mega Evolving mid-battle does not move its HP.
+   Players are not told which rules are on: nothing below labels a number for them. */
+const hbOn=()=>!!(S.meta&&S.meta.hb);
+const hbTier=sides=>!hbOn()?0:sides>=10?2:sides===8?1:0;
+/* the HP multiplier for a Pokémon with this Monster die ('d8', '1d10', 8...) */
+function hpx(die){
+  const t=hbTier(dieSides(die));
+  return t===2?1.5:t===1?1.25:1;
 }
-/* the multiplier a Pokémon's current HP was set up at. Sheets from before the rule have no mark, which means ×1. */
+/* the multiplier a Pokémon's current HP was set up at. A sheet with no mark is at ×1. */
 function hpxOf(m){
-  const v=Math.round(num(m&&m.hpx));
-  return v>=1?v:1;
+  const v=Number(m&&m.hpx);
+  return v>=1&&v<=10?v:1;
 }
-/* every Pokémon whose HP is at a different multiplier from the table's: players' Pokémon, NPC teams and foes in the battle */
+const hbFreq=(freq,sides)=>hbTier(sides)<2?freq:String(freq||'').replace(/^(\s*)3(\s*\/\s*day)/i,'$14$2').replace(/^(\s*)1(\s*\/\s*day)/i,'$12$2');
+function hbDice(dice,sides){
+  if(hbTier(sides)<1)return dice;
+  const m=/^(\s*)(\d+)(\s*d)/i.exec(String(dice||''));
+  return m?m[1]+(+m[2]+1)+String(dice).slice(m[0].length-m[3].length):dice;
+}
+/* a move as it is used and shown for a Pokémon with this Monster die (the saved move is never changed) */
+function hbMove(x,sides){
+  if(!x||!hbTier(sides))return x;
+  const freq=hbFreq(x.freq,sides),dice=hbDice(x.dice,sides);
+  return freq===x.freq&&dice===x.dice?x:Object.assign({},x,{freq,dice});
+}
+/* a short GM-only note of what the homebrew rules give this Pokémon; '' when nothing or when the viewer is a player */
+function hbNote(die,sides){
+  if(!S.me.admin)return '';
+  const t=hbTier(sides==null?dieSides(die):sides);
+  return t?'Homebrew: HP ×'+(t===2?'1.5':'1.25')+', +1 power'+(t===2?', 4/day and 2/day uses':''):'';
+}
+/* every Pokémon whose HP is at a different multiplier from the one the rules now give it: players' Pokémon, NPC teams and foes in the battle */
 function hpxList(){
-  const want=hpx(),out=[];
+  const out=[];
   const add=(sc,id,path,m,who,cid)=>{
     const hp=m&&m.hp;
+    const want=hpx(m&&m.die);
     if(!hp||num(hp.max)<=0||hpxOf(m)===want)return;
-    /* a blank sheet (20 / 20 and never filled in) has no real HP to scale; filling it in from the handbook already uses the new number */
+    /* a blank sheet (20 / 20 and never filled in) has no real HP to scale; filling it in from the handbook already uses the right number */
     if(sc==='p'&&num(hp.max)===20&&num(hp.cur)===20&&!(m.autoSig&&m.autoSig.hp))return;
-    out.push({sc,id,path,m,hp,from:hpxOf(m),cid:cid||'',who});
+    /* a ranked wild Pokémon's HP comes from its rank, not from its die (Update 52) */
+    if(m.qr)return;
+    out.push({sc,id,path,m,hp,from:hpxOf(m),want,cid:cid||'',who});
   };
   Object.keys(S.pokemon||{}).forEach(uid=>{
     const box=S.pokemon[uid]||{};
@@ -811,39 +841,68 @@ function hpxList(){
   return out;
 }
 /* current and maximum HP both change by the same factor, so damage already taken stays in proportion */
-function hpxApply(){
-  if(!S.me.admin)return;
-  const want=hpx(),list=hpxList();
-  if(!list.length){toast('Every Pokémon is already at ×'+want+'.');return;}
+function hpxApply(quiet){
+  if(!S.me.admin)return 0;
+  const list=hpxList();
+  if(!list.length){if(!quiet)toast('Every Pokémon already has the right HP.');return 0;}
   list.forEach(x=>{
-    const k=want/x.from;
+    const k=x.want/x.from;
     const oldMax=num(x.hp.max),oldCur=num(x.hp.cur);
     const max=Math.max(1,Math.round(oldMax*k));
     const cur=oldCur<=0?0:clamp(Math.round(oldCur*k),1,max);
     edit(x.sc,x.id,x.path+'hp',Object.assign({},x.hp,{cur,max}));
-    edit(x.sc,x.id,x.path+'hpx',want);
+    edit(x.sc,x.id,x.path+'hpx',x.want);
     if(x.sc==='p'&&x.m.autoSig&&x.m.autoSig.hp===hsh(String(oldMax)))edit('p',x.id,'autoSig.hp',hsh(String(max)));
     if(x.sc==='gb'){
       if(num(x.m.alMax)>0)edit('gb','battle',x.path+'alMax',Math.max(1,Math.round(num(x.m.alMax)*k)));
       foePublish(x.cid);
     }
   });
-  toast('Set '+list.length+' Pokémon to ×'+want+' HP.',true);
+  if(!quiet)toast('Updated the HP of '+list.length+' Pokémon.',true);
+  render();
+  return list.length;
+}
+function hbSet(on){
+  if(!S.me.admin||hbOn()===!!on)return;
+  edit('meta','table','hb',!!on);
+  const n=hpxApply(true);
+  toast((on?'Homebrew rules are on.':'Rules as written are on.')+(n?' Updated the HP of '+n+' Pokémon; damage taken stays in proportion.':''),true);
   render();
 }
 function hpxAct(b){
-  if(b.dataset.act==='hpx_apply')hpxApply();
+  const a=b.dataset.act;
+  if(a==='hpx_apply')hpxApply();
+  else if(a==='hpx_hb')hbSet(b.dataset.v==='1');
+  else if(a==='hpx_rules'){S.ui.open.hbRules=!S.ui.open.hbRules;render();}
 }
 function hpxDesk(){
-  const want=hpx(),list=hpxList();
-  return h`<section class="panel"><div class="ph"><h2>Pokémon HP</h2><span class="pill gm">GM only</span></div>
-    <div class="fgrid">${fNum('HP multiplier for every Pokémon','meta','table','hpx',S.meta,{min:1,max:5})}</div>
-    <p class="sub">The handbook’s HP is multiplied by this number: 1 is the book, 2 is double. It is used when a Pokémon is filled in from the handbook, when it evolves, for wild foes and for NPC teams. The Pokédex shows the multiplied number.</p>
-    ${list.length?h`<div class="hpxgo" role="status"><p><b>${list.length}</b> Pokémon on the site were set up at a different multiplier.</p>
+  const on=hbOn(),list=hpxList(),open=!!S.ui.open.hbRules;
+  return h`<section class="panel"><div class="ph"><h2>Rules in use</h2><span class="pill gm">GM only</span></div>
+    <div class="seg" role="group" aria-label="Rules in use"><button data-act="hpx_hb" data-v="0" aria-pressed="${String(!on)}">Rules as written</button><button data-act="hpx_hb" data-v="1" aria-pressed="${String(on)}">Homebrew</button></div>
+    <p class="sub">${on?'Homebrew is on: stronger evolved Pokémon, by Monster die.':'The handbook and Pokédex are used as written.'} Only you see this switch. Players are not told which is on; their sheets and the Pokédex simply show the numbers in use.</p>
+    ${list.length?h`<div class="hpxgo" role="status"><p><b>${list.length}</b> Pokémon have HP that does not match the rules in use.</p>
       <p class="sub">${list.slice(0,8).map(x=>x.who).join(', ')}${list.length>8?' and '+(list.length-8)+' more':''}.</p>
-      <p class="sub">Their current and maximum HP both change to match ×${want}, so damage already taken stays in proportion. Do this once, right after you change the number.</p>
-      <button class="btn primary" data-act="hpx_apply">Set all ${list.length} to ×${want} HP</button></div>`
-      :h`<p class="sub"><b>Every Pokémon on the site is at ×${want} HP.</b> New ones filled in from the handbook use it automatically.</p>`}
+      <p class="sub">This happens when a Pokémon was set up under an older HP multiplier, or its Monster die was changed. Current and maximum HP change together, so damage taken stays in proportion.</p>
+      <button class="btn primary" data-act="hpx_apply">Fix the HP of ${list.length} Pokémon</button></div>`:''}
+    <button class="btn sm" data-act="hpx_rules" aria-expanded="${String(open)}">${open?'Hide the house rules':'Show the house rules'}</button>
+    ${open?h`<div class="hbrules">
+      <h3>Evolved Pokémon are stronger (the site applies this)</h3>
+      <div class="tblwrap"><table class="tbl"><thead><tr><th>Monster die</th><th>Max HP</th><th>Damaging moves</th><th>Daily uses</th></tr></thead><tbody>
+        <tr><td>d4 or d6</td><td>as written</td><td>as written</td><td>as written</td></tr>
+        <tr><td>d8</td><td>×1.25</td><td>+1 power</td><td>as written</td></tr>
+        <tr><td>d10 or d12</td><td>×1.5</td><td>+1 power</td><td>3/day becomes 4/day, 1/day becomes 2/day</td></tr></tbody></table></div>
+      <ul><li><b>+1 power</b> is one more die of the move's own size: 3d8 rolls 4d8, 2d6 rolls 3d6, 3dM rolls four Monster dice.</li>
+        <li>HP is rounded to the nearest whole number. Flipping the switch rescales every player's Pokémon, NPC team and foe at once.</li>
+        <li>A Mega-evolved Pokémon uses its Mega die for power and uses. Its HP follows its own die.</li>
+        <li>Pokémon with no Monster die are as written.</li></ul>
+      <h3>Alphas act twice (a reminder on the turn order)</h3>
+      <p>An Alpha takes two actions a round. Its row shows “Acts twice”; you run the second action. Totems and Titans act once.</p>
+      <h3>Table rules (the site does not enforce these)</h3>
+      <ul><li><b>Two commands a round.</b> Outside League and gym battles, every trainer, player or NPC, commands two Pokémon each round.</li>
+        <li><b>Prey flees, predators don't.</b> Prey and territorial wild Pokémon run at a quarter of their HP. Packs and predators fight on.</li></ul>
+      <h3>Sizing encounters for three trainers with six Pokémon</h3>
+      <ul><li>Up to 6 wilds that flee: routine.</li><li>7 that flee, or 5 Houndour that don't: a scrap, one or two knockouts.</li><li>8 that flee, or 6 Houndour that don't: dangerous.</li><li>One trainer alone: 2 wilds is fair, 3 is risky.</li><li>Alpha boss: acts twice, with four packmates.</li></ul>
+      <p class="sub">These figures come from simulated fights with basic Pokémon and simple move choices. Treat them as a rough guide; the party will outgrow them.</p></div>`:''}
   </section>`;
 }
 
@@ -897,7 +956,7 @@ function nrRefresh(m,rec){
   if(psCh)bits.push('passives');
   if(skCh)bits.push('skills');
   if(mvCh)bits.push(mvCh+' move'+(mvCh===1?'':'s')+' updated');
-  const mon=Object.assign({},m,{sp:rec.n,ty:F.types.slice(),sz:F.size,wt:F.weight,base:Object.assign({},m.base||{},F.base),sk:F.skills,ps:F.passives.map(x=>Object.assign({},x)),mv,hpx:hpx(),
+  const mon=Object.assign({},m,{sp:rec.n,ty:F.types.slice(),sz:F.size,wt:F.weight,base:Object.assign({},m.base||{},F.base),sk:F.skills,ps:F.passives.map(x=>Object.assign({},x)),mv,hpx:hpx(F.die),
     hp:Object.assign({},m.hp||{},{max:F.hp,cur:oldCur<=0?0:(oldMax>0&&oldCur<oldMax?clamp(Math.round(oldCur*F.hp/oldMax),1,F.hp):F.hp)})});
   return {mon,bits,miss:mvMiss};
 }
@@ -968,7 +1027,7 @@ function nrDesk(){
       <p><b>${u.rows.length}</b> of ${u.total} NPC Pokémon differ from the handbook${u.same?'; '+u.same+' already match':''}.</p>
       ${u.rows.length?h`<ul class="mini-list">${u.rows.slice(0,40).map(r=>h`<li><b>${r.sp}</b> <span class="sub">${r.who}: ${r.bits.join(', ')||'no changes'}${r.miss.length?'. Not in the handbook, kept as is: '+r.miss.join(', '):''}</span></li>`)}</ul>${u.rows.length>40?h`<p class="sub">…and ${u.rows.length-40} more.</p>`:''}`:''}
       ${u.unk.length?h`<p class="sub">Not found in the handbook, left alone: ${u.unk.slice(0,12).join(', ')}${u.unk.length>12?' and '+(u.unk.length-12)+' more':''}.</p>`:''}
-      ${u.rows.length?h`<div class="row"><button class="btn sm" data-act="nr_backup" ${S.dl?'':raw('disabled')}>Download a backup first</button><button class="btn primary" data-act="nr_apply" ${u.busy?raw('disabled'):''}>Update ${u.rows.length} Pokémon</button></div><p class="sub">Their HP uses the table’s ×${hpx()} multiplier, and damage already taken stays in proportion.</p>`:''}</div>`
+      ${u.rows.length?h`<div class="row"><button class="btn sm" data-act="nr_backup" ${S.dl?'':raw('disabled')}>Download a backup first</button><button class="btn primary" data-act="nr_apply" ${u.busy?raw('disabled'):''}>Update ${u.rows.length} Pokémon</button></div><p class="sub">Their HP follows the rules in use, and damage already taken stays in proportion.</p>`:''}</div>`
       :h`<p class="sub"><b>Every NPC Pokémon already matches the handbook.</b></p>`):''}
   </section>`
 }
@@ -1190,7 +1249,7 @@ function evoPlan(uid,pid,m,toRec,cond){
   const stone=st?{name:st,i:bagStone(uid,st)}:null;
   const oldB=baseList(m.base);
   const hp=m.hp||{};
-  const rows=[{ab:'HP',o:Math.round(num(hp.max)*hpx()/hpxOf(m)),n:F.hp}].concat(STATS.map((s,i)=>({ab:s[2],o:oldB[i],n:num(F.base[s[0]])})));
+  const rows=[{ab:'HP',o:Math.round(num(hp.max)*hpx(m.die)/hpxOf(m)),n:F.hp}].concat(STATS.map((s,i)=>({ab:s[2],o:oldB[i],n:num(F.base[s[0]])})));
   return {uid,pid,from:m.species,to:toRec.n,F,cands,passives,gained,dropped,own:own.map(x=>x.name),skills,stone,rows,cond:cond||''};
 }
 const evoMoveCount=p=>p.cands.filter(c=>c.sel).length;
@@ -1261,11 +1320,11 @@ async function evoGo(uid,pid){
   edit('p',id,'base',Object.assign({},m.base||{},F.base));
   const hp=m.hp||{};
   /* an older sheet is brought to the table's multiplier first, so the damage it has taken stays in proportion */
-  const hk=hpx()/hpxOf(m);
+  const hk=hpx(m.die)/hpxOf(m);
   const oldMax=num(hp.max)*hk,oldCur=num(hp.cur)*hk;
   const cur=!oldMax?F.hp:(oldCur<=0?0:clamp(F.hp-Math.round(oldMax-oldCur),1,F.hp));
   edit('p',id,'hp',Object.assign({},hp,{cur,max:F.hp}));
-  edit('p',id,'hpx',hpx());
+  edit('p',id,'hpx',hpx(F.die));
   edit('p',id,'size',F.size);
   edit('p',id,'weight',F.weight);
   edit('p',id,'skills',p.skills);

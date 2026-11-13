@@ -432,7 +432,7 @@ function natureTxt(o){
 }
 /* one move in the read view: the name is a button that opens the effect text; daily uses are tap-to-spend dots */
 function mvRead(sc,id,path,x,ro,xkey,after){
-  const mm=/^(\d+)\s*\/\s*day/i.exec(x.freq||'');
+  const mm=/^(\d+)\s*\/\s*(day|combat)/i.exec(x.freq||'');
   const n=mm?clamp(+mm[1],1,9):0;
   const used=num(x.used);
   const open=!!S.ui.open[xkey];
@@ -469,7 +469,7 @@ function monRead(uid,m,ro){
   const itOpen=!ro&&!!S.ui.open['it'+key];
   return h`<div class="mb rd">
     <div class="rdtop"><div class="spr big">${monPic(m)}</div>
-      <div class="rdtx">${rdFacts([['Species',m.species],['Gender',m.gender],['Size',[m.size,m.weight].filter(Boolean).join(', ')],['Monster die',m.die],['Nature',natureTxt(m)],['Poké Ball',m.ball],['Got it',m.caught]])||h`<p class="sub">Nothing filled in yet.</p>`}</div>
+      <div class="rdtx">${rdFacts([['Species',m.species],['Gender',m.gender],['Size',[m.size,m.weight].filter(Boolean).join(', ')],['Monster die',m.die],['Nature',natureTxt(m)],['Poké Ball',m.ball],['Got it',m.caught]])||h`<p class="sub">Nothing filled in yet.</p>`}${hbNote(m.die,monDie(m))?h`<p class="sub hbn">${hbNote(m.die,monDie(m))}</p>`:''}</div>
       ${ro?'':edBtn(key)}</div>
     <div class="stats">${hpTile('p',id,m.hp,ro)}${tiles}</div>
     <div class="lcd acc"><span>Attack ${sgn(mod(effStat(m,'atk')))}</span><span>Sp. Attack ${sgn(mod(effStat(m,'spa')))}</span><span>Effect ${sgn(mod(effStat(m,'spe')))}</span></div>
@@ -479,7 +479,7 @@ function monRead(uid,m,ro){
     <div class="rdsec rditem"><span class="fl">Held item</span>${itOpen?h`${fText('Held item','p',id,'item',m,{list:'dl-items'})}<button class="btn sm" data-act="toggle" data-key="${'it'+key}">Done</button>`:h`<span class="rdval">${m.item?h`${itemMini(m.item)}${m.item}`:'None'}</span>${ro?'':h`<button class="btn sm ghost" data-act="toggle" data-key="${'it'+key}">Change</button>`}`}</div>
     ${String(m.skills||'').trim()?h`<div class="rdsec"><span class="fl">Skills</span><span>${m.skills}</span></div>`:''}
     <div class="list"><div class="ph"><h2>Moves</h2><span class="sub">${mv.length?'Tap a move to read its effect.':''}</span></div>
-      ${mv.length?mv.map((x,i)=>mvRead('p',id,'moves.'+i,x,ro,'mx'+key+'#'+i,ro||x.kind==='Style'||!String(x.name||'').trim()?'':h`<div class="row mvroll"><button class="btn sm ${S.ui.mr.key===mrKey(uid,m.id,i)?'primary':''}" data-act="b_mopen" data-uid="${uid}" data-pid="${m.id}" data-i="${i}" aria-expanded="${String(S.ui.mr.key===mrKey(uid,m.id,i))}">Roll ${x.name}</button></div>${moveForm(uid,m.id,i,x)}`)):h`<p class="sub">No moves listed yet.${ro?'':' Use Edit details to add them.'}</p>`}</div>
+      ${mv.length?mv.map((x,i)=>mvRead('p',id,'moves.'+i,hbMove(x,monDie(m)),ro,'mx'+key+'#'+i,ro||x.kind==='Style'||!String(x.name||'').trim()?'':h`<div class="row mvroll"><button class="btn sm ${S.ui.mr.key===mrKey(uid,m.id,i)?'primary':''}" data-act="b_mopen" data-uid="${uid}" data-pid="${m.id}" data-i="${i}" aria-expanded="${String(S.ui.mr.key===mrKey(uid,m.id,i))}">Roll ${x.name}</button></div>${moveForm(uid,m.id,i,x)}`)):h`<p class="sub">No moves listed yet.${ro?'':' Use Edit details to add them.'}</p>`}</div>
     <div class="list"><div class="ph"><h2>Passives</h2></div>
       ${ps.length?h`<ul class="mini-list rdps">${ps.map(x=>h`<li><b>${x.name||'Unnamed passive'}</b><span class="sub">${x.text}</span></li>`)}</ul>`:h`<p class="sub">No passives listed yet.</p>`}</div>
     ${ctot?h`<div class="rdsec"><span class="fl">Contest stats</span><span class="row">${CT_TYPES.filter(t=>num(cs[t])).map(t=>h`<span>${ctChip(t)} ${cs[t]}</span>`)}</span></div>`:''}
@@ -491,7 +491,7 @@ function monRead(uid,m,ro){
 }
 
 function moveRow(id,m,x,i,ro){
-  const mm=/^(\d+)\s*\/\s*day/i.exec(x.freq||'');
+  const mm=/^(\d+)\s*\/\s*(day|combat)/i.exec(x.freq||'');
   const n=mm?clamp(+mm[1],1,9):0;
   const used=num(x.used);
   const p='moves.'+i+'.';

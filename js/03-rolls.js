@@ -649,7 +649,7 @@ function moveRoll(uid,pid,i,onlyDmg){
   if(needDie(x,monDie(m),mName(m)+(megaOn(m)?' (Mega)':'')))return;
   const info=f.tgt?btInfo(f.tgt,false):null;
   const tgtBit=info?{cid:f.tgt,name:info.name}:null;
-  const prep=auRollPrep('p',uid+'/'+pid,'moves.'+i,x,btCidOf(uid+'/'+pid),!!onlyDmg);
+  const prep=auRollPrep('p',uid+'/'+pid,'moves.'+i,hbMove(x,monDie(m)),btCidOf(uid+'/'+pid),!!onlyDmg);
   if(!prep)return;
   /* a target's Defense and stages are used only when everyone can see them (a player's Pokémon always can) */
   const c=atkCalc({

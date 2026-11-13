@@ -76,10 +76,8 @@ function auTurnItems(cid){
     const imm=(AU_IMM[s]||[]).filter(t=>types.indexOf(t)>=0);
     if(imm.length){out.push({key:s+':imm',txt:s+': '+v.name+' is '+imm.join(' and ')+' type, so it is immune.',btns:[['Remove '+s,'rm',s]],skip:true});return;}
     const k=AU_STG[s];
-    if(k&&!auDone(a,s+':stg')){
-      const low=stg(L.doc,k)<=-STG_MAX;
-      out.push({key:s+':stg',txt:s+': '+STAT_NAME[k]+' ▼ at the start of its turn.'+(low?' It is already at ▼▼▼.':''),btns:low?[]:[['Lower '+STAT_NAME[k],'stg',k]],skip:true});
-    }
+    /* a ▼ does not stack with itself: the status keeps the stat at one ▼, so there is nothing to offer once it is there */
+    if(k&&!auDone(a,s+':stg')&&stg(L.doc,k)>-1)out.push({key:s+':stg',txt:s+': '+STAT_NAME[k]+' ▼ at the start of its turn.',btns:[['Lower '+STAT_NAME[k],'stg',k]],skip:true});
     const hp=s==='Toxified'?[a.tox+1,8]:AU_HP[s];
     if(hp&&!auDone(a,s+':hp'))out.push({key:s+':hp',txt:s+': loses '+hp[0]+'d'+hp[1]+' HP when it acts.',btns:[['Roll and apply','hp',s]],skip:true});
     if(AU_NOTE[s])out.push({key:'',txt:s+': '+AU_NOTE[s],btns:[],skip:false});
@@ -114,9 +112,10 @@ function auDo(cid,key,act,x){
   if(act==='rm'||act==='cure'){
     let ok=true,msg='';
     if(act==='cure'){
-      const dc=auCureDc(x,v.types||[],a),r=rnd(20);
+      const qb=L.sc==='gb'&&qwBig(L.doc)?4:0;
+      const dc=auCureDc(x,v.types||[],a),d20=rnd(20),r=d20+qb;
       ok=r>=dc;
-      const e=chkEntry(who+': '+x+' cure check',r,'d20 = '+r+', needs '+dc+(ok?' · cured':' · not cured'));
+      const e=chkEntry(who+': '+x+' cure check',r,'d20 = '+d20+(qb?' + 4 (wild rank)':'')+', needs '+dc+(ok?' · cured':' · not cured'));
       if(L.sc==='gb')e.gm=true;
       logRoll(e);renderRoll();
       msg=who+' rolls '+r+' against '+dc+': '+(ok?x+' is cured.':'still '+x+'.');
@@ -178,9 +177,9 @@ function auHit(src,id,how){
 /* ----- when a move is rolled: uses, the Alpha rider, Recharge ----- */
 /* Returns null to stop the roll, or {x, done()}: x is the move to roll (dice raised when a rider applies), done() records what the roll used. */
 function auRollPrep(sc,id,path,x,cid,onlyDmg){
-  const mm=/^(\d+)\s*\/\s*day/i.exec(x.freq||'');
+  const mm=/^(\d+)\s*\/\s*(day|combat)/i.exec(x.freq||'');
   const n=mm?clamp(+mm[1],1,9):0,used=num(x.used);
-  if(!onlyDmg&&n&&used>=n){toast((x.name||'That move')+' has no uses left today. Tap one of its dots to clear it if that is wrong.');return null;}
+  if(!onlyDmg&&n&&used>=n){toast((x.name||'That move')+' has no uses left '+(mm[2].toLowerCase()==='combat'?'this combat':'today')+'. Tap one of its dots to clear it if that is wrong.');return null;}
   const inB=!!cid&&!!BT().on&&!!num(BT().bid);
   let mv=x,note='';
   if(inB&&AU_RIDER.test(x.text||'')){
@@ -202,11 +201,11 @@ function auRollPrep(sc,id,path,x,cid,onlyDmg){
 
 /* ----- the page pieces ----- */
 function auPill(cid){
-  if(!BT().on)return '';
   const L=auLoc(cid);
   if(!L)return '';
-  const a=auGet(cid);
-  return a.rc?h`<span class="pill wary">Must recharge</span>`:'';
+  const a=BT().on?auGet(cid):{rc:0};
+  const twice=S.me.admin&&hbOn()&&L.sc==='gb'&&foeKind(L.doc)==='alpha';
+  return h`${twice?h`<span class="pill gm" title="Homebrew: an Alpha takes two actions a round">Acts twice</span>`:''}${L.sc==='gb'?qnPill(L.doc):''}${a.rc?h`<span class="pill wary">Must recharge</span>`:''}`;
 }
 function auPanel(){
   const b=BT();
