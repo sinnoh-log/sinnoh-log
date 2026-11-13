@@ -854,12 +854,12 @@ function ntGrowAct(d){
   const nt=NTS()[d.id];if(!nt)return;
   const st=ntStages(nt);
   if(d.act==='nt_stload'){if(ntStageLoad(d.id,d.sid))toast(ntName(nt)+' now uses that team.',true);render();return;}
-  if(d.act==='nt_stsave'){edit('gt',d.id,'stages',st.map(x=>x.id===d.sid?Object.assign({},x,{team:ntCopyTeam(ntTeam(nt)),qr:(qnOf(nt)&&nt.q.r)||x.qr||''}):x));toast('Saved the current team over it.',true);render();return;}
+  if(d.act==='nt_stsave'){edit('gt',d.id,'stages',st.map(x=>x.id===d.sid?Object.assign({},x,{team:ntCopyTeam(ntTeam(nt)),qr:qnOf(nt)?(glIs(nt)?glRank(x.bd):nt.q.r):(x.qr||'')}):x));toast('Saved the current team over it.',true);render();return;}
   if(d.act==='nt_strm'){edit('gt',d.id,'stages',st.filter(x=>x.id!==d.sid));render();return;}
   if(d.act==='nt_stnew'){
     const raw=S.ui.nt['stb_'+d.id],bd=clamp(Math.round(num(raw===''||raw==null?(ntBadges(d.id)||0):raw)),0,8);
     const sid=ntStageId();
-    edit('gt',d.id,'stages',st.filter(x=>num(x.bd)!==bd).concat([{id:sid,bd,label:'',team:ntCopyTeam(ntTeam(nt)),qr:(qnOf(nt)&&nt.q.r)||''}]));
+    edit('gt',d.id,'stages',st.filter(x=>num(x.bd)!==bd).concat([{id:sid,bd,label:'',team:ntCopyTeam(ntTeam(nt)),qr:qnOf(nt)?(glIs(nt)?glRank(bd):nt.q.r):''}]));
     if(!nt.grown||!st.some(x=>x.id===nt.grown))edit('gt',d.id,'grown',sid);
     S.ui.nt['stb_'+d.id]='';
     toast('Saved the current team at '+bd+' badge'+(bd===1?'':'s')+'.',true);render();
@@ -997,7 +997,7 @@ function npcTab(){
   }[sort];
   const ids=all.filter(id=>{const t=NTS()[id];return cfPass(cat,ntCat(t))&&(!q||[ntName(t),t.role,t.place,t.notes].some(x=>String(x||'').toLowerCase().includes(q)));}).sort(cmp);
   const groups=cfGroups(ids,id=>ntCat(NTS()[id]),grp,true);
-  return h`<section class="panel"><div class="ph"><h2>NPC trainers</h2><span class="pill gm">GM only</span><div class="acts"><button class="btn sm" data-act="nt_pack">Import NPC pack</button><button class="btn primary sm" data-act="nt_new">New NPC trainer</button></div></div>
+  return h`<section class="panel"><div class="ph"><h2>NPC trainers</h2><span class="pill gm">GM only</span><div class="acts">${glTodo().length?h`<button class="btn sm" data-act="nt_glq">Set up ${glTodo().length} Gym Leader${glTodo().length===1?'':'s'} as Quick NPCs</button>`:''}<button class="btn sm" data-act="nt_pack">Import NPC pack</button><button class="btn primary sm" data-act="nt_new">New NPC trainer</button></div></div>
     <p class="sub">Create a trainer, give them Pokémon, and add them to a battle. Everything here stays in a document only you can read. The players see an NPC only after you tick <b>Show this NPC to the table</b>, and then only what you ticked, including for each Pokémon. In a battle the Pokémon start hidden as “Foe A”, “Foe B”. Each NPC has a <b>Category</b> (auto-guessed from the role until you pick one). Villain faction is a category only you can see; the table never learns it.</p>
     ${all.length?h`${cfTools('n',all.map(id=>ntCat(NTS()[id])))}
       <div class="tools"><label class="fld"><span class="fl">Search</span><input type="search" data-u="q.npc" value="${S.ui.q.npc||''}" placeholder="Name, role, place, notes"></label></div>`:''}</section>
@@ -1051,6 +1051,7 @@ function ntAct(b){
     case 'nt_rkgo':case 'nt_rkrm':case 'nt_rkadd':ntRankAct(d);break;
     case 'nt_stload':case 'nt_stsave':case 'nt_strm':case 'nt_stnew':ntGrowAct(d);break;
     case 'nt_pack':{const fp=$('#ntpackfile');if(fp)fp.click();break;}
+    case 'nt_glq':{const d=glSetup();toast(d.length?'Set up as Quick NPCs: '+d.join(', ')+'. Their rank follows the challenger\'s badges.':'Every Gym Leader already has a rank.',true);render();break;}
     case 'nt_open':S.ui.nt.open[d.id]=!S.ui.nt.open[d.id];if(S.ui.nt.open[d.id])ntEnsure(d.id);render();break;
     case 'nt_more':S.ui.nt.more[d.id]=!S.ui.nt.more[d.id];render();break;
     case 'nt_tal':{

@@ -938,3 +938,23 @@ Item pictures were squeezed out of shape in the read-first bag (Update 49) and c
 - **Ranks grow with teams.** Each saved team under Team growth can carry a rank (`r` on a pack stage). Loading that team, by hand or when a rival reaches its badge mark, sets the NPC's rank too. Saving a team keeps the rank in use. Team growth shows each saved team's rank.
 - **Choices.** Some features ask for a choice: a Rule and stat for Good Manners, a Nemesis, the type a Gym Trainer teaches. Quick NPCs have a **Choices for their features** field in Edit details, shown on the sheet and in the GM box in a battle.
 - `tests/t_packs.js` checks this with the real packs, which stay out of the repo: run it with `PACKS=<folder with the packs>`.
+
+## Gym Leaders as Quick NPCs (Update 55)
+
+- **One click:** NPC trainers shows **Set up N Gym Leaders as Quick NPCs** while any NPC in the Gym Leader category has no rank. Leaders you have already ranked are left alone.
+- **Class:** each Leader is a Type Ace in their Gym's type, with a Veteran feature that fits them:
+  - Roark: Backpacker (Endurance).
+  - Gardenia: Ranger (Styler Call).
+  - Maylene: Athlete (Swift).
+  - Klevin: Lady/Gentleman (Good Manners, Robert's Rules).
+  - Fantina: Performer (Contest Training).
+  - Byron: Gym Trainer (Lesson 2).
+  - Candice: Skater (Accelerate).
+  - Marina: Sailor (Read The Wind).
+  - Any other Leader gets the type most of their team shares and the Gym Trainer's Lesson 1.
+- **Rank follows the challenger's badges**, like the vault's tier teams: Novice at 0–1, Skilled at 2–4, Experienced at 5–6, Ace at 7 or more. Veteran features start at Experienced.
+  - Saved tier teams under Team growth get the rank for their badge mark, so loading a team sets the rank.
+  - A team saved later at a badge mark gets that mark's rank.
+  - A Leader without saved teams is ranked by team size: 2, 3, 4, or 5+ Pokémon.
+- **Out of battle** a Leader is a professional: skill checks use +4 at every tier.
+- `tests/t_gymq.js` checks it.

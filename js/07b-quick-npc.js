@@ -111,13 +111,63 @@ function qnFromPack(x){
   return q;
 }
 const qnPackRank=x=>QN_RANKS.some(z=>z[0]===String(x))?String(x):'';
+/* ----- Gym Leaders as Quick NPCs (Update 55) -----
+   Each Leader is a Type Ace in their Gym's type, plus a Veteran feature that fits them. Their rank follows the challenger's
+   badges, like their teams: Novice at 0-1 badges, Skilled at 2-4, Experienced at 5-6, Ace at 7 or more. A Leader whose tier
+   teams are saved under Team growth gets the rank on each saved team, so loading the team for a challenger sets it.
+   Without saved teams, the rank comes from the team's size (2, 3, 4, 5+ Pokémon, as on the vault's tier lists). */
+const GL_QUICK={
+  roark:{ty:'Rock',vc:'backpacker',vt:'skilled',ch:'Endurance from his Backpacker feature: a miner who takes the hit and keeps working.'},
+  gardenia:{ty:'Grass',vc:'ranger',vt:'skilled',ch:'Styler Call: an Eterna Forest native answers her (Budew, Cherubi or Combee).'},
+  maylene:{ty:'Fighting',vc:'athlete',vt:'skilled',ch:'Swift, from her conditioning work with cadets.'},
+  klevin:{ty:'Fairy',vc:'ladygentleman',vt:'skilled',ch:'Good Manners: Robert\'s Rules (cannot take Priority turns), stat Speed. He asks permission and names the rule before the battle.'},
+  fantina:{ty:'Ghost',vc:'performer',vt:'exp',ch:'Contest Training: her free Effect moves are her showpieces (Confuse Ray, Will-O-Wisp, Hypnosis).'},
+  byron:{ty:'Steel',vc:'gymtrainer',vt:'exp',ch:'Lesson 2: Stat Adjustments, the apprenticeship master\'s lesson.'},
+  candice:{ty:'Ice',vc:'skater',vt:'skilled',ch:'Accelerate: her Pokémon pick up speed on straight runs, like a ski run.'},
+  marina:{ty:'Flying',vc:'sailor',vt:'skilled',ch:'Read The Wind: she calls the first downwind from the gulls on the roof.'},
+  volkner:{ty:'Electric',vc:'gymtrainer',vt:'skilled',ch:'Lesson 1: Type Advantage, type Electric.'},
+  'crasher wake':{ty:'Water',vc:'gymtrainer',vt:'skilled',ch:'Lesson 1: Type Advantage, type Water.'}
+};
+const glKey=nt=>{const n=String((nt&&nt.name)||'').toLowerCase();return Object.keys(GL_QUICK).find(k=>new RegExp('(^|[^a-z])'+k+'($|[^a-z])').test(n))||'';};
+const glIs=nt=>!!nt&&(ntCat(nt)==='gym');
+const glRank=bd=>{bd=num(bd);return bd>=7?'4':bd>=5?'3':bd>=2?'2':'1';};
+const glTeamRank=team=>{const n=(team||[]).length;return n>=5?'4':n===4?'3':n===3?'2':'1';};
+/* Leaders who have not been given a rank yet */
+const glTodo=()=>ntIds().filter(id=>{const nt=NTS()[id];return glIs(nt)&&!(nt.q&&nt.q.r);});
+function glProfile(nt){
+  const k=glKey(nt);
+  if(k)return Object.assign({},GL_QUICK[k]);
+  /* a Leader not on the list: the type most of their Pokémon share, and the Gym Trainer's first lesson in it */
+  const cnt={};
+  const all=ntTeam(nt).concat(...(Array.isArray(nt.stages)?nt.stages:[]).map(s=>s&&Array.isArray(s.team)?s.team:[]));
+  all.forEach(m=>(m.ty||[]).forEach(t=>{if(t)cnt[t]=(cnt[t]||0)+1;}));
+  const ty=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0]||'';
+  return {ty,vc:'gymtrainer',vt:'skilled',ch:ty?'Lesson 1: Type Advantage, type '+ty+'.':'Lesson 1: Type Advantage. Choose the Gym\'s type.'};
+}
+function glSetup(){
+  if(!S.me.admin)return [];
+  const done=[];
+  glTodo().forEach(id=>{
+    const nt=NTS()[id],p=glProfile(nt);
+    const st=Array.isArray(nt.stages)?nt.stages:[];
+    const cur=st.find(x=>x.id===nt.grown);
+    const r=cur?glRank(cur.bd):glTeamRank(ntTeam(nt));
+    edit('gt',id,'q',Object.assign({},nt.q||{},{on:true,r,cls:'typeace',ty:TYPES.indexOf(p.ty)>=0?p.ty:'',vc:p.vc,vt:p.vt,boss:'',sq:0,ch:p.ch}));
+    if(st.length)edit('gt',id,'stages',st.map(x=>Object.assign({},x,{qr:glRank(x.bd)})));
+    done.push(ntName(nt));
+  });
+  return done;
+}
 function qnClassOpts(){return QN.map(c=>[c.k,c.n+(c.g==='grunt'?' (grunt)':c.g==='spec'?' (specialist)':'')]);}
 function qnSheet(id,nt,ed){
   const q=nt.q||{};
   const who=ntName(nt);
   const feats=qnFeats(q);
   const c=qnCls(q.cls);
-  const rn=qnRankNum(q.r);
+  /* a Gym Leader's rank is a handicap for the challenger's tier; out of battle they are a professional (Update 55) */
+  const gl=glIs(nt);
+  const rn=gl?4:qnRankNum(q.r);
+  const glTxt=gl?h`<p class="sub qnch"><b>Gym Leader:</b> the rank follows the challenger's badges: Novice at 0–1, Skilled at 2–4, Experienced at 5–6, Ace at 7 or more. Saved tier teams under Team growth carry their rank, so load the right team before the battle. Skill checks use +4 at every tier.</p>`:'';
   if(ed)return h`<div class="ntsheet qn">
     <div class="ph"><h3>Quick NPC</h3><span class="sub">From the Quick & Simple NPCs rules. Only you see this.</span></div>
     <div class="fgrid">
@@ -129,7 +179,8 @@ function qnSheet(id,nt,ed){
       ${fNum('Squad: number of trainers (0 if not a squad)','gt',id,'q.sq',nt,{min:0,max:20})}
     </div>
     ${fArea('Choices for their features','gt',id,'q.ch',nt,{rows:2,ph:'A Rule and stat for Good Manners, a Nemesis, the type a Gym Trainer teaches…'})}
-    ${q.r?h`<p class="sub">${QN_RANK_TXT[q.r]}</p>`:''}
+    ${glTxt}
+    ${q.r&&!gl?h`<p class="sub">${QN_RANK_TXT[q.r]}</p>`:''}
     ${c?h`<p class="sub"><b>${c.n}</b>${c.u?' · Pokémon used: '+c.u:''}${c.alt?' · Also: '+c.alt:''}</p>`:''}
     ${num(q.sq)>0&&num(q.sq)<3?h`<p class="sub">A Squad needs three or more trainers.</p>`:''}
     <p class="sub">Their team below is added as usual. Build it to match the rank.</p>
@@ -138,7 +189,7 @@ function qnSheet(id,nt,ed){
   return h`<div class="ntsheet qn rd">
     <div class="ph"><h3>${q.r?qnRankName(q.r):'No rank yet'} ${c?c.n:'(no class yet)'}${q.cls==='typeace'&&q.ty?' · '+q.ty:''}</h3><span class="pill gm">GM only</span></div>
     ${sq?h`<p class="sub"><b>Squad of ${sq} trainers.</b> Only ${qnSquadAct(sq)} of them command Pokémon or use features each round. One member uses one limited feature each round; the dots below are the squad's shared pool.</p>`:''}
-    ${q.r?h`<p class="sub">${QN_RANK_TXT[q.r]}</p>`:h`<p class="sub">Choose a rank and class in Edit details.</p>`}
+    ${gl?glTxt:q.r?h`<p class="sub">${QN_RANK_TXT[q.r]}</p>`:h`<p class="sub">Choose a rank and class in Edit details.</p>`}
     <div class="row"><button class="btn sm" data-act="nt_roll" data-label="${who}: skill check" data-bonus="${rn}" data-tal="0">Skill check (d20 + ${rn})</button><button class="btn sm" data-act="nt_roll" data-label="${who}: skill check in their line of work" data-bonus="${rn}" data-tal="3">In their line of work (+3 more)</button><label class="row"><input type="checkbox" data-act="b_secret" ${S.ui.secret?raw('checked'):''}><span>Roll in secret</span></label></div>
     ${feats.length?h`<div class="qnfs">${feats.map(f=>qnFeatHtml(f,qnUsed(nt,f.key),'data-act="nt_qpip" data-id="'+esc(id)+'"'))}</div>`:(q.r==='1'?h`<p class="sub">Novices have no useful features.</p>`:'')}
     ${qnChoices(q)}
