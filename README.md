@@ -1011,3 +1011,28 @@ A GM-only **GM Dashboard** page (first item under Game Master in the menu, with 
 - **Eggs.** Add an egg for a trainer; the hatch time comes from the Pokédex unless you type one. It counts down with the calendar, and **Hatch** gives the Pokémon to the player.
 - **To do.** A plain list to tick off.
 - `tests/t_dash.js` checks it, including that players get neither the page nor its data.
+
+## GM Dashboard, reworked (Update 60)
+
+- **One Today list.** It replaces the separate Reminders and checklist, so each job or alert appears once with its button.
+  - Square boxes are yours to tick; round ones tick themselves when the site sees the job done.
+  - Alerts (a fainted Pokémon, an egg ready, headlines or rival changes waiting, open road challenges) have a dot and go away once dealt with.
+  - Finished jobs drop to the bottom. The menu count shows what's left.
+- **Grouped buttons** at the top: Time (next day, next time of day, weather), Party care (rest, Pokémon Center), Weekly (run either circuit's week).
+- **Folded panels.** The trip and road battles fold to a one-line summary with their main button. **Show the full trip** and **Show road battles** open the full panels. Road battles open by themselves while a challenge or an unpaid prize is waiting.
+- **Quick edits on the party cards.**
+  - Each Pokémon has an HP box: type −9 or +5 to change it, or a plain number to set it.
+  - Each daily move is a button showing its uses: press to spend one, and pressing past the limit resets it.
+  - Statuses have a × to clear them, and loyalty is a menu.
+  - **More** holds the evolution switch, Move to the box or party, and Open its page.
+- **The box** opens under each card with the same controls.
+
+## Road battles by tier, and quick Gym battles (Update 61)
+
+- **Best-ever tier.** Road battles now measure both sides the same way: their best-ever tier on the Gym circuit (Unranked rookie +1, Ranked +2, Top 150 +3, Top 50 +4, Top 10 +5), plus 1 per 2 badges. Trainer level no longer counts. The rankings engine and rows now report each trainer's best-ever points (`peak`). Rank from badges still sets the challenge size and team strength.
+- **Gym battle**, in the Road battles panel: pick a Gym, then a Leader rematch, an exhibition with the Leader, or a Gym trainer, and choose 1 to 6 Pokémon a side.
+  - A Leader is at full strength (d20 + 9, moved −1 to +2 by the Gym's reputation) with their strongest saved team.
+  - A Gym trainer matches whoever answers.
+  - Prize money only, never ranking points; a Leader who loses pays 2,700 P.
+  - Badge battles are never settled this way.
+  - Unfinished Gym battles stay on the list when you roll for road trainers.

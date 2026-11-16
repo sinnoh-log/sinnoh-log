@@ -657,7 +657,6 @@ input[type=search]{appearance:none}
 .dashlist li.on .dashit b{text-decoration:line-through;opacity:.65}
 .dashit{flex:1 1 200px;min-width:0;display:flex;flex-direction:column}
 .dashbox{flex:none;width:28px;height:28px;border:2px solid var(--line);border-radius:8px;background:var(--raised);color:inherit;font-weight:800;display:inline-grid;place-items:center;cursor:pointer;padding:0}
-span.dashbox{border-radius:50%;cursor:default}
 .dashbox.on{background:var(--good);border-color:var(--good);color:#fff}
 .dashpcs{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
 .dashpc{border:2px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:var(--raised);min-width:0}
@@ -669,6 +668,26 @@ span.dashbox{border-radius:50%;cursor:default}
 .dashmons li.down b{opacity:.6}
 .dashtags{gap:5px;flex-wrap:wrap}
 .dashgrow{flex:1 1 220px}
+.dashgrps{display:flex;flex-wrap:wrap;gap:10px 18px}
+.dashgrp{display:flex;flex-direction:column;gap:4px;min-width:0}
+.dashbtns{display:flex;gap:6px;flex-wrap:wrap}
+.dashlist li.warn{border-left:5px solid var(--warn)}.dashlist li.good{border-left:5px solid var(--good)}
+.dashbox.round{border-radius:50%;cursor:default}
+.dashdot{flex:none;width:28px;height:28px;display:inline-grid;place-items:center}
+.dashdot::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--line)}
+.dashdot.warn::before{background:var(--warn)}.dashdot.good::before{background:var(--good)}
+.dashmh{align-items:flex-start;gap:6px}
+.dashhp{gap:6px;flex-wrap:nowrap;align-items:center}
+.dashhpin{width:70px;min-width:0;padding:4px 6px;font-size:13px}
+.dashuse b{font-variant-numeric:tabular-nums}
+.dashuse.full{border-color:var(--warn);color:var(--warn)}
+.dashloy select{font-size:13px;padding:4px 6px;max-width:100%}
+.dashmore{gap:6px;flex-wrap:wrap;padding:6px 0 2px}
+.pillx{border:0;background:none;color:inherit;font:inherit;font-weight:800;padding:0 0 0 4px;cursor:pointer;line-height:1}
+.dashfold{display:flex;justify-content:flex-end;margin:0 0 -6px}
+.dashprog{width:100%;height:8px}
+.dashmons.boxed{padding-left:10px;border-left:3px solid var(--line-soft)}
+.dashboxbtn{align-self:flex-start}
 /* team growth (Update 58) */
 .grq{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
 .grq>li{display:flex;flex-direction:column;gap:6px}
@@ -700,6 +719,7 @@ span.dashbox{border-radius:50%;cursor:default}
 .rdbcost{margin:4px 0;padding-left:18px}.rdbcost li{margin:2px 0}
 .rdbko{color:var(--bad);font-weight:700}
 .rdbwarn{color:var(--warn)}
+.rdbgym{border:2px dashed var(--line);border-radius:12px;padding:8px 12px;margin-top:10px;display:flex;flex-direction:column;gap:6px}
 .tpenc{color:var(--bad);font-weight:600}.tdcal{cursor:pointer;font:inherit;color:inherit}
 .clrleg{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:13px;margin-top:6px}
 .clrleg span{display:inline-flex;align-items:center;gap:6px}
@@ -1584,19 +1604,19 @@ input,select,textarea{border-radius:9px}
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
 <!-- The app, in load order. These files share one scope; keep the order. -->
-<script src="js/01-core.js?v=2026-11-16-dash"></script>
-<script src="js/02-species.js?v=2026-11-16-dash"></script>
-<script src="js/03-rolls.js?v=2026-11-16-dash"></script>
-<script src="js/04-battle.js?v=2026-11-16-dash"></script>
-<script src="js/04b-battle-helper.js?v=2026-11-16-dash"></script>
-<script src="js/05-pokedex-contests.js?v=2026-11-16-dash"></script>
-<script src="js/06-world.js?v=2026-11-16-dash"></script>
-<script src="js/07-npc.js?v=2026-11-16-dash"></script>
-<script src="js/07b-quick-npc.js?v=2026-11-16-dash"></script>
-<script src="js/08-battlemap.js?v=2026-11-16-dash"></script>
-<script src="js/09-sheets.js?v=2026-11-16-dash"></script>
-<script src="js/09b-road.js?v=2026-11-16-dash"></script>
-<script src="js/09c-growth.js?v=2026-11-16-dash"></script>
-<script src="js/09d-dash.js?v=2026-11-16-dash"></script>
-<script src="js/10-calendar-main.js?v=2026-11-16-dash"></script>
+<script src="js/01-core.js?v=2026-11-16-tier"></script>
+<script src="js/02-species.js?v=2026-11-16-tier"></script>
+<script src="js/03-rolls.js?v=2026-11-16-tier"></script>
+<script src="js/04-battle.js?v=2026-11-16-tier"></script>
+<script src="js/04b-battle-helper.js?v=2026-11-16-tier"></script>
+<script src="js/05-pokedex-contests.js?v=2026-11-16-tier"></script>
+<script src="js/06-world.js?v=2026-11-16-tier"></script>
+<script src="js/07-npc.js?v=2026-11-16-tier"></script>
+<script src="js/07b-quick-npc.js?v=2026-11-16-tier"></script>
+<script src="js/08-battlemap.js?v=2026-11-16-tier"></script>
+<script src="js/09-sheets.js?v=2026-11-16-tier"></script>
+<script src="js/09b-road.js?v=2026-11-16-tier"></script>
+<script src="js/09c-growth.js?v=2026-11-16-tier"></script>
+<script src="js/09d-dash.js?v=2026-11-16-tier"></script>
+<script src="js/10-calendar-main.js?v=2026-11-16-tier"></script>
 </body></html>

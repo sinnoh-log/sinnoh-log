@@ -25,11 +25,11 @@ const seedFn=S=>{
   // the numbers
   const U=await p.evaluate(()=>({
     res:[5,4,0,-1,-4,-5,-12].map(rdbResult).join(','),
-    lv:[1,5,6,10,11,20].map(rdbLvlBonus).join(','),bd:[0,1,2,3,4,8].map(rdbBdBonus).join(','),
+    tier:[0,49,50,99,100,199,200,299,300,900].map(rdbTierB).join(','),tn:[0,50,100,200,300].map(rdbTierName).join('|'),bd:[0,1,2,3,4,8].map(rdbBdBonus).join(','),
     prize:[0,3,8].map(rdbPrize).join(','),rank:[0,1,2,3,4,5,6,8].map(rdbRankOfBadges).join(''),
     road:RDB_COUNT.road.join(''),semi:RDB_COUNT.semi.join(''),off:RDB_COUNT.off.join('')}));
   ok(U.res==='clean,hard,hard,close,close,rout,rout','margins: 5+ clean, 0–4 hard (ties to the player), −1 to −4 close, −5 or worse rout');
-  ok(U.lv==='1,1,2,2,3,4'&&U.bd==='0,0,1,1,2,4','player bonus: +1 per 5 levels rounded up, +1 per 2 badges');
+  ok(U.tier==='1,1,2,2,3,3,4,4,5,5'&&U.tn==='Unranked rookie|Ranked|Top 150|Top 50|Top 10'&&U.bd==='0,0,1,1,2,4','bonus: best tier +1 (Unranked) to +5 (Top 10), and +1 per 2 badges');
   ok(U.prize==='300,1200,2700','prize: 300 P × (loser’s badges + 1)');
   ok(U.rank==='11223344','rank from badges: 0–1 Novice, 2–3 Skilled, 4–5 Experienced, 6+ Ace');
   ok(U.road==='001112'&&U.semi==='000011'&&U.off==='000001','d6 by zone: road 3–5 one, 6 two; semi 5–6 one; off 6 one');
@@ -54,7 +54,7 @@ const seedFn=S=>{
   ok(D.n===150&&D.same/D.n>0.7,'the draw favours trainers near the party: '+D.same+' of '+D.n+' were on Route 203 or a town away');
   const T=await p.evaluate(()=>{
     const C=rdbCands(),out=[];
-    C.rows.filter(r=>r.kind==='bg').slice(0,40).forEach(r=>{const f=rdbFoe(r,{txt:'x'},C.W);const sv=(S.teamGm.f||{})[r.id]||grTeamOf(r,C.W);out.push({ty:f.ty,team:f.team,okTy:!!sv&&f.ty===sv.ty&&f.team.every(s=>sv.sp.includes(s)),match:f.team.filter(s=>{const i=speciesInfo(s);return i&&i.types.indexOf(f.ty)>=0;}).length,n:f.n,rank:f.rank,size:f.team.length,bonus:f.rb+f.bb,bd:f.bd});});
+    C.rows.filter(r=>r.kind==='bg').slice(0,40).forEach(r=>{const f=rdbFoe(r,{txt:'x'},C.W);const sv=(S.teamGm.f||{})[r.id]||grTeamOf(r,C.W);out.push({ty:f.ty,team:f.team,okTy:!!sv&&f.ty===sv.ty&&f.team.every(s=>sv.sp.includes(s)),match:f.team.filter(s=>{const i=speciesInfo(s);return i&&i.types.indexOf(f.ty)>=0;}).length,n:f.n,rank:f.rank,size:f.team.length,bonus:f.tb+f.bb,tb:f.tb,peak:r.peak,pts:r.pts,bd:f.bd});});
     const rv=C.rows.find(r=>r.id==='n_r1'),fr=rdbFoe(rv,{txt:'x'},C.W);
     const home=rdbHomeType('Somebody','Oreburgh'),away=rdbHomeType('Somebody','Kanto');
     return {out,fr,home,away,rocky:['Rock','Ground','Steel','Fighting'].includes(home),hasAway:TYPES.includes(away)};
@@ -62,7 +62,8 @@ const seedFn=S=>{
   const mt=T.out.reduce((a,x)=>a+x.match,0),all=T.out.reduce((a,x)=>a+x.size,0);
   ok(mt/all>0.4,'most of what they bring is their favourite type ('+mt+' of '+all+')');
   ok(T.out.every(x=>x.okTy&&x.size===x.n),'every field trainer brings members of their saved team, sized to the challenge, favouring their type (e.g. '+T.out[0].ty+': '+T.out[0].team.join(', ')+')');
-  ok(T.out.every(x=>x.rank===(x.bd>=6?'4':x.bd>=4?'3':x.bd>=2?'2':'1')&&x.bonus===({'1':1,'2':2,'3':3,'4':4}[x.rank]+Math.floor(x.bd/2))),'foe bonus = rank (from badges) + 1 per 2 badges');
+  ok(T.out.every(x=>x.rank===(x.bd>=6?'4':x.bd>=4?'3':x.bd>=2?'2':'1')&&x.tb===(x.peak>=300?5:x.peak>=200?4:x.peak>=100?3:x.peak>=50?2:1)&&x.bonus===x.tb+Math.floor(x.bd/2)),'foe bonus = their best-ever tier + 1 per 2 badges (rank still sets the challenge size)');
+  ok(T.out.every(x=>x.peak>=x.pts)&&T.out.some(x=>x.peak>x.pts),'best-ever points are never below today’s, and some trainers have slipped from their best');
   ok(T.out.every(x=>x.n>=({'1':1,'2':1,'3':2,'4':3}[x.rank])&&x.n<=({'1':1,'2':2,'3':3,'4':3}[x.rank])),'challenge size by rank: Novice 1, Skilled 1–2, Experienced 2–3, Ace 3');
   ok(T.fr.rank==='2'&&T.fr.ty==='Ghost'&&T.fr.team.every(s=>['Drifloon','Misdreavus','Mismagius'].includes(s))&&T.fr.team.length===T.fr.n,'a rival with a Quick NPC sheet keeps the sheet’s rank, type and team ('+T.fr.team.join(', ')+')');
   ok(T.rocky&&T.hasAway,'hometown sets the type: Oreburgh leans Rock, Ground, Steel or Fighting ('+T.home+'); a visitor from Kanto can be anything');
@@ -90,7 +91,7 @@ const seedFn=S=>{
   await click(p,{act:'rdb_settle',k:f2.k});await W(p,300);
   ok(await p.evaluate(k=>S.roadGm.cur.foes.find(x=>x.k===k).st,f2.k)==='open','no d20 yet: nothing is settled');
   t=await txt();
-  ok(/Mira: d20 \+ 2 for level 6 \+ 1 for 2 badges = d20 \+ 3/.test(t),'the player’s bonus: level 6 (+2) and 2 badges (+1)');
+  ok(/Mira: d20 \+ 1 for their best tier \(Unranked rookie\) \+ 1 for 2 badges = d20 \+ 2/.test(t),'the player’s bonus: best tier Unranked (+1) and 2 badges (+1); level no longer counts');
   for(const id of ['p1','p2','p3'].slice(0,f2.n))await click(p,{act:'rdb_mon',k:f2.k,id});
   const extra=['p1','p2','p3'][f2.n];if(extra)await click(p,{act:'rdb_mon',k:f2.k,id:extra});await W(p,300);
   ok(await p.evaluate(k=>S.ui.rdb.f[k].mons.length,f2.k)===f2.n,'the player picks exactly as many Pokémon as the challenge ('+f2.n+')');
@@ -99,7 +100,7 @@ const seedFn=S=>{
   const before=await p.evaluate(()=>rkWith('gym',()=>rkBattles().length));
   await click(p,{act:'rdb_settle',k:f2.k});await W(p,700);
   let F=await p.evaluate(k=>S.roadGm.cur.foes.find(x=>x.k===k),f2.k);
-  ok(F.st==='done'&&F.fight.res==='clean'&&F.fight.pt===23&&F.fight.ft===1+f2.rb+f2.bb,'Mira 20 + 3 = 23 against 1 + '+(f2.rb+f2.bb)+': a clean win');
+  ok(F.st==='done'&&F.fight.res==='clean'&&F.fight.pt===22&&F.fight.ft===1+f2.tb+f2.bb,'Mira 20 + 2 = 22 against 1 + '+(f2.tb+f2.bb)+': a clean win');
   ok(F.fight.prize===300*(f2.bd+1)&&F.fight.pay===F.fight.prize,'she wins 300 P × ('+f2.bd+' badges + 1) = '+F.fight.prize+' P');
   ok(F.fight.mons.length===f2.n&&F.fight.mons.every(m=>!m.faint&&m.pct>=10&&m.pct<=40&&m.uses>=0&&m.uses<=1),'clean win costs: d4 × 10% HP each, 0–1 daily uses, nobody faints');
   ok(await p.evaluate(()=>S.trainers.u1.credits)===1000&&JSON.stringify(await p.evaluate(()=>S.pokemon.u1.p1.hp))==='{"cur":30,"max":30}','nothing is applied by itself: credits and HP unchanged');
@@ -133,6 +134,34 @@ const seedFn=S=>{
   t=await txt();
   ok(/What it cost \(apply by hand\)/.test(t)&&/faints/.test(t)&&/Recorded on the Gym rankings/.test(t),'the card lists the costs to apply by hand and what the rankings recorded');
   ok(await p.evaluate(()=>S.roadGm.log.length)===2,'the log keeps both battles');
+  // Gym battles: rematches, exhibitions and Gym trainers
+  const btN=await p.evaluate(()=>rkWith('gym',()=>rkBattles().length));
+  await p.evaluate(()=>{Object.assign(S.ui.rdb,{gym:'relic',gk:'rematch',gn:'2'});});
+  await click(p,{act:'rdb_gym'});await W(p,600);
+  let G=await p.evaluate(()=>S.roadGm.cur.foes.find(f=>f.kind==='gl'));
+  ok(G&&G.n===2&&G.team.length===2&&G.mode==='rematch'&&G.rep===0&&G.name===await p.evaluate(()=>rkGymName(RK_GYMS.find(g=>g.k==='relic'))),'Gym battle: a 2-on-2 rematch with the Relic Badge Leader ('+(G&&G.name)+': '+(G&&G.team.join(', '))+')');
+  t=await txt();
+  ok(/Their roll: d20 \+ 9 at full strength = d20 \+ 9/.test(t)&&/Leader rematch/.test(t),'the card says the Leader is at full strength, d20 + 9');
+  ok(await p.evaluate(k=>!document.querySelector('[data-act="rdb_swap"][data-k="'+k+'"]'),G.k),'a Gym battle has no Swap button');
+  ok(await p.evaluate(()=>{S.cond.rk=Object.assign({},S.cond.rk,{gym:{g_relic:{rep:'brutal'}}});const f=rdbGymFoe('relic','exhibition',3);S.cond.rk.gym={};return f.rep===2&&f.mode==='exhibition'&&f.n===3;}),'a brutal Gym’s Leader gets +2 more');
+  await click(p,{act:'rdb_who',k:G.k,v:'u1'});
+  await click(p,{act:'rdb_mon',k:G.k,id:'p1'});await click(p,{act:'rdb_mon',k:G.k,id:'p2'});
+  await p.evaluate(k=>{const x=S.ui.rdb.f[k];x.pd='20';x.fd='1';},G.k);
+  await click(p,{act:'rdb_settle',k:G.k});await W(p,700);
+  G=await p.evaluate(k=>S.roadGm.cur.foes.find(f=>f.k===k),G.k);
+  ok(G.fight&&G.fight.fb===9&&G.fight.ft===10&&G.fight.win&&G.fight.prize===2700,'beating the Leader pays the top prize, 2,700 P (Mira 22 vs 1 + 9)');
+  ok(await p.evaluate(()=>rkWith('gym',()=>rkBattles().length))===btN&&/do not count on the rankings/.test(G.fight.why),'and nothing goes on the rankings');
+  await p.evaluate(()=>{Object.assign(S.ui.rdb,{gym:'coal',gk:'trainer',gn:'1'});});
+  await click(p,{act:'rdb_gym'});await W(p,600);
+  let GT=await p.evaluate(()=>S.roadGm.cur.foes.find(f=>f.kind==='gt'));
+  ok(GT&&/^Gym trainer /.test(GT.name)&&GT.n===1&&GT.team.length===1,'a Gym trainer joins the list ('+(GT&&GT.name)+', '+(GT&&GT.ty)+')');
+  await click(p,{act:'rdb_roll'});await W(p,700);
+  ok(await p.evaluate(k=>S.roadGm.cur.foes.some(f=>f.k===k),GT.k),'rolling for road trainers keeps the waiting Gym battle');
+  await click(p,{act:'rdb_who',k:GT.k,v:'u3'});await click(p,{act:'rdb_mon',k:GT.k,id:'c1'});
+  await p.evaluate(k=>{const x=S.ui.rdb.f[k];x.pd='10';x.fd='10';},GT.k);
+  await click(p,{act:'rdb_settle',k:GT.k});await W(p,700);
+  GT=await p.evaluate(k=>S.roadGm.cur.foes.find(f=>f.k===k),GT.k);
+  ok(GT.fight&&GT.fight.fb===GT.fight.pb&&GT.fight.res==='hard'&&GT.fight.prize===300,'the Gym trainer matches Cora’s bonus: 10 vs 10 is a hard-fought win, 300 P');
   await p.screenshot({path:ROOT+'/tests/out/road.png',fullPage:true});
   // the rankings feed shows the result, not the rolls
   await p.evaluate(()=>{setTab('rank');});await W(p,800);

@@ -19,7 +19,21 @@ const RDB_ZONES=[['road','On the road'],['semi','Semi-route'],['off','Off-route'
 const RDB_COUNT={road:[0,0,1,1,1,2],semi:[0,0,0,0,1,1],off:[0,0,0,0,0,1]};
 const RDB_SIZE={'1':[1,1],'2':[1,2],'2s':[1,2],'3':[2,3],'4':[3,3]};
 const rdbRankOfBadges=bd=>bd>=6?'4':bd>=4?'3':bd>=2?'2':'1';
-const rdbLvlBonus=l=>Math.ceil(clamp(Math.round(num(l))||1,1,20)/5);
+/* Update 61: both sides use their best-ever tier on the Gym circuit (Unranked rookie +1, Ranked +2, Top 150 +3,
+   Top 50 +4, Top 10 +5) plus 1 per 2 badges. Level no longer counts. */
+const rdbTierIx=p=>{const T=RK_C.gym.tiers,i=T.findIndex(t=>num(p)>=t[0]);return i<0?T.length-1:i;};
+const rdbTierB=p=>RK_C.gym.tiers.length-rdbTierIx(p);
+const rdbTierName=p=>RK_C.gym.tiers[rdbTierIx(p)][1];
+/* a player's best-ever points on the Gym circuit (0 when they are not on it) */
+const rdbPeakOf=uid=>rkWith('gym',()=>{const r=rkRows().find(x=>x.id===uid);return r?num(r.peak):0;});
+/* Gym battles off the badge path (rematches, exhibitions, the trainers inside a Gym): a Leader is at full strength
+   (+9, a Top 10 trainer with eight badges) moved by the Gym's reputation; a Gym trainer matches whoever answers.
+   They pay prize money but never count on the rankings. */
+const RDB_GKINDS=[['rematch','Leader rematch'],['exhibition','Exhibition with the Leader'],['trainer','A Gym trainer']];
+const RDB_REP_ADJ={easy:-1,standard:0,tough:1,brutal:2};
+const rdbIsGym=f=>f&&(f.kind==='gl'||f.kind==='gt');
+/* the foe's bonus: pb is the player's, which a Gym trainer copies */
+const rdbFoeB=(f,pb)=>f.kind==='gt'?pb:f.kind==='gl'?9+num(f.rep):(f.tb!=null?num(f.tb):num(f.rb))+num(f.bb);
 const rdbBdBonus=b=>Math.floor(clamp(num(b),0,8)/2);
 const RDB_PRIZE=300;
 const rdbPrize=bd=>RDB_PRIZE*(clamp(Math.round(num(bd)),0,8)+1);
@@ -56,7 +70,7 @@ const RDB_CONF='lily-of-the-valley-conference';
 const RDB_BAND={'1':[0,330],'2':[290,420],'2s':[290,420],'3':[380,500],'4':[450,999]};
 const RDB_LEGEND=new Set([144,145,146,150,151,243,244,245,249,250,251,377,378,379,380,381,382,383,384,385,386,480,481,482,483,484,485,486,487,488,489,490,491,492,493]);
 
-S.ui.rdb=Object.assign({at:'',zone:'',d6:'',f:{}},S.ui.rdb||{});
+S.ui.rdb=Object.assign({at:'',zone:'',d6:'',f:{},gym:'coal',gk:'rematch',gn:'3'},S.ui.rdb||{});
 const rdbG=()=>S.roadGm||{};
 const rdbCur=()=>{const c=rdbG().cur;return c&&Array.isArray(c.foes)?c:null;};
 const rdbLog=()=>Array.isArray(rdbG().log)?rdbG().log:[];
@@ -261,9 +275,9 @@ function rdbFoe(r,L,W){
   }
   if(!ty)ty=rdbHomeType(r.name,homeNm);
   if(team.length<n&&!(saved&&saved.sp.length))team=team.concat(rdbTeam(ty,rank,n-team.length,r.name+'|'+W,team));
-  const rb=qnRankNum(rank)||1,bb=rdbBdBonus(r.bd);
+  const tb=rdbTierB(r.peak),bb=rdbBdBonus(r.bd);
   return {k:rkKey(),id:r.id,kind:r.kind,name:r.name,home:homeNm||String(r.home||'').split(/[;,]/)[0].trim(),lab:r.lab||'',rank,bd:num(r.bd),pos:r.pos,rec:r.recTxt||'',
-    ty,n:team.length?Math.min(n,team.length):n,team,where:L.txt,jt:L.jt||'',rb,bb,st:'open'};
+    ty,n:team.length?Math.min(n,team.length):n,team,where:L.txt,jt:L.jt||'',tb,tn:rdbTierName(r.peak),bb,st:'open'};
 }
 
 /* ----- the battle ----- */
@@ -305,12 +319,14 @@ function rdbSettle(k){
   const mons=u.mons.map(id=>party.find(m=>m.id===id)).filter(Boolean);
   if(!party.length){toast(tName(t)+' has no Pokémon with them.');return;}
   if(mons.length!==need){toast('Pick '+need+' Pokémon for '+tName(t)+' ('+mons.length+' picked).');return;}
-  const lv=rdbLvlBonus(t.level),bd=badgeCount(t),bb=rdbBdBonus(bd),pb=lv+bb,pt=pd+pb,ft=fd+f.rb+f.bb,m=pt-ft,res=rdbResult(m),win=m>=0;
+  const pk=rdbPeakOf(u.uid),tb=rdbTierB(pk),bd=badgeCount(t),bb=rdbBdBonus(bd),pb=tb+bb,fb=rdbFoeB(f,pb),pt=pd+pb,ft=fd+fb,m=pt-ft,res=rdbResult(m),win=m>=0;
   const cost=rdbCosts(res,mons);
-  const prize=rdbPrize(win?f.bd:bd);
-  const fight={uid:u.uid,pname:tName(t),lvl:Math.round(num(t.level))||1,pbd:bd,pd,lv,bb,pb,pt,fd,ft,m,res,win,mons:cost.mons,inj:cost.inj,prize,pay:win?prize:-prize,paid:0,moved:0,bt:'',pts:null,why:''};
+  /* the loser pays 300 P × (their badges + 1); a Leader pays the top rate, a Gym trainer the player's own rate */
+  const prize=f.kind==='gl'?(win?rdbPrize(8):rdbPrize(bd)):f.kind==='gt'?rdbPrize(bd):rdbPrize(win?f.bd:bd);
+  const fight={uid:u.uid,pname:tName(t),pbd:bd,pd,tb,tn:rdbTierName(pk),bb,pb,fb,pt,fd,ft,m,res,win,mons:cost.mons,inj:cost.inj,prize,pay:win?prize:-prize,paid:0,moved:0,bt:'',pts:null,why:''};
   /* the rankings: a public battle, if the player is on the Gym board and the foe still is */
-  if(onGym(t)){
+  if(rdbIsGym(f))fight.why='Gym rematches, exhibitions and Gym trainers do not count on the rankings.';
+  else if(onGym(t)){
     const where=f.route?' on '+rdbRouteName(f.route):f.place?' '+f.place.charAt(0).toLowerCase()+f.place.slice(1):'';
     const r=rkWith('gym',()=>rkSaveBattle(u.uid,f.id,win?'a':'b','public','A road battle'+where+'.',{road:1}));
     if(r.err)fight.why=r.err;else{fight.bt=r.k;fight.pts={a:num(r.pv.a),b:num(r.pv.b)};}
@@ -351,12 +367,49 @@ function rdbRoll(){
   const d6=typed>=1&&typed<=6?typed:encRand(1,6);
   const n=RDB_COUNT[zone][d6-1];
   const dr=n?rdbDraw(n,new Set()):{foes:[],wide:false,none:false};
-  rdbSaveCur({k:rkKey(),d6,zone,date:clToday()||'',at:P.txt,typed:typed>=1&&typed<=6?1:0,want:n,wide:dr.wide?1:0,none:dr.none?1:0,foes:dr.foes});
-  u.d6='';u.f={};
+  /* Gym battles still waiting (open, or won or lost but not paid) stay on the list */
+  const keep=rdbCur()?rdbCur().foes.filter(f=>rdbIsGym(f)&&rdbUnfinished(f)):[];
+  rdbSaveCur({k:rkKey(),d6,zone,date:clToday()||'',at:P.txt,typed:typed>=1&&typed<=6?1:0,want:n,wide:dr.wide?1:0,none:dr.none?1:0,foes:dr.foes.concat(keep)});
+  u.d6='';Object.keys(u.f).forEach(k=>{if(!keep.some(f=>f.k===k))delete u.f[k];});
+  render();
+}
+const rdbUnfinished=f=>f.st==='open'||(f.st==='done'&&f.fight&&!f.fight.paid);
+/* the Leader's NPC sheet, if there is one: matched by the Leader's name */
+function rdbLeaderSheet(name){
+  const n=String(name||'').toLowerCase();
+  const id=ntIds().find(i=>{const nt=NTS()[i];return nt&&(String(nt.name||'').toLowerCase()===n||(glKey(nt)&&n.indexOf(glKey(nt))>=0));});
+  return id?NTS()[id]:null;
+}
+function rdbGymFoe(gk,mode,n){
+  const g=RK_GYMS.find(x=>x.k===gk)||RK_GYMS[0],town=RDB_GYM_AT[g.k],lname=rkGymName(g),nt=rdbLeaderSheet(lname),q=nt?qnOf(nt):null;
+  const prof=GL_QUICK[nt?glKey(nt):lname.toLowerCase().split(/\s+/).find(w=>GL_QUICK[w])||'']||{};
+  /* the Leader's strongest team: the saved team for the most badges, else the team on the sheet */
+  const st=nt?ntStages(nt):[],top=st.length?st[st.length-1].team:null,full=(Array.isArray(top)&&top.length?top:nt?ntTeam(nt):[]).map(m=>m.sp||m.species).filter(Boolean);
+  const ty=(q&&q.ty)||prof.ty||rdbMainType(nt?ntTeam(nt):[])||'Normal';
+  const rp=rkGymRep(g.id);
+  if(mode==='trainer'){
+    const avg=grPartyAvg(),nm=(rkGenField(num(Date.now()%9973)+7,1)[0]||{name:'Sam'}).name.split(' ')[0];
+    return {k:rkKey(),id:'gt_'+rkKey(),kind:'gt',mode,gym:g.k,name:'Gym trainer '+nm,home:trName(town),rank:rdbRankOfBadges(avg),bd:avg,pos:null,rec:'',ty,n,
+      team:rdbTeam(ty,rdbRankOfBadges(avg),n,'gt|'+Date.now(),[]),where:'',jt:'Trains under '+lname+' at the '+trName(town)+' Gym; matched to whoever answers',route:'',place:'In the '+trName(town)+' Gym',st:'open'};
+  }
+  const team=full.slice(0,n);
+  if(team.length<n)team.push(...rdbTeam(ty,'4',n-team.length,'gl|'+g.k,team));
+  return {k:rkKey(),id:g.id,kind:'gl',mode,gym:g.k,name:lname,home:trName(town),rank:'4',bd:8,pos:null,rec:'',ty,n,team,where:'',
+    jt:(mode==='rematch'?'A rematch':'An exhibition')+' with the '+g.badge+' Badge Leader, at full strength',route:'',place:'In the '+trName(town)+' Gym',rep:RDB_REP_ADJ[rp[0]]||0,repName:rp[1],st:'open'};
+}
+function rdbGymAdd(){
+  const u=S.ui.rdb,n=clamp(Math.round(num(u.gn))||3,1,6),f=rdbGymFoe(u.gym||'coal',u.gk||'rematch',n);
+  const cur=rdbCur(),today=clToday()||'';
+  let c;
+  if(cur&&cur.date===today)c=JSON.parse(JSON.stringify(cur));
+  else c={k:rkKey(),d6:0,zone:rdbZone(),date:today,at:'',want:0,foes:cur?cur.foes.filter(x=>rdbIsGym(x)&&rdbUnfinished(x)):[],gymOnly:1};
+  c.foes.push(f);rdbSaveCur(c);
+  toast(f.kind==='gl'?f.name+(f.mode==='rematch'?' rematch':' exhibition')+' added: '+n+'-on-'+n+'.':f.name+' is ready at the '+f.home+' Gym.',true);
   render();
 }
 function rdbSwap(k){
   const cur=rdbCur();if(!cur)return;
+  if(rdbIsGym(cur.foes.find(x=>x.k===k)))return;
   const skip=new Set(cur.foes.map(x=>x.id)),dr=rdbDraw(1,skip);
   if(!dr.foes.length){toast('Nobody else on the board to swap in.');return;}
   const c=JSON.parse(JSON.stringify(cur));
@@ -370,6 +423,7 @@ function rdbAct(b){
   switch(d.act){
     case 'rdb_zone':u.zone=d.v;render();break;
     case 'rdb_roll':rdbRoll();break;
+    case 'rdb_gym':rdbGymAdd();break;
     case 'rdb_clear':edit('gr','road','cur',null);u.f={};render();break;
     case 'rdb_no':{const f=rdbSetFoe(d.k,{st:'no'});if(f)rdbSaveLog(rdbLog().concat([{k:d.k,date:clToday()||'',at:Date.now(),foe:f.name,fid:f.id,res:'no'}]));render();break;}
     case 'rdb_undo':rdbUndo(d.k);break;
@@ -399,18 +453,25 @@ function rdbPlaceOpts(sel,trip){
     <optgroup label="Routes">${routes.map(f=>opt(f.id,f.name))}</optgroup>`;
 }
 function rdbFoeHtml(f){
-  const u=rdbUi(f.k),F=f.fight,rk=qnRankName(f.rank)||'Novice';
-  const head=h`<div class="row sp"><span><b>${f.name}</b>${f.kind==='rival'?h` <span class="pill">Rival</span>`:''} <span class="sub">${[f.home,rk,rkPl(f.bd,'badge'),'#'+f.pos+' on the Gym board',f.rec.replace(/ · \d+ badges?$/,'')].filter(Boolean).join(' · ')}</span></span>
-    ${f.st==='no'?h`<span class="pill">Declined</span>`:f.st==='done'?h`<span class="pill ${F&&F.win?'resolved':'wary'}">${rdbResName(F&&F.res)}</span>`:''}</div>`;
+  const u=rdbUi(f.k),F=f.fight,rk=qnRankName(f.rank)||'Novice',gym=rdbIsGym(f),old=f.tb==null&&!gym;
+  const mode=gym?(RDB_GKINDS.find(x=>x[0]===f.mode)||['','Gym battle'])[1]:'';
+  const facts=gym?[f.home+' Gym',f.kind==='gl'?'Gym Leader':'Gym trainer']:[f.home,rk,rkPl(f.bd,'badge'),f.tn?'best tier '+f.tn:'','#'+f.pos+' on the Gym board',String(f.rec||'').replace(/ · \d+ badges?$/,'')];
+  const head=h`<div class="row sp"><span><b>${f.name}</b>${f.kind==='rival'?h` <span class="pill">Rival</span>`:''}${gym?h` <span class="pill gm">${mode}</span>`:''} <span class="sub">${facts.filter(Boolean).join(' · ')}</span></span>
+    ${f.st==='no'?h`<span class="pill">${gym?'Called off':'Declined'}</span>`:f.st==='done'?h`<span class="pill ${F&&F.win?'resolved':'wary'}">${rdbResName(F&&F.res)}</span>`:''}</div>`;
+  const repTxt=f.kind==='gl'&&num(f.rep)?' '+(num(f.rep)>0?'+ ':'− ')+Math.abs(num(f.rep))+' for a '+String(f.repName||'').toLowerCase()+' Gym':'';
+  const roll=f.kind==='gl'?'d20 + 9 at full strength'+repTxt+' = d20 + '+(9+num(f.rep))+'.'
+    :f.kind==='gt'?'matched to whoever answers: the same bonus as the player.'
+    :old?'d20 + '+f.rb+' for rank + '+f.bb+' for badges = d20 + '+(num(f.rb)+num(f.bb))+'.'
+    :'d20 + '+f.tb+' for their best tier ('+f.tn+') + '+f.bb+' for badges = d20 + '+(f.tb+f.bb)+'.';
   const info=h`<div class="rdbwhere">${f.jt||f.where}.</div>
-    <div><b>Wants a ${f.n}-on-${f.n} battle.</b> Favours ${f.ty}-types: ${f.team.join(', ')||'no team named'}.</div>
-    <div class="sub">Their roll: d20 + ${f.rb} for rank + ${f.bb} for badges = d20 + ${f.rb+f.bb}.</div>`;
-  if(f.st==='no')return h`<div class="rdbf no">${head}<div class="row"><span class="sub">The party passed. No points, no money.</span><button class="btn sm ghost" data-act="rdb_undo" data-k="${f.k}">Undo</button></div></div>`;
+    <div><b>${gym?'A '+f.n+'-on-'+f.n+' battle.':'Wants a '+f.n+'-on-'+f.n+' battle.'}</b> ${gym?'Uses':'Favours'} ${f.ty}-types: ${f.team.join(', ')||'no team named'}.</div>
+    <div class="sub">Their roll: ${roll}</div>`;
+  if(f.st==='no')return h`<div class="rdbf no">${head}<div class="row"><span class="sub">${gym?'Called off. No money.':'The party passed. No points, no money.'}</span><button class="btn sm ghost" data-act="rdb_undo" data-k="${f.k}">Undo</button></div></div>`;
   if(f.st==='done'&&F){
     const rp=F.pts?h`Recorded on the Gym rankings: ${F.pname} <b>${rkSgn(F.pts.a)} RP</b>, ${f.name} <b>${rkSgn(F.pts.b)} RP</b>.`:h`${F.why||'Not recorded on the rankings.'}`;
     return h`<div class="rdbf done">${head}${info}
       <div class="rdbres ${F.win?'win':'loss'}"><span><b>${rdbResName(F.res)}</b>, by ${Math.abs(F.m)}${F.m===0?' (a tie goes to the player)':''}.</span>
-        <span class="sub">${F.pname}: ${F.pd} + ${F.lv} level + ${F.bb} badges = <b>${F.pt}</b> · ${f.name}: ${F.fd} + ${f.rb} rank + ${f.bb} badges = <b>${F.ft}</b></span></div>
+        <span class="sub">${F.pname}: ${F.pd} + ${F.tb!=null?F.tb+' tier':F.lv+' level'} + ${F.bb} badges = <b>${F.pt}</b> · ${f.name}: ${F.fd} + ${F.fb!=null?F.fb:num(f.rb)+num(f.bb)} = <b>${F.ft}</b></span></div>
       <div><span class="fl">What it cost (apply by hand)</span><ul class="rdbcost">${F.mons.map(m=>h`<li><b>${m.name}</b>: ${m.faint?h`<span class="rdbko">faints</span> (${m.cur} HP lost)`:h`−${m.hp} HP (${m.pct}% of ${m.max}) → ${m.after}/${m.max}${m.hold?', hangs on':''}`}; ${m.uses?'spends '+m.uses+' daily '+(m.uses===1?'use':'uses'):'no daily uses spent'}</li>`)}</ul>
         ${F.inj?h`<p><span class="rdbko">Injury:</span> ${F.inj.name} is hurt (d6 rolled ${F.inj.r}). What that means is your call.</p>`:F.res==='close'||F.res==='rout'?h`<p class="sub">Injury check: no injury.</p>`:''}</div>
       <div class="row"><span>${F.win?h`<b>${F.pname}</b> wins <b>${fmtP(F.prize)}</b> from ${f.name}.`:h`<b>${F.pname}</b> owes ${f.name} <b>${fmtP(F.prize)}</b>.`}</span>
@@ -420,17 +481,17 @@ function rdbFoeHtml(f){
   }
   const pcs=tids().filter(id=>S.trainers[id]&&S.trainers[id].name),t=S.trainers[u.uid];
   const party=t?partyOf(u.uid):[],need=t?Math.min(f.n,party.length):f.n;
-  const lv=t?rdbLvlBonus(t.level):0,bd=t?badgeCount(t):0;
+  const pk=t?rdbPeakOf(u.uid):0,tb=rdbTierB(pk),bd=t?badgeCount(t):0;
   return h`<div class="rdbf">${head}${info}
     <div class="fld"><span class="fl">Who answers</span><span class="seg" role="group" aria-label="Who answers ${f.name}">${pcs.map(id=>h`<button data-act="rdb_who" data-k="${f.k}" data-v="${id}" aria-pressed="${String(u.uid===id)}">${tName(S.trainers[id])}</button>`)}</span></div>
-    ${t?h`<p class="sub">${tName(t)}: d20 + ${lv} for level ${Math.round(num(t.level))||1} + ${rdbBdBonus(bd)} for ${rkPl(bd,'badge')} = d20 + ${lv+rdbBdBonus(bd)}.</p>
+    ${t?h`<p class="sub">${tName(t)}: d20 + ${tb} for their best tier (${rdbTierName(pk)}) + ${rdbBdBonus(bd)} for ${rkPl(bd,'badge')} = d20 + ${tb+rdbBdBonus(bd)}${f.kind==='gt'?', and the Gym trainer matches it':''}.</p>
       <div class="fld"><span class="fl">${tName(t)} sends out ${need} (${u.mons.length} picked)</span>
         ${party.length?h`<span class="seg rdbmons" role="group" aria-label="Pokémon for this battle">${party.map(m=>{const i=u.mons.indexOf(m.id);return h`<button data-act="rdb_mon" data-k="${f.k}" data-id="${m.id}" aria-pressed="${String(i>=0)}">${i>=0?(i+1)+'. ':''}${mName(m)} <span class="sub">${m.hp?num(m.hp.cur)+'/'+num(m.hp.max):''}</span></button>`;})}</span>`:h`<span class="sub">No Pokémon with them.</span>`}</div>
       <div class="fgrid">
         <label class="fld"><span class="fl">${tName(t)}’s d20 (their real roll)</span><input type="number" min="1" max="20" inputmode="numeric" data-rdb="${f.k}|pd" value="${u.pd}"></label>
         <label class="fld"><span class="fl">${f.name}’s d20</span><span class="row"><input type="number" min="1" max="20" inputmode="numeric" data-rdb="${f.k}|fd" value="${u.fd}" placeholder="Rolled if empty"><button class="btn sm" data-act="rdb_froll" data-k="${f.k}">Roll</button></span></label>
       </div>`:''}
-    <div class="row">${t?h`<button class="btn sm primary" data-act="rdb_settle" data-k="${f.k}">Settle the battle</button>`:''}<button class="btn sm" data-act="rdb_no" data-k="${f.k}">Declined</button><button class="btn sm ghost" data-act="rdb_swap" data-k="${f.k}">Swap for another trainer</button></div>
+    <div class="row">${t?h`<button class="btn sm primary" data-act="rdb_settle" data-k="${f.k}">Settle the battle</button>`:''}<button class="btn sm" data-act="rdb_no" data-k="${f.k}">${gym?'Call it off':'Declined'}</button>${gym?'':h`<button class="btn sm ghost" data-act="rdb_swap" data-k="${f.k}">Swap for another trainer</button>`}</div>
   </div>`;
 }
 function rdbPanel(){
@@ -450,7 +511,15 @@ function rdbPanel(){
     <p class="sub">${P?P.txt+'. ':'Start a trip or choose where the party is. '}On the road a 3–5 brings one trainer and a 6 brings two; on the semi-route a 5–6 brings one; off-route only a 6.</p>
     ${seeded?'':h`<p class="sub rdbwarn">The Gym circuit rankings have no field trainers or rivals yet, so nobody can turn up. Fill the board on the Rankings page first.</p>`}
     <div class="row"><button class="btn primary sm" data-act="rdb_roll" ${P?'':raw('disabled')}>Roll for trainers</button>${cur?h`<button class="btn sm ghost" data-act="rdb_clear">Clear the day</button>`:''}</div>
-    ${cur?h`<div class="rdbday"><p><b>${cur.date?clNice(cur.date)+' · ':''}d6: ${cur.d6}</b>${cur.typed?' (your roll)':''} ${(RDB_ZONES.find(z=>z[0]===cur.zone)||['',''])[1].toLowerCase()}, ${cur.at.charAt(0).toLowerCase()+cur.at.slice(1)}: ${cur.want?(cur.want===1?'one trainer wants':'two trainers want')+' a battle.':'nobody challenges the party today.'}</p>
+    <div class="rdbgym" role="group" aria-label="Gym battle"><span class="fl">Gym battle</span>
+      <div class="fgrid">
+        <label class="fld"><span class="fl">Gym</span><select data-u="rdb.gym" data-nr>${RK_GYMS.map(g=>h`<option value="${g.k}" ${g.k===u.gym?raw('selected'):''}>${trName(RDB_GYM_AT[g.k])}: ${rkGymName(g)}</option>`)}</select></label>
+        <label class="fld"><span class="fl">Against</span><select data-u="rdb.gk" data-nr>${RDB_GKINDS.map(([v,l])=>h`<option value="${v}" ${v===u.gk?raw('selected'):''}>${l}</option>`)}</select></label>
+        <label class="fld"><span class="fl">Pokémon a side</span><select data-u="rdb.gn" data-nr>${[1,2,3,4,5,6].map(n=>h`<option value="${n}" ${String(n)===String(u.gn)?raw('selected'):''}>${n}</option>`)}</select></label>
+      </div>
+      <div class="row"><button class="btn sm" data-act="rdb_gym">Add the Gym battle</button><span class="sub">Rematches, exhibitions and Gym trainers only, never a badge battle. Prize money, no ranking points.</span></div>
+    </div>
+    ${cur?h`<div class="rdbday">${cur.gymOnly?h`<p><b>${cur.date?clNice(cur.date)+' · ':''}Gym battles</b></p>`:h`<p><b>${cur.date?clNice(cur.date)+' · ':''}d6: ${cur.d6}</b>${cur.typed?' (your roll)':''} ${(RDB_ZONES.find(z=>z[0]===cur.zone)||['',''])[1].toLowerCase()}, ${cur.at.charAt(0).toLowerCase()+cur.at.slice(1)}: ${cur.want?(cur.want===1?'one trainer wants':'two trainers want')+' a battle.':'nobody challenges the party today.'}</p>`}
       ${cur.wide?h`<p class="sub">Nobody on the board is walking near the party today, so ${cur.foes.length===1?'this trainer was':'these trainers were'} picked by standing alone.</p>`:''}
       ${cur.want&&!cur.foes.length?h`<p class="sub">The board has nobody to send.</p>`:''}
       ${cur.foes.map(rdbFoeHtml)}</div>`:''}
@@ -458,9 +527,10 @@ function rdbPanel(){
     <details class="clrd"><summary>How road battles work</summary><ul class="tprules">
       <li><b>Who turns up.</b> Trainers on the Gym circuit rankings travel too: from home to their next Gym, resting a few days after each badge. The ones walking the party’s road are likeliest, then those a town or two away; those close to the players in the standings come up more, and tracked rivals twice as often.</li>
       <li><b>Rank and challenge.</b> 0–1 badges Novice (1-on-1), 2–3 Skilled (1 or 2), 4–5 Experienced (2 or 3), 6+ Ace (3). A rival with a Quick NPC sheet keeps the sheet’s rank and team. The party chooses who answers, and anyone may decline.</li>
-      <li><b>The roll.</b> Player: their real d20 + 1 per 5 levels (rounded up) + 1 per 2 badges. Foe: d20 + rank (Novice 1 to Ace 4) + 1 per 2 badges. Win by 5+ clean win, 0–4 hard-fought win, lose by 1–4 close loss, 5+ rout.</li>
+      <li><b>The roll.</b> Both sides: d20 + their best-ever tier on the Gym circuit (Unranked rookie +1, Ranked +2, Top 150 +3, Top 50 +4, Top 10 +5) + 1 per 2 badges. The player rolls real dice. Win by 5+ clean win, 0–4 hard-fought win, lose by 1–4 close loss, 5+ rout.</li>
       <li><b>The cost.</b> Each Pokémon sent out loses d4 × 10% of its max HP on a clean win, × 15% on a hard win, × 20% on a close loss (and the last one out faints); in a rout all of them faint. Daily uses: 0–1 each on a clean win, 1–2 on a hard win or close loss, 2–3 in a rout. An injury comes on a 1 in 6 after a close loss, 1–2 after a rout. Nothing is applied for you.</li>
       <li><b>Money and standing.</b> The winner takes 300 P × (the loser’s badges + 1). It counts as a public battle on the rankings: +5 RP to the winner (+10 for beating a higher-ranked trainer), −5 to the loser.</li>
+      <li><b>Gym battles.</b> Rematches and exhibitions put the Leader at full strength (d20 + 9, one less for an easy Gym, up to two more for a brutal one) with their strongest saved team; a Gym trainer matches whoever answers. You choose how many Pokémon a side. A Leader who loses pays the top prize (2,700 P); a player who loses pays as usual. Nothing goes on the rankings, and badge battles are never settled this way.</li>
     </ul></details>
   </section>`;
 }

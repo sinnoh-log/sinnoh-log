@@ -491,6 +491,7 @@ function rkEngine(){
   };
   ents.forEach(e=>{e.res.forEach(r=>{e.full+=r.p;});});
   age(0);endOfWeek(0);
+  ents.forEach(e=>{e.peak=pts(e);});   /* best-ever points (Update 61): road battles use the best tier a trainer has reached */
   for(let w=1;w<=W;w++){
     age(w);
     const order=ents.slice().sort((x,y)=>pts(y)-pts(x)||x.id.localeCompare(y.id));
@@ -540,9 +541,10 @@ function rkEngine(){
       const pp=rkPtsAt(log.filter(x=>x.u===pid),w),d=pp+pt*RK_TETHER-pts(e);
       if(Math.abs(d)>=1)add(e,w,Math.round(d*0.5));
     });
+    ents.forEach(e=>{const p=pts(e);if(p>e.peak)e.peak=p;});
   }
   const out={W,E:{},REC,CON,UP};
-  ents.forEach(e=>{out.E[e.id]={pts:Math.round(pts(e)),prev:W?rkPtsAt(e.res,W-1):Math.round(pts(e)),badges:nb(e),held:Object.assign({},e.held)};});
+  ents.forEach(e=>{out.E[e.id]={pts:Math.round(pts(e)),prev:W?rkPtsAt(e.res,W-1):Math.round(pts(e)),badges:nb(e),held:Object.assign({},e.held),peak:Math.round(Math.max(e.peak,pts(e)))};});
   paced.forEach(([k,bd])=>{const o=out.E['n_'+k];if(o&&bd!=null)o.badges=bd;});
   rkEngMemo[C.d]={key,out};
   return out;
@@ -644,9 +646,9 @@ function rkRows(){
   const lab=rkD().lab||{},b=rkB(),met=b.met||{},gone=b.gone||{};
   const field=b.seed?rkGenField(num(b.seed),num(b.n)||300):[];
   const conB=rkC()===RK_C.con;
-  const rows=entriesOf(S.trainers).filter(t=>t.name&&(conB?onCon(t):onGym(t))).map(t=>{const m=log.filter(e=>e.u===t.id),p=rkPtsAt(m,W);return {id:t.id,name:tName(t),pts:p,wk:W?p-rkPtsAt(m,W-1):0,lab:lab[t.id]||'',kind:'pc',bd:badgeCount(t),rb:ribCount(t)};})
-    .concat(rkNpcs().map(n=>{const x=EN.E['n_'+n.k]||{pts:0,prev:0,badges:0};return {id:'n_'+n.k,k:n.k,name:n.n||'Unnamed rival',pts:x.pts,wk:x.pts-x.prev,lab:n.s||'',kind:'rival',home:n.h||'',bd:x.badges};}))
-    .concat(field.filter(f=>!gone[f.i]&&EN.E['b'+f.i]).map(f=>{const x=EN.E['b'+f.i];return {id:'b'+f.i,i:f.i,kind:'bg',name:f.name,home:f.home,lab:f.lab,pts:x.pts,wk:x.pts-x.prev,bd:x.badges};}));
+  const rows=entriesOf(S.trainers).filter(t=>t.name&&(conB?onCon(t):onGym(t))).map(t=>{const m=log.filter(e=>e.u===t.id),p=rkPtsAt(m,W);let pk=p;for(let w=0;w<W;w++)pk=Math.max(pk,rkPtsAt(m,w));return {id:t.id,name:tName(t),pts:p,peak:pk,wk:W?p-rkPtsAt(m,W-1):0,lab:lab[t.id]||'',kind:'pc',bd:badgeCount(t),rb:ribCount(t)};})
+    .concat(rkNpcs().map(n=>{const x=EN.E['n_'+n.k]||{pts:0,prev:0,badges:0};return {id:'n_'+n.k,k:n.k,name:n.n||'Unnamed rival',pts:x.pts,peak:Math.max(x.pts,num(x.peak)),wk:x.pts-x.prev,lab:n.s||'',kind:'rival',home:n.h||'',bd:x.badges};}))
+    .concat(field.filter(f=>!gone[f.i]&&EN.E['b'+f.i]).map(f=>{const x=EN.E['b'+f.i];return {id:'b'+f.i,i:f.i,kind:'bg',name:f.name,home:f.home,lab:f.lab,pts:x.pts,peak:Math.max(x.pts,num(x.peak)),wk:x.pts-x.prev,bd:x.badges};}));
   rows.forEach(r=>{r.met=r.kind!=='pc'&&!!met[r.id];r.rec=EN.REC[r.id]||null;r.con=EN.CON[r.id]||null;});
   rows.sort((a,b)=>b.pts-a.pts||(a.kind==='pc'?-1:b.kind==='pc'?1:0)||a.name.localeCompare(b.name));
   rows.forEach((r,i)=>{r.pos=i+1;});
