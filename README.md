@@ -965,3 +965,17 @@ Item pictures were squeezed out of shape in the read-first bag (Update 49) and c
 - A settled battle is recorded on the Gym circuit rankings as a public battle, so the feed shows who won and where, never the rolls.
 - Rankings code: the battle recording behind **Save the battle** is now `rkSaveBattle()`, shared with the road panel. The season engine also reports which Gyms each trainer holds and when they won them.
 - `tests/t_road.js` checks it, including that players see nothing and that the panel fits a phone.
+
+## Typed initiative and private travel days (Update 57)
+
+- **Initiative form.** An **Initiative** button (GM only) on the turn order and on the Battle map's turn bar opens one form listing everyone in the fight with their Speed.
+  - For each combatant you type either the d20 (Speed is added) or the final total; a switch on each row picks which. The sum shows beside the box as you type, and a d20 outside 1–20 is flagged.
+  - When starting a battle, empty boxes are rolled d20 + Speed. In a running battle an empty box keeps its number, and **Re-sort the order** keeps whose turn it is. Late joiners can be fixed the same way.
+  - Applying switches the battle to d20 + Speed so **Re-sort by Speed** can't overwrite typed numbers. Escape closes the form.
+- **Ties** now go to the higher Speed, then a roll, everywhere the order is sorted (the roll buttons, re-sorting, adding someone mid-fight).
+- **Travel days.** Players see each day's weather and progress only.
+  - A day's wild encounter, road event and rival sighting are saved in `gm/road` (`trip {k, d}`), which only the GM can read.
+  - A trip rolled before this update moves its secrets there the first time the GM opens it.
+  - **Copy the log to the journal** has an *Include encounters and events* tick box.
+  - Ending a trip clears both parts.
+- `tests/t_init.js` and `tests/t_trip.js` check them.

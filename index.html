@@ -646,6 +646,16 @@ input[type=search]{appearance:none}
 .calsel{margin-top:10px;border-top:1px solid var(--line-soft);padding-top:8px}
 .calev{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}.calev li{display:flex;justify-content:space-between;gap:10px;align-items:center;border-top:1px solid var(--line-soft);padding:6px 0}
 .tplog{list-style:none;margin:8px 0;padding:0;display:flex;flex-direction:column}.tplog li{border-top:1px solid var(--line-soft);padding:7px 0;font-size:14px;display:flex;flex-direction:column;gap:2px}
+/* typed initiative (Update 57) */
+.inibk{position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:16px;background:rgba(5,10,28,.6)}
+.inidlg{width:min(680px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:auto;display:flex;flex-direction:column;gap:10px;margin:0}
+.inilist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.inilist li{display:grid;grid-template-columns:minmax(0,1fr) auto 76px minmax(0,150px);gap:8px;align-items:center;padding:6px 8px;border:2px solid var(--line);border-radius:10px}
+.inilist li.foe{border-style:dashed}
+.ininm{display:flex;flex-direction:column;min-width:0}.ininm b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inilist input{width:100%}
+.initot{font-variant-numeric:tabular-nums;font-size:13px}.initot.bad{color:var(--bad);font-weight:700}
+@media (max-width:560px){.inilist li{grid-template-columns:minmax(0,1fr) 76px}.inilist li .ininm,.inilist li .initot{grid-column:1/-1}}
 /* road battles (Update 56) */
 .rdbday{display:flex;flex-direction:column;gap:10px;margin-top:10px}
 .rdbf{border:2px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:7px;background:var(--raised)}
@@ -1543,17 +1553,17 @@ input,select,textarea{border-radius:9px}
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
 <!-- The app, in load order. These files share one scope; keep the order. -->
-<script src="js/01-core.js?v=2026-11-16-road"></script>
-<script src="js/02-species.js?v=2026-11-16-road"></script>
-<script src="js/03-rolls.js?v=2026-11-16-road"></script>
-<script src="js/04-battle.js?v=2026-11-16-road"></script>
-<script src="js/04b-battle-helper.js?v=2026-11-16-road"></script>
-<script src="js/05-pokedex-contests.js?v=2026-11-16-road"></script>
-<script src="js/06-world.js?v=2026-11-16-road"></script>
-<script src="js/07-npc.js?v=2026-11-16-road"></script>
-<script src="js/07b-quick-npc.js?v=2026-11-16-road"></script>
-<script src="js/08-battlemap.js?v=2026-11-16-road"></script>
-<script src="js/09-sheets.js?v=2026-11-16-road"></script>
-<script src="js/09b-road.js?v=2026-11-16-road"></script>
-<script src="js/10-calendar-main.js?v=2026-11-16-road"></script>
+<script src="js/01-core.js?v=2026-11-16-ini"></script>
+<script src="js/02-species.js?v=2026-11-16-ini"></script>
+<script src="js/03-rolls.js?v=2026-11-16-ini"></script>
+<script src="js/04-battle.js?v=2026-11-16-ini"></script>
+<script src="js/04b-battle-helper.js?v=2026-11-16-ini"></script>
+<script src="js/05-pokedex-contests.js?v=2026-11-16-ini"></script>
+<script src="js/06-world.js?v=2026-11-16-ini"></script>
+<script src="js/07-npc.js?v=2026-11-16-ini"></script>
+<script src="js/07b-quick-npc.js?v=2026-11-16-ini"></script>
+<script src="js/08-battlemap.js?v=2026-11-16-ini"></script>
+<script src="js/09-sheets.js?v=2026-11-16-ini"></script>
+<script src="js/09b-road.js?v=2026-11-16-ini"></script>
+<script src="js/10-calendar-main.js?v=2026-11-16-ini"></script>
 </body></html>

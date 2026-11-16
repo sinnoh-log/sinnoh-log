@@ -137,14 +137,16 @@ function btTb(cid){
   const f=foeOf(cid);
   return f?num(f.tb):0;
 }
+/* ties: the higher Speed goes first, then a roll (tb) */
+const btCmp=(a,z)=>z.ini-a.ini||z.sp-a.sp||z.tb-a.tb;
 function btRollInit(){
   if(!S.me.admin)return;
   const b=BT();
   const ids=Object.keys(b.c||{}).filter(cid=>btInfo(cid,true));
   if(!ids.length){toast('Add some Pokémon or foes first.');return;}
   const d20m=b.mode==='d20';
-  const rows=ids.map(cid=>({cid,ini:btSpeed(cid)+(d20m?rnd(20):0),tb:rnd(20)}));
-  rows.sort((a,z)=>z.ini-a.ini||z.tb-a.tb);
+  const rows=ids.map(cid=>{const sp=btSpeed(cid);return {cid,sp,ini:sp+(d20m?rnd(20):0),tb:rnd(20)};});
+  rows.sort(btCmp);
   rows.forEach(r=>btSetIni(r.cid,r.ini,r.tb));
   edit('bt','battle','order',rows.map(r=>r.cid));
   const first=rows.find(r=>!btIsDown(r.cid))||rows[0];
@@ -160,8 +162,8 @@ function btResort(){
   if(!S.me.admin)return;
   const b=BT();
   const ids=btOrder();
-  const rows=ids.map(cid=>({cid,ini:btSpeed(cid),tb:btTb(cid)||rnd(20)}));
-  rows.sort((a,z)=>z.ini-a.ini||z.tb-a.tb);
+  const rows=ids.map(cid=>{const sp=btSpeed(cid);return {cid,sp,ini:sp,tb:btTb(cid)||rnd(20)};});
+  rows.sort(btCmp);
   rows.forEach(r=>btSetIni(r.cid,r.ini,r.tb));
   edit('bt','battle','order',rows.map(r=>r.cid));
   render();
@@ -210,9 +212,9 @@ function btInsert(cid,obj,ini,tb){
   edit('bt','battle','c.'+cid,obj);
   const ord=(b.order||[]).filter(x=>b.c&&b.c[x]&&x!==cid);
   let at=ord.length;
+  const me={ini,sp:btSpeed(cid),tb};
   for(let i=0;i<ord.length;i++){
-    const oi=btIni(ord[i]),ot=btTb(ord[i]);
-    if(ini>oi||(ini===oi&&tb>ot)){at=i;break;}
+    if(btCmp(me,{ini:btIni(ord[i]),sp:btSpeed(ord[i]),tb:btTb(ord[i])})<0){at=i;break;}
   }
   ord.splice(at,0,cid);
   edit('bt','battle','order',ord);
@@ -795,10 +797,84 @@ function btAddPanel(){
     ${ntBattlePanel()}
   </section>`;
 }
+/* ----- typed initiative (Update 57): the GM enters the rolls players call out ----------
+   One form, opened from the turn order or the map, lists everyone in the fight with their Speed. Each box takes the d20
+   (Speed is added) or the final total, chosen per row. An empty box is rolled d20 + Speed when the battle starts; in a running
+   battle it keeps the number it has. Applying sorts the order (ties: higher Speed, then a roll), starts the battle if it
+   has not started, and otherwise keeps whose turn it is. Only the GM sees the form. */
+S.ui.ini=S.ui.ini||{open:false,v:{}};
+const iniIds=()=>{const b=BT(),o=btOrder(),rest=Object.keys(b.c||{}).filter(cid=>o.indexOf(cid)<0);return o.concat(rest).filter(cid=>btInfo(cid,true));};
+const iniRow=cid=>S.ui.ini.v[cid]||(S.ui.ini.v[cid]={n:'',t:'d20'});
+/* what a row adds up to: {ini, ok, txt}; ini is null when the box is empty */
+function iniCalc(cid){
+  const x=iniRow(cid),sp=btSpeed(cid),raw=String(x.n==null?'':x.n).trim();
+  if(raw==='')return {ini:null,ok:true,txt:''};
+  const n=Math.round(num(raw));
+  if(!isFinite(Number(raw)))return {ini:null,ok:false,txt:'Not a number'};
+  if(x.t==='tot')return {ini:n,ok:true,txt:'= '+n};
+  if(n<1||n>20)return {ini:null,ok:false,txt:'A d20 is 1 to 20'};
+  return {ini:n+sp,ok:true,txt:n+' + '+sp+' Speed = '+(n+sp)};
+}
+function iniApply(){
+  if(!S.me.admin)return;
+  const b=BT(),ids=iniIds();
+  if(!ids.length){toast('Add some Pokémon or foes first.');return;}
+  const bad=ids.find(cid=>!iniCalc(cid).ok);
+  if(bad){toast(btInfo(bad,true).name+': '+iniCalc(bad).txt+'.');return;}
+  let typed=0,rolled=0;
+  const rows=ids.map(cid=>{
+    const sp=btSpeed(cid),c=iniCalc(cid);
+    let ini;
+    if(c.ini!=null){ini=c.ini;typed++;}
+    else if(b.on)ini=btIni(cid);
+    else{ini=sp+rnd(20);rolled++;}
+    return {cid,sp,ini,tb:(b.on&&btTb(cid))||rnd(20)};
+  });
+  rows.sort(btCmp);
+  rows.forEach(r=>btSetIni(r.cid,r.ini,r.tb));
+  edit('bt','battle','order',rows.map(r=>r.cid));
+  edit('bt','battle','mode','d20');
+  if(!b.on){
+    const first=rows.find(r=>!btIsDown(r.cid))||rows[0];
+    edit('bt','battle','turn',first.cid);
+    edit('bt','battle','round',1);
+    edit('bt','battle','bid',Date.now());
+    edit('bt','battle','on',true);
+  }else if(!rows.some(r=>r.cid===b.turn)){
+    const first=rows.find(r=>!btIsDown(r.cid))||rows[0];
+    edit('bt','battle','turn',first.cid);
+  }
+  S.ui.ini={open:false,v:{}};
+  toast((b.on?'Order re-sorted':'Battle started')+': '+typed+' typed'+(rolled?', '+rolled+' rolled':'')+'.',true);
+  render();
+}
+/* the box keeps what is typed; the sum beside it updates without redrawing the page */
+function iniInput(t){
+  const cid=t.dataset.inib;iniRow(cid).n=t.value;
+  const o=document.getElementById('initot-'+cid);if(o){const c=iniCalc(cid);o.textContent=c.txt;o.classList.toggle('bad',!c.ok);}
+}
+function iniForm(){
+  if(!S.me.admin||!S.ui.ini.open)return '';
+  const b=BT(),ids=iniIds();
+  return h`<div class="inibk"><div class="inidlg panel" role="dialog" aria-modal="true" aria-labelledby="initl">
+    <div class="row sp"><h2 id="initl">Initiative</h2><button class="btn sm ghost" data-act="b_iniclose">Close</button></div>
+    <p class="sub">Type each roll as it is called out: the d20 (Speed is added) or the total. ${b.on?'An empty box keeps its current number.':'Empty boxes are rolled d20 + Speed when you start.'} Ties go to the higher Speed, then a roll.</p>
+    ${ids.length?h`<ol class="inilist">${ids.map(cid=>{
+      const v=btInfo(cid,true),x=iniRow(cid),c=iniCalc(cid),sp=btSpeed(cid),side=v.side==='f'?'Foe':v.side==='t'?'Trainer':v.owner;
+      return h`<li class="${v.side==='f'?'foe':'ally'}"><span class="ininm"><b>${v.name}</b><span class="sub">${side} · Speed ${sp}${b.on?' · now '+btIni(cid):''}</span></span>
+        <span class="seg" role="group" aria-label="${'What you type for '+v.name}"><button data-act="b_initog" data-cid="${cid}" data-v="d20" aria-pressed="${String(x.t!=='tot')}">d20</button><button data-act="b_initog" data-cid="${cid}" data-v="tot" aria-pressed="${String(x.t==='tot')}">Total</button></span>
+        <input type="number" inputmode="numeric" data-inib="${cid}" value="${x.n}" placeholder="${b.on?'keep':'roll'}" aria-label="${v.name+(x.t==='tot'?' initiative total':' d20 roll')}">
+        <output id="${'initot-'+cid}" class="initot ${c.ok?'':'bad'}">${c.txt}</output></li>`;})}</ol>`:h`<p class="sub">Nobody is in the battle yet.</p>`}
+    <div class="row"><button class="btn primary sm" data-act="b_iniapply" ${ids.length?'':raw('disabled')}>${b.on?'Re-sort the order':'Start the battle'}</button><button class="btn sm ghost" data-act="b_iniclear">Clear the boxes</button></div>
+  </div></div>`;
+}
+function iniClose(){S.ui.ini.open=false;render();const b=document.querySelector('[data-act="b_iniopen"]');if(b)b.focus({preventScroll:true});}
+const iniBtn=()=>S.me.admin?h`<button class="btn sm" data-act="b_iniopen" ${iniIds().length?'':raw('disabled')}>Initiative</button>`:'';
+
 /* the Battle page has two views of the same fight: the turn order, and the map */
 function battleTab(){
   const sw=bmSwitch();
-  return h`${sw}${fcPanel()}${bmAvail()&&S.ui.bt.view==='map'?bmapPanel():battleOrderTab()}`;
+  return h`${sw}${fcPanel()}${bmAvail()&&S.ui.bt.view==='map'?bmapPanel():battleOrderTab()}${iniForm()}`;
 }
 function battleOrderTab(){
   const b=BT(),gm=!!S.me.admin;
@@ -808,7 +884,7 @@ function battleOrderTab(){
   const ask=S.ui.confirm==='bt|end';
   const mineNow=cv&&(cv.side==='a'||cv.side==='t')&&canEditT(cv.uid);
   return h`<section class="panel btl"><div class="ph"><h2>Battle</h2>${b.on?h`<span class="pill good">Round ${num(b.round)||1}</span>`:h`<span class="pill">${ord.length?'Setting up':'No battle'}</span>`}
-      ${gm?h`<div class="acts"><button class="btn primary sm" data-act="b_init" ${ord.length?'':raw('disabled')}>${b.on?'Roll initiative again':'Roll initiative'}</button><button class="btn sm" data-act="b_next" ${b.on?'':raw('disabled')}>Next turn</button>${b.on&&b.mode!=='d20'?h`<button class="btn sm" data-act="b_resort">Re-sort by Speed</button>`:''}<button class="btn sm danger ${ask?'armed':''}" data-act="b_end">${ask?'Tap again to end it for everyone':'End battle'}</button></div>`:''}</div>
+      ${gm?h`<div class="acts"><button class="btn primary sm" data-act="b_init" ${ord.length?'':raw('disabled')}>${b.on?'Roll initiative again':'Roll initiative'}</button>${iniBtn()}<button class="btn sm" data-act="b_next" ${b.on?'':raw('disabled')}>Next turn</button>${b.on&&b.mode!=='d20'?h`<button class="btn sm" data-act="b_resort">Re-sort by Speed</button>`:''}<button class="btn sm danger ${ask?'armed':''}" data-act="b_end">${ask?'Tap again to end it for everyone':'End battle'}</button></div>`:''}</div>
     ${gm?h`<div class="row"><div class="seg" role="group" aria-label="How turn order is decided"><button data-act="b_mode" data-v="speed" aria-pressed="${String(b.mode!=='d20')}">Highest Speed first</button><button data-act="b_mode" data-v="d20" aria-pressed="${String(b.mode==='d20')}">d20 + Speed</button></div></div>`:''}
     ${b.on&&cv?h`<p class="bnow ${mineNow?'mine':''}">${mineNow?'Your turn: ':''}<b>${cv.name}</b> is acting${cv.side==='a'?' · '+cv.owner:''}.</p>`:(ord.length?h`<p class="sub">${b.on?'':(gm?'Add everyone, then roll initiative.':'The GM is setting up the battle.')}</p>`:h`<p class="sub">${gm?'Nothing here yet. Add your players’ Pokémon and any foes below.':'No battle is running. When the GM starts one, the turn order shows up here.'}</p>`)}
     ${auPanel()}
@@ -864,6 +940,11 @@ function batAct(b,e){
     case 'b_stg':btStage(d.sc,d.id,d.path,d.k,num(d.d),d.cid);break;
     case 'b_aff':btAffl(d.sc,d.id,d.path,d.a,d.cid);break;
     case 'b_init':btRollInit();break;
+    case 'b_iniopen':if(S.me.admin){S.ui.ini={open:true,v:{}};render();const f=document.querySelector('.inidlg input');if(f)f.focus({preventScroll:true});}break;
+    case 'b_iniclose':iniClose();break;
+    case 'b_iniclear':S.ui.ini.v={};render();break;
+    case 'b_initog':{iniRow(d.cid).t=d.v==='tot'?'tot':'d20';render();break;}
+    case 'b_iniapply':iniApply();break;
     case 'b_next':btNext();break;
     case 'b_resort':btResort();break;
     case 'b_mode':btSetMode(d.v);break;

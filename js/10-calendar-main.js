@@ -106,7 +106,40 @@ function clRoadEvent(danger){
 }
 
 /* ----- the trip ----- */
+S.ui.clj=S.ui.clj||{all:false};
 const clTrip=()=>{const t=(S.cond||{}).trip;return t&&Array.isArray(t.steps)&&t.steps.length?t:null;};
+/* Update 57: what a travel day turned up (wild encounters, road events, a rival sighting) is the GM's alone. The shared trip
+   keeps the weather and progress; the rest sits in gm/road under trip {k, d:{<day number>: {enc, sp, ev, riv}}}, which
+   only the GM can read. k ties it to one trip. */
+const CL_SECRET=['enc','sp','ev','riv'];
+const clTripKey=t=>t?(t.k||String(t.start||'')+'|'+t.from+'|'+t.to):'';
+const clSecrets=t=>{const g=(S.roadGm||{}).trip;return g&&t&&g.k===clTripKey(t)&&g.d?g.d:{};};
+const clDayFull=(t,e)=>{const x=clSecrets(t)[e.n];return x?Object.assign({},e,x):e;};
+const clHasSecret=e=>!!(e.enc||e.ev||e.riv||(Array.isArray(e.sp)&&e.sp.length));
+/* splits a day into the shared part and the GM's part; empty fields are left out */
+function clSplitDay(e){
+  const pub=Object.assign({},e),sec={};
+  CL_SECRET.forEach(k=>{const v=e[k];delete pub[k];if(v&&(!Array.isArray(v)||v.length))sec[k]=v;});
+  return [pub,sec];
+}
+/* saves the GM's part of some days, keeping what is stored for this trip already */
+function clSaveSecrets(t,days){
+  const d=Object.assign({},clSecrets(t));
+  Object.keys(days).forEach(n=>{if(Object.keys(days[n]).length)d[n]=days[n];});
+  edit('gr','road','trip',{k:clTripKey(t),d});
+}
+/* a trip rolled before Update 57 still has encounters in the shared record: move them to the GM's */
+let clMoving=false;
+function clMoveSecrets(){
+  const t=clTrip();
+  if(clMoving||!S.me.admin||!S.gmIn||!t||!t.log.some(clHasSecret))return false;
+  clMoving=true;
+  const days={},log=t.log.map(e=>{const [pub,sec]=clSplitDay(e);if(Object.keys(sec).length)days[e.n]=Object.assign({},clSecrets(t)[e.n]||{},sec);return pub;});
+  clSaveSecrets(t,days);
+  edit('cd','conditions','trip',Object.assign({},t,{log}));
+  setTimeout(()=>{clMoving=false;},1500);
+  return true;
+}
 function clTripFromPlan(){
   const u=S.ui.tp,who=trWho(),cl=who?clrOf(S.trainers[who]):null;
   const path=trPath(u.from,u.to,u.pace,cl,u.avoid);
@@ -120,8 +153,10 @@ function clTripFromPlan(){
   return {from:u.from,to:u.to,pace:u.pace,who,steps,pos:0,into:0,day:0,start:clToday(),log:[],done:false};
 }
 function clRollDay(){
+  clMoveSecrets();
   const T=clTrip();if(!T||T.done||!S.me.admin)return;
   const t=JSON.parse(JSON.stringify(T));
+  t.log=t.log.map(e=>clSplitDay(e)[0]);
   let date=clToday(),x;
   if(date&&t.day>0){date=clAdd(date,1);x=clSetDate(date,{dawn:true});}
   else if(date)x=cdGet().x;
@@ -166,27 +201,30 @@ function clRollDay(){
   }
   if(t.pos>=t.steps.length){t.done=true;entry.prog=entry.prog.replace('Reached '+trName(t.to)+'.','').trim();entry.prog=(entry.prog?entry.prog+' ':'')+'Arrived at '+trName(t.to)+'.';}
   if(!st.sea&&Math.random()<0.12){const pool=rkRoadPool();if(pool.length){const r=pool[Math.floor(Math.random()*pool.length)];entry.riv={id:r.id,c:r.c,n:r.name,txt:r.name+' ('+(r.c==='con'?'Contest':'Gym')+' circuit #'+r.pos+', '+r.rec+')'};}}
-  t.log=t.log.concat([entry]).slice(-120);
+  const [pub,sec]=clSplitDay(entry);
+  t.log=t.log.concat([pub]).slice(-120);
+  clSaveSecrets(t,{[entry.n]:sec});
   edit('cd','conditions','trip',t);
   render();
 }
-function clTripText(t){
-  return t.log.map(e=>'Day '+e.n+(e.date?' ('+clNice(e.date)+')':'')+': '+e.at+'. '+e.wx+'. '+e.prog+(e.enc?' '+e.enc+(e.sp.length?': '+e.sp.join(', '):'')+'.':'')+(e.ev?' '+e.ev:'')+(e.riv?' On the road: '+e.riv.txt+'.':'')+(e.push?' Pushed: Constitution check.':'')+(e.zone?' ('+(e.zone==='semi'?'semi-route':'off-route')+')':'')).join('\n');
+function clTripText(t,all){
+  return t.log.map(e=>all?clDayFull(t,e):e).map(e=>'Day '+e.n+(e.date?' ('+clNice(e.date)+')':'')+': '+e.at+'. '+e.wx+'. '+e.prog+(e.enc?' '+e.enc+((e.sp||[]).length?': '+e.sp.join(', '):'')+'.':'')+(e.ev?' '+e.ev:'')+(e.riv?' On the road: '+e.riv.txt+'.':'')+(e.push?' Pushed: Constitution check.':'')+(e.zone?' ('+(e.zone==='semi'?'semi-route':'off-route')+')':'')).join('\n');
 }
 function clTripPanel(){
   const t=clTrip();if(!t)return '';
-  const gm=!!S.me.admin,last=t.log.slice(-8).reverse();
+  const gm=!!S.me.admin,last=t.log.slice(-8).reverse().map(e=>gm?clDayFull(t,e):Object.assign({},e,{enc:'',sp:[],ev:'',riv:null}));
+  if(gm&&t.log.some(clHasSecret))setTimeout(clMoveSecrets,0);
   const total=t.steps.reduce((a,s)=>a+s.days,0);
   const doneDays=t.steps.slice(0,t.pos).reduce((a,s)=>a+s.days,0)+t.into;
   return h`<section class="panel"><div class="ph"><h2>On the road</h2><span class="sub">${trName(t.from)} to ${trName(t.to)} · ${TR_PACE[t.pace][1]} pace · day ${t.day}</span></div>
     <div class="rbar" role="img" aria-label="${Math.round(100*doneDays/Math.max(total,1))}% of the way"><i ${raw('style="width:'+Math.min(100,Math.round(100*doneDays/Math.max(total,1)))+'%"')}></i></div>
     ${t.done?h`<p><b>Arrived at ${trName(t.to)}</b> after ${t.day} ${t.day===1?'day':'days'}.</p>`:''}
     ${last.length?h`<ol class="tplog">${last.map(e=>h`<li><b>Day ${e.n}${e.date?h` · ${clNice(e.date)}`:''}</b> <span class="sub">${e.wx}</span><div>${e.at}. ${e.prog}</div>
-      ${e.enc?h`<div class="tpenc">${e.enc}${gm&&e.sp.length?': '+e.sp.join(', '):''}</div>`:''}${e.ev?h`<div>${e.ev}</div>`:''}${gm&&e.riv?h`<div class="tpenc">On the road: ${e.riv.txt}. <button class="btn sm ghost" data-act="rk_goto" data-c="${e.riv.c}" data-id="${e.riv.id}">Open their card</button></div>`:''}${e.push?h`<div class="sub">Pushed: every trainer makes a Constitution check tonight.</div>`:''}${e.zone==='semi'?h`<div class="sub">Semi-route: Nature 12 to keep the heading; Perception 13 before any encounter.</div>`:e.zone==='off'?h`<div class="sub">Off-route: Nature 16 twice today; Perception 16 on watch; Insight or Pokémon Handling 17 before any fight; Constitution 14 tonight without a proper camp.</div>`:''}</li>`)}</ol>`
+      ${e.enc?h`<div class="tpenc">${e.enc}${gm&&(e.sp||[]).length?': '+e.sp.join(', '):''}</div>`:''}${e.ev?h`<div>${e.ev}</div>`:''}${gm&&e.riv?h`<div class="tpenc">On the road: ${e.riv.txt}. <button class="btn sm ghost" data-act="rk_goto" data-c="${e.riv.c}" data-id="${e.riv.id}">Open their card</button></div>`:''}${e.push?h`<div class="sub">Pushed: every trainer makes a Constitution check tonight.</div>`:''}${e.zone==='semi'?h`<div class="sub">Semi-route: Nature 12 to keep the heading; Perception 13 before any encounter.</div>`:e.zone==='off'?h`<div class="sub">Off-route: Nature 16 twice today; Perception 16 on watch; Insight or Pokémon Handling 17 before any fight; Constitution 14 tonight without a proper camp.</div>`:''}</li>`)}</ol>`
       :h`<p class="sub">${gm?'Roll the first day when the party sets out.':'The party is about to set out.'}</p>`}
     ${gm&&!t.done?h`<div class="row"><span class="fl">Where the party travels</span><span class="seg" role="group" aria-label="Zone">${[['road','On the road'],['semi','Semi-route'],['off','Off-route']].map(([v,l])=>h`<button data-act="zn_zone" data-v="${v}" aria-pressed="${String((t.zone||'road')===v)}">${l}</button>`)}</span></div>`:''}
-    ${gm?h`<div class="row">${t.done?'':h`<button class="btn primary sm" data-act="cl_roll">Roll the day</button>`}<button class="btn sm" data-act="cl_journal" ${t.log.length?'':raw('disabled')}>Copy the log to the journal</button><button class="btn sm ghost" data-act="cl_end">${t.done?'Clear the trip':'Abandon the trip'}</button></div>
-      <p class="sub">Each roll moves the party one day: weather for the season, a wild encounter check from the route's danger (and its table), and a road event. Wild Pokémon names show only to you.</p>`:''}
+    ${gm?h`<div class="row">${t.done?'':h`<button class="btn primary sm" data-act="cl_roll">Roll the day</button>`}<button class="btn sm" data-act="cl_journal" ${t.log.length?'':raw('disabled')}>Copy the log to the journal</button><label class="row"><input type="checkbox" data-u="clj.all" ${S.ui.clj.all?raw('checked'):''} data-nr><span>Include encounters and events</span></label><button class="btn sm ghost" data-act="cl_end">${t.done?'Clear the trip':'Abandon the trip'}</button></div>
+      <p class="sub">Each roll moves the party one day: weather for the season, a wild encounter check from the route's danger (and its table), and a road event. Players see only the weather and how far the party got; encounters, events and sightings are yours.</p>`:''}
   </section>`;
 }
 
@@ -1029,14 +1067,15 @@ function clAct(b){
       if(!gm)break;
       const t=clTripFromPlan();
       if(!t){toast('Plan a way first.');break;}
-      edit('cd','conditions','trip',t);toast('Trip started. Roll each day as the party travels.',true);render();break;}
+      t.k=Math.random().toString(36).slice(2,10);
+      edit('cd','conditions','trip',t);edit('gr','road','trip',{k:t.k,d:{}});toast('Trip started. Roll each day as the party travels.',true);render();break;}
     case 'cl_roll':clRollDay();break;
-    case 'cl_end':if(gm){edit('cd','conditions','trip',null);render();}break;
+    case 'cl_end':if(gm){edit('cd','conditions','trip',null);edit('gr','road','trip',null);render();}break;
     case 'cl_journal':{
       const t=clTrip();if(!gm||!t||!t.log.length)break;
       const id=S.db.collection('journal').doc().id;
-      newDoc('j',id,{session:num(S.meta.session)||1,title:'On the road: '+trName(t.from)+' to '+trName(t.to),body:clTripText(t),place:PD_BY[t.to]?PD_BY[t.to].name:'',addedBy:S.me.id,createdAt:Date.now()});
-      toast('The trip log is in the journal.',true);break;}
+      newDoc('j',id,{session:num(S.meta.session)||1,title:'On the road: '+trName(t.from)+' to '+trName(t.to),body:clTripText(t,!!S.ui.clj.all),place:PD_BY[t.to]?PD_BY[t.to].name:'',addedBy:S.me.id,createdAt:Date.now()});
+      toast(S.ui.clj.all?'The trip log, with encounters and events, is in the journal.':'The trip log (weather and progress) is in the journal.',true);break;}
     default:break;
   }
 }
@@ -1647,7 +1686,7 @@ function captureFocus(){
   const a=document.activeElement;
   if(!a||!a.dataset)return null;
   if(a.classList&&(a.classList.contains('ptr')||a.classList.contains('ptz')))return{at:'fr',k:(a.classList.contains('ptz')?'ptz':'ptr')+'|'+a.dataset.id};
-  const at=a.dataset.b!=null?'b':a.dataset.u!=null?'u':a.dataset.pq!=null?'pq':a.dataset.bmt!=null?'bmt':a.dataset.bmk!=null?'bmk':null;
+  const at=a.dataset.b!=null?'b':a.dataset.u!=null?'u':a.dataset.pq!=null?'pq':a.dataset.bmt!=null?'bmt':a.dataset.bmk!=null?'bmk':a.dataset.inib!=null?'inib':a.dataset.rdb!=null?'rdb':null;
   if(!at)return null;
   let s=null,en=null;
   try{s=a.selectionStart;en=a.selectionEnd;}catch(e){}
@@ -2179,6 +2218,7 @@ document.addEventListener('input',e=>{
   if(t.dataset.sq!=null){shQty(t);return;}
   if(t.dataset.b!=null){onBound(t);if(e.inputType==='insertReplacementText')onSpeciesChange(t);return;}
   if(t.dataset.rdb!=null){rdbInput(t);return;}
+  if(t.dataset.inib!=null){iniInput(t);return;}
   if(t.dataset.u!=null){
     const k=t.dataset.u.split('.');
     S.ui[k[0]][k[1]]=t.type==='checkbox'?t.checked:t.value;
@@ -2276,6 +2316,7 @@ document.addEventListener('focusout',e=>{
   if(t&&t.dataset&&t.dataset.b)onSpeciesChange(t);
 });
 document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&S.ui.ini&&S.ui.ini.open){e.preventDefault();iniClose();return;}
   if(S.ui.lbx){
     if(e.key==='Escape'){e.preventDefault();lbxClose();return;}
     if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();lbxStep(e.key==='ArrowLeft'?-1:1,e.key==='ArrowLeft'?'lbx-p':'lbx-n');return;}

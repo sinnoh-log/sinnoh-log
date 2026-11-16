@@ -549,7 +549,7 @@ function bmTurnBar(){
   const cur=b.turn&&ord.indexOf(b.turn)>=0?b.turn:'';
   const cv=cur?btInfo(cur,gm):null;
   const mine=cv&&(cv.side==='a'||cv.side==='t')&&canEditT(cv.uid);
-  return h`<div class="row sp bmturn">${b.on&&cv?h`<p class="bnow ${mine?'mine':''}"><b>Round ${num(b.round)||1}</b> · ${mine?'Your turn: ':''}<b>${cv.name}</b> is acting${cv.side==='a'?' · '+cv.owner:''}</p>`:h`<span class="sub">${ord.length?(b.on?'':(gm?'Roll initiative on the Turn order page to start.':'The GM is setting up the battle.')):'No battle is running.'}</span>`}${gm&&b.on?h`<button class="btn sm" data-act="b_next">Next turn</button>`:''}</div>`;
+  return h`<div class="row sp bmturn">${b.on&&cv?h`<p class="bnow ${mine?'mine':''}"><b>Round ${num(b.round)||1}</b> · ${mine?'Your turn: ':''}<b>${cv.name}</b> is acting${cv.side==='a'?' · '+cv.owner:''}</p>`:h`<span class="sub">${ord.length?(b.on?'':(gm?'Set initiative to start: type the rolls, or roll them on the Turn order page.':'The GM is setting up the battle.')):'No battle is running.'}</span>`}${gm?h`<span class="row">${iniBtn()}${b.on?h`<button class="btn sm" data-act="b_next">Next turn</button>`:''}</span>`:''}</div>`;
 }
 function bmGridSvg(cfg){
   if(!cfg.grid)return '';

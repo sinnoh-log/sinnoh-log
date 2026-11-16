@@ -1,6 +1,6 @@
 'use strict';
 /* Sinnoh Trainer Log · 01-core. The files in js/ are classic scripts that share one scope: load them in order (see index.html). */
-const BUILD='2026-11-16 · Update 56';
+const BUILD='2026-11-16 · Update 57';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -489,6 +489,7 @@ function startWatches(){
       if(gbm)S.bmGm=gbm;else if(!Q.has('bg|bmap'))S.bmGm={};
       if(gsh)S.shopGm=gsh;else if(!Q.has('sg|shops'))S.shopGm={};
       if(grd)S.roadGm=grd;else if(!Q.has('gr|road'))S.roadGm={};
+      S.gmIn=true;   /* the GM's own documents have arrived at least once */
       shPubSoon();
       S.bmGmCh=bch;
       bmAssembleGm();
