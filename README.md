@@ -958,3 +958,10 @@ Item pictures were squeezed out of shape in the read-first bag (Update 49) and c
   - A Leader without saved teams is ranked by team size: 2, 3, 4, or 5+ Pokémon.
 - **Out of battle** a Leader is a professional: skill checks use +4 at every tier.
 - `tests/t_gymq.js` checks it.
+
+## Road battles (Update 56)
+
+- A GM-only **Road battles** panel sits under the trip on the Calendar and Map pages. It is not drawn for players, and its rolls and pending challenges are kept in `gm/road`, which only the GM can read. The rules are in the vault note *Road Battles*.
+- A settled battle is recorded on the Gym circuit rankings as a public battle, so the feed shows who won and where, never the rolls.
+- Rankings code: the battle recording behind **Save the battle** is now `rkSaveBattle()`, shared with the road panel. The season engine also reports which Gyms each trainer holds and when they won them.
+- `tests/t_road.js` checks it, including that players see nothing and that the panel fits a phone.

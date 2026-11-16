@@ -646,6 +646,19 @@ input[type=search]{appearance:none}
 .calsel{margin-top:10px;border-top:1px solid var(--line-soft);padding-top:8px}
 .calev{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}.calev li{display:flex;justify-content:space-between;gap:10px;align-items:center;border-top:1px solid var(--line-soft);padding:6px 0}
 .tplog{list-style:none;margin:8px 0;padding:0;display:flex;flex-direction:column}.tplog li{border-top:1px solid var(--line-soft);padding:7px 0;font-size:14px;display:flex;flex-direction:column;gap:2px}
+/* road battles (Update 56) */
+.rdbday{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.rdbf{border:2px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:7px;background:var(--raised)}
+.rdbf.no{opacity:.75}
+.rdbf .seg{max-width:100%}
+.rdbmons button{display:inline-flex;gap:6px;align-items:baseline}
+.rdbmons button[aria-pressed="true"] .sub{color:inherit;opacity:.85}
+.rdbwhere{font-style:italic}
+.rdbres{border-left:4px solid var(--line);padding:4px 10px;display:flex;flex-direction:column;gap:2px}
+.rdbres.win{border-color:var(--good)}.rdbres.loss{border-color:var(--bad)}
+.rdbcost{margin:4px 0;padding-left:18px}.rdbcost li{margin:2px 0}
+.rdbko{color:var(--bad);font-weight:700}
+.rdbwarn{color:var(--warn)}
 .tpenc{color:var(--bad);font-weight:600}.tdcal{cursor:pointer;font:inherit;color:inherit}
 .clrleg{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:13px;margin-top:6px}
 .clrleg span{display:inline-flex;align-items:center;gap:6px}
@@ -1530,16 +1543,17 @@ input,select,textarea{border-radius:9px}
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
 <!-- The app, in load order. These files share one scope; keep the order. -->
-<script src="js/01-core.js?v=2026-11-13-qgym"></script>
-<script src="js/02-species.js?v=2026-11-13-qgym"></script>
-<script src="js/03-rolls.js?v=2026-11-13-qgym"></script>
-<script src="js/04-battle.js?v=2026-11-13-qgym"></script>
-<script src="js/04b-battle-helper.js?v=2026-11-13-qgym"></script>
-<script src="js/05-pokedex-contests.js?v=2026-11-13-qgym"></script>
-<script src="js/06-world.js?v=2026-11-13-qgym"></script>
-<script src="js/07-npc.js?v=2026-11-13-qgym"></script>
-<script src="js/07b-quick-npc.js?v=2026-11-13-qgym"></script>
-<script src="js/08-battlemap.js?v=2026-11-13-qgym"></script>
-<script src="js/09-sheets.js?v=2026-11-13-qgym"></script>
-<script src="js/10-calendar-main.js?v=2026-11-13-qgym"></script>
+<script src="js/01-core.js?v=2026-11-16-road"></script>
+<script src="js/02-species.js?v=2026-11-16-road"></script>
+<script src="js/03-rolls.js?v=2026-11-16-road"></script>
+<script src="js/04-battle.js?v=2026-11-16-road"></script>
+<script src="js/04b-battle-helper.js?v=2026-11-16-road"></script>
+<script src="js/05-pokedex-contests.js?v=2026-11-16-road"></script>
+<script src="js/06-world.js?v=2026-11-16-road"></script>
+<script src="js/07-npc.js?v=2026-11-16-road"></script>
+<script src="js/07b-quick-npc.js?v=2026-11-16-road"></script>
+<script src="js/08-battlemap.js?v=2026-11-16-road"></script>
+<script src="js/09-sheets.js?v=2026-11-16-road"></script>
+<script src="js/09b-road.js?v=2026-11-16-road"></script>
+<script src="js/10-calendar-main.js?v=2026-11-16-road"></script>
 </body></html>

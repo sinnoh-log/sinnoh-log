@@ -504,7 +504,7 @@ function rkEngine(){
     });
   }
   const out={W,E:{},REC,CON,UP};
-  ents.forEach(e=>{out.E[e.id]={pts:Math.round(pts(e)),prev:W?rkPtsAt(e.res,W-1):Math.round(pts(e)),badges:nb(e)};});
+  ents.forEach(e=>{out.E[e.id]={pts:Math.round(pts(e)),prev:W?rkPtsAt(e.res,W-1):Math.round(pts(e)),badges:nb(e),held:Object.assign({},e.held)};});
   paced.forEach(([k,bd])=>{const o=out.E['n_'+k];if(o&&bd!=null)o.badges=bd;});
   rkEngMemo[C.d]={key,out};
   return out;
@@ -846,6 +846,22 @@ function rkTab(){
     <div class="row"><button class="btn sm" data-act="rk_nadd">Add the rival</button>${rkB().seed&&rkNpcs().some(n=>n.b==null)?h`<button class="btn sm ghost" data-act="rk_fold" title="Each rival replaces the field trainer with the closest points, so the board keeps its size">Put rivals in the field</button>`:''}${rkNpcs().some(n=>C.sample.some(s=>s.n===n.n))?'':h`<button class="btn sm ghost" data-act="rk_sample">Add five sample rivals</button>`}</div>
   </section>`:''}`;
 }
+/* records one battle on the current board: points for both sides, the record and any tier news. {err} or {k, pv, news} */
+function rkSaveBattle(a,b,win,kind,note,extra){
+  const rows=rkRows(),pv=rkBattlePts(a,b,win,kind,rows);
+  if(pv.err)return {err:pv.err};
+  const W=num(rkB().wk),k=rkKey(),at=Date.now(),day=clToday()||'',kn=(RK_BKINDS.find(x=>x[0]===kind)||RK_BKINDS[0])[1];
+  const nameOf=rkNamer(rows),wn=win==='a'?a:b,ls=win==='a'?b:a;
+  const w=String(note||'').trim()||kn+': '+nameOf(wn)+' beat '+nameOf(ls);
+  const add=[],tn=[],log=rkLog();
+  [['a',a],['b',b]].forEach(([s,id])=>{
+    const p=pv[s];if(rkIsGym(id)||!p)return;
+    add.push({k:rkKey(),u:id,p,w,wk:W,d:day,at,bt:k,e:kind});
+    if(S.trainers[id]){const m=log.filter(e=>e.u===id),t=rkTierNews(rkC(),id,rkPtsAt(m,W),rkPtsAt(m,W)+p);if(t){t.wk=W;tn.push(t);}}
+  });
+  rkSave({bt:rkBattles().concat([Object.assign({k,a,b,win,kind,w:String(note||'').trim(),wk:W,d:day,at},extra||{})]),log:log.concat(add,tn)});
+  return {k,pv,news:tn.length?tn[0].w:''};
+}
 function rkAct(b){
   const d=b.dataset,u=S.ui.rk,gm=!!S.me.admin;
   if(d.act==='rk_all'){u.all=!u.all;render();return;}
@@ -859,20 +875,9 @@ function rkAct(b){
   switch(d.act){
     case 'rk_bwin':u.bwin=d.v;render();break;
     case 'rk_btadd':{
-      const rows=rkRows(),pv=rkBattlePts(u.ba,u.bb,u.bwin,u.bk,rows);
-      if(pv.err){toast(pv.err);break;}
-      if(u.bwin!=='a'&&u.bwin!=='b'){toast('Pick the winner.');break;}
-      const k=rkKey(),at=Date.now(),day=clToday()||'',kn=(RK_BKINDS.find(x=>x[0]===u.bk)||RK_BKINDS[0])[1];
-      const nameOf=rkNamer(rows),wn=u.bwin==='a'?u.ba:u.bb,ls=u.bwin==='a'?u.bb:u.ba;
-      const w=String(u.bw||'').trim()||kn+': '+nameOf(wn)+' beat '+nameOf(ls);
-      const add=[],tn=[],log=rkLog();
-      [['a',u.ba],['b',u.bb]].forEach(([s,id])=>{
-        const p=pv[s];if(rkIsGym(id)||!p)return;
-        add.push({k:rkKey(),u:id,p,w,wk:W,d:day,at,bt:k,e:u.bk});
-        if(S.trainers[id]){const m=log.filter(e=>e.u===id),t=rkTierNews(rkC(),id,rkPtsAt(m,W),rkPtsAt(m,W)+p);if(t){t.wk=W;tn.push(t);}}
-      });
-      rkSave({bt:rkBattles().concat([{k,a:u.ba,b:u.bb,win:u.bwin,kind:u.bk,w:String(u.bw||'').trim(),wk:W,d:day,at}]),log:log.concat(add,tn)});
-      toast(tn.length?tn[0].w:'Battle saved.',true);
+      const r=rkSaveBattle(u.ba,u.bb,u.bwin,u.bk,u.bw);
+      if(r.err){toast(r.err);break;}
+      toast(r.news||'Battle saved.',true);
       u.ba='';u.bb='';u.bwin='';u.bw='';render();break;}
     case 'rk_btdel':rkSave({bt:rkBattles().filter(x=>x.k!==d.k),log:rkLog().filter(e=>e.bt!==d.k)});render();break;
     case 'rk_add':{
@@ -972,6 +977,7 @@ function calTab(){
       ${selLog.map(e=>h`<p class="sub">Day ${e.n} on the road: ${e.at}. ${e.wx}.</p>`)}</div>`:''}
   </section>
   ${clTripPanel()}
+  ${rdbPanel()}
   <section class="panel"><div class="ph"><h2>Events</h2><span class="sub">${clEvents().length}</span></div>
     ${clEvents().length?clFilterBar():''}
     ${clEvents().length?h`<div id="callist">${clListHtml()}</div>`
@@ -1483,6 +1489,7 @@ function mapTab(){
       </aside>
     </div>
     ${clTripPanel()}
+    ${rdbPanel()}
     ${trPanel()}`;
 }
 
@@ -1837,6 +1844,7 @@ function act(b,e){
   if(d.act&&d.act.indexOf('cd_')===0){cdAct(b);return;}
   if(d.act&&d.act.indexOf('cl_')===0){clAct(b);return;}
   if(d.act&&d.act.indexOf('rk_')===0){rkAct(b);return;}
+  if(d.act&&d.act.indexOf('rdb_')===0){rdbAct(b);return;}
   if(d.act&&d.act.indexOf('tm_')===0){tmAct(b);return;}
   if(d.act&&d.act.indexOf('br_')===0){brAct(b);return;}
   if(d.act==='zn_load'){znLoad();return;}
@@ -2170,6 +2178,7 @@ document.addEventListener('input',e=>{
   if(t.dataset.pq!=null){S.ui.q.places=t.value;refreshPlaceList();return;}
   if(t.dataset.sq!=null){shQty(t);return;}
   if(t.dataset.b!=null){onBound(t);if(e.inputType==='insertReplacementText')onSpeciesChange(t);return;}
+  if(t.dataset.rdb!=null){rdbInput(t);return;}
   if(t.dataset.u!=null){
     const k=t.dataset.u.split('.');
     S.ui[k[0]][k[1]]=t.type==='checkbox'?t.checked:t.value;

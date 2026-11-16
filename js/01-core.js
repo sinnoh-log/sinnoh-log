@@ -1,6 +1,6 @@
 'use strict';
 /* Sinnoh Trainer Log · 01-core. The files in js/ are classic scripts that share one scope: load them in order (see index.html). */
-const BUILD='2026-11-13 · Quick Gym Leaders';
+const BUILD='2026-11-16 · Update 56';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -117,7 +117,7 @@ const S={
   ready:false,noDb:false,db:null,user:null,dl:null,
   me:{id:null,admin:false,canWrite:true},
   tab:'overview',viewUid:null,
-  megaOk:{},battle:{},battleGm:{},trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},gmNt:{},npcPub:{},shopPub:{},shopGm:{},
+  megaOk:{},battle:{},battleGm:{},trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},gmNt:{},npcPub:{},shopPub:{},shopGm:{},roadGm:{},
   awards:{},timeline:{},pins:{},banner:{},cond:{},places:{},gmPl:{},placeId:null,members:{},invite:null,mapChunks:{},mapSrc:'',room:null,peers:[],avatars:{},
   pick:null,names:{},save:{cls:'',text:'Saved'},rolls:[],_tsig:'',
   ui:{open:{},flip:{},sheetTab:'',lbx:null,adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},pop:null,megaPop:null,
@@ -187,7 +187,7 @@ const PD_BY={};PD.forEach(f=>{PD_BY[f.id]=f;});
 const PLACES=PD.map(f=>f.name).sort();
 
 /* ---------- store: refs, local copies, write queue ---------- */
-const SET_ALWAYS=new Set(['meta','gl','gn','bn','pl','gp','mg','bt','gb','gt','np','bm','bg','sh','sg','cd']);
+const SET_ALWAYS=new Set(['meta','gl','gn','bn','pl','gp','mg','bt','gb','gt','np','bm','bg','sh','sg','gr','cd']);
 function refFor(sc,id){
   const db=S.db;
   switch(sc){
@@ -215,6 +215,7 @@ function refFor(sc,id){
     case 'bg':return db.collection('gm').doc('bmap');
     case 'sh':return db.collection('meta').doc('shops');
     case 'sg':return db.collection('gm').doc('shops');
+    case 'gr':return db.collection('gm').doc('road');
     case 'cd':return db.collection('meta').doc('conditions');
   }
 }
@@ -244,6 +245,7 @@ function getLocal(sc,id){
     case 'bg':return S.bmGm;
     case 'sh':return S.shopPub;
     case 'sg':return S.shopGm;
+    case 'gr':return S.roadGm;
     case 'cd':return S.cond;
   }
 }
@@ -273,6 +275,7 @@ function putLocal(sc,id,d){
     case 'bg':S.bmGm=d;break;
     case 'sh':S.shopPub=d;break;
     case 'sg':S.shopGm=d;break;
+    case 'gr':S.roadGm=d;break;
     case 'cd':S.cond=d;break;
   }
 }
@@ -353,7 +356,7 @@ function withPending(sc,id,d){
 function edit(sc,id,path,v){
   let doc=getLocal(sc,id);
   if(!doc){
-    if(sc==='gl'||sc==='gn'||sc==='pl'||sc==='gp'||sc==='mg'||sc==='bt'||sc==='gb'||sc==='np'||sc==='bm'||sc==='sh'||sc==='sg'||sc==='cd'){doc={};putLocal(sc,id,doc);}
+    if(sc==='gl'||sc==='gn'||sc==='pl'||sc==='gp'||sc==='mg'||sc==='bt'||sc==='gb'||sc==='np'||sc==='bm'||sc==='sh'||sc==='sg'||sc==='gr'||sc==='cd'){doc={};putLocal(sc,id,doc);}
     else return;
   }
   const parts=path.split('.');
@@ -465,10 +468,11 @@ function startWatches(){
   if(S.me.admin){
     watch(db.collection('gm'),s=>{
       const loy={},npc={},gpl={},gnt={},bch={};
-      let gbat=null,gbm=null,gsh=null;
+      let gbat=null,gbm=null,gsh=null,grd=null;
       s.docs.forEach(d=>{
         if(d.id==='battle')gbat=withPending('gb','battle',d.data());
         else if(d.id==='shops')gsh=withPending('sg','shops',d.data());
+        else if(d.id==='road')grd=withPending('gr','road',d.data());
         else if(d.id==='bmap')gbm=withPending('bg','bmap',d.data());
         else if(d.id.indexOf('bmi_')===0)bch[+d.id.slice(4)]=d.data();
         else if(d.id.indexOf('loy_')===0)loy[d.id.slice(4)]=withPending('gl',d.id.slice(4),d.data());
@@ -484,6 +488,7 @@ function startWatches(){
       if(gbat)S.battleGm=gbat;else if(!Q.has('gb|battle'))S.battleGm={};
       if(gbm)S.bmGm=gbm;else if(!Q.has('bg|bmap'))S.bmGm={};
       if(gsh)S.shopGm=gsh;else if(!Q.has('sg|shops'))S.shopGm={};
+      if(grd)S.roadGm=grd;else if(!Q.has('gr|road'))S.roadGm={};
       shPubSoon();
       S.bmGmCh=bch;
       bmAssembleGm();
