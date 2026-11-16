@@ -1040,6 +1040,7 @@ function gmTab(){
     </div>
     <p class="sub">The banner is changed from the Overview page, the map from the Map page, and NPCs with portraits are added on the People page. Their secret notes are only visible to you.</p></section>
   ${hpxDesk()}
+  ${grDesk()}
   ${nrDesk()}
   ${CFG?tableAccess():''}
   ${awardForm()}${awardHistory()}

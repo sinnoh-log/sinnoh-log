@@ -54,12 +54,14 @@ const seedFn=S=>{
   ok(D.n===150&&D.same/D.n>0.7,'the draw favours trainers near the party: '+D.same+' of '+D.n+' were on Route 203 or a town away');
   const T=await p.evaluate(()=>{
     const C=rdbCands(),out=[];
-    C.rows.filter(r=>r.kind==='bg').slice(0,40).forEach(r=>{const f=rdbFoe(r,{txt:'x'},C.W);out.push({ty:f.ty,team:f.team,okTy:f.team.every(s=>{const i=speciesInfo(s);return i&&i.types.indexOf(f.ty)>=0;}),n:f.n,rank:f.rank,size:f.team.length,bonus:f.rb+f.bb,bd:f.bd});});
+    C.rows.filter(r=>r.kind==='bg').slice(0,40).forEach(r=>{const f=rdbFoe(r,{txt:'x'},C.W);const sv=(S.teamGm.f||{})[r.id]||grTeamOf(r,C.W);out.push({ty:f.ty,team:f.team,okTy:!!sv&&f.ty===sv.ty&&f.team.every(s=>sv.sp.includes(s)),match:f.team.filter(s=>{const i=speciesInfo(s);return i&&i.types.indexOf(f.ty)>=0;}).length,n:f.n,rank:f.rank,size:f.team.length,bonus:f.rb+f.bb,bd:f.bd});});
     const rv=C.rows.find(r=>r.id==='n_r1'),fr=rdbFoe(rv,{txt:'x'},C.W);
     const home=rdbHomeType('Somebody','Oreburgh'),away=rdbHomeType('Somebody','Kanto');
     return {out,fr,home,away,rocky:['Rock','Ground','Steel','Fighting'].includes(home),hasAway:TYPES.includes(away)};
   });
-  ok(T.out.every(x=>x.okTy&&x.size===x.n),'every field trainer’s team is named, all of their type and the size of the challenge (e.g. '+T.out[0].ty+': '+T.out[0].team.join(', ')+')');
+  const mt=T.out.reduce((a,x)=>a+x.match,0),all=T.out.reduce((a,x)=>a+x.size,0);
+  ok(mt/all>0.4,'most of what they bring is their favourite type ('+mt+' of '+all+')');
+  ok(T.out.every(x=>x.okTy&&x.size===x.n),'every field trainer brings members of their saved team, sized to the challenge, favouring their type (e.g. '+T.out[0].ty+': '+T.out[0].team.join(', ')+')');
   ok(T.out.every(x=>x.rank===(x.bd>=6?'4':x.bd>=4?'3':x.bd>=2?'2':'1')&&x.bonus===({'1':1,'2':2,'3':3,'4':4}[x.rank]+Math.floor(x.bd/2))),'foe bonus = rank (from badges) + 1 per 2 badges');
   ok(T.out.every(x=>x.n>=({'1':1,'2':1,'3':2,'4':3}[x.rank])&&x.n<=({'1':1,'2':2,'3':3,'4':3}[x.rank])),'challenge size by rank: Novice 1, Skilled 1–2, Experienced 2–3, Ace 3');
   ok(T.fr.rank==='2'&&T.fr.ty==='Ghost'&&T.fr.team.every(s=>['Drifloon','Misdreavus','Mismagius'].includes(s))&&T.fr.team.length===T.fr.n,'a rival with a Quick NPC sheet keeps the sheet’s rank, type and team ('+T.fr.team.join(', ')+')');

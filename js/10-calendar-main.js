@@ -958,8 +958,10 @@ function rkAct(b){
       rkSaveB({hist:hist.concat([rkSnap(W+1)]).slice(-80)});
       const dr=rkDraftHeads(W+1);if(dr.length)rkSave({heads:rkHeads().concat(dr).slice(-200)});
       const gr=rkC()===RK_C.gym?ntGrowAll('week',W+1):[];
-      toast('Week '+(W+1)+': the results are in.'+(gr.length?' New teams: '+gr.join(', ')+'.':''),true);render();break;}
-    case 'rk_unweek':{const w=Math.max(0,W-1);if(rkC()===RK_C.gym){const ug=ntUngrow(w);if(ug.length)toast('Week undone. Teams put back: '+ug.join(', ')+'.',true);}rkSaveB({wk:w,hist:(Array.isArray(bb.hist)?bb.hist:[]).filter(e=>num(e.w)<=w)});if(rkHeads().some(x=>num(x.wk)>w))rkSave({heads:rkHeads().filter(x=>num(x.wk)<=w)});render();break;}
+      toast('Week '+(W+1)+': the results are in.'+(gr.length?' New teams: '+gr.join(', ')+'.':''),true);render();
+      if(rkC()===RK_C.gym)setTimeout(()=>grRun('week',W+1).then(r=>{const t=grSay(r);if(t){toast('Week '+(W+1)+': '+t+'.',true);render();}}),400);
+      break;}
+    case 'rk_unweek':{const w=Math.max(0,W-1);if(rkC()===RK_C.gym){grUnweek(w);const ug=ntUngrow(w);if(ug.length)toast('Week undone. Teams put back: '+ug.join(', ')+'.',true);}rkSaveB({wk:w,hist:(Array.isArray(bb.hist)?bb.hist:[]).filter(e=>num(e.w)<=w)});if(rkHeads().some(x=>num(x.wk)>w))rkSave({heads:rkHeads().filter(x=>num(x.wk)<=w)});render();break;}
     case 'rk_hpub':rkSave({heads:rkHeads().map(x=>x.k===d.k?Object.assign({},x,{pub:true,at:Date.now()}):x)});render();break;
     case 'rk_hpuball':{const at=Date.now();rkSave({heads:rkHeads().map((x,i)=>x.pub?x:Object.assign({},x,{pub:true,at:at+i}))});render();break;}
     case 'rk_hdel':rkSave({heads:rkHeads().filter(x=>x.k!==d.k)});render();break;
@@ -1884,6 +1886,7 @@ function act(b,e){
   if(d.act&&d.act.indexOf('cl_')===0){clAct(b);return;}
   if(d.act&&d.act.indexOf('rk_')===0){rkAct(b);return;}
   if(d.act&&d.act.indexOf('rdb_')===0){rdbAct(b);return;}
+  if(d.act&&d.act.indexOf('gr_')===0){grAct(b);return;}
   if(d.act&&d.act.indexOf('tm_')===0){tmAct(b);return;}
   if(d.act&&d.act.indexOf('br_')===0){brAct(b);return;}
   if(d.act==='zn_load'){znLoad();return;}

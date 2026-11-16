@@ -809,6 +809,7 @@ function ntGrowAll(why,wk){
     const nt=NTS()[id],st=ntStages(nt);
     if(st.length<2)return;
     const bd=ntBadges(id);if(bd==null)return;
+    return;   /* Update 58: a rival on the rankings grows step by step instead (GM Desk, Team growth); saved teams load by hand */
     const cur=st.find(x=>x.id===nt.grown)||st[0];
     const next=st.filter(x=>num(x.bd)<=bd&&num(x.bd)>num(cur.bd)).pop();
     if(next&&ntStageLoad(id,next.id,true)){
@@ -838,13 +839,14 @@ function ntBadgeChanged(){
     const W=num(((S.cond&&S.cond[RK_C.gym.b])||{}).wk);
     const gr=rkWith('gym',()=>ntGrowAll('badge',W));
     if(gr.length){toast('New badge, new rival teams: '+gr.join(', ')+'.',true);render();}
+    grRun('badge',W).then(r=>{const t=grSay(r);if(t){toast('New badge: '+t+'.',true);render();}});
   },800);
 }
 function ntGrowPanel(id,nt){
   const st=ntStages(nt),bd=ntBadges(id),u=S.ui.nt;
   const cur=st.find(x=>x.id===nt.grown);
   return h`<div class="mgate"><span class="fl">Team growth</span>
-    <p class="sub">${bd!=null?h`On the Gym rankings with <b>${bd} badge${bd===1?'':'s'}</b>. `:'Not on the Gym rankings, so teams change only when you load them. '}Each saved team has a badge mark. When you run a week on the rankings and this rival has reached the next mark, the team below replaces the current one. Damage, nicknames and changes to the current team are not kept, so save it first if you want them.</p>
+    <p class="sub">${bd!=null?h`On the Gym rankings with <b>${bd} badge${bd===1?'':'s'}</b>. This rival’s team now grows step by step as badges are won: the changes wait for you under Team growth on the GM Desk. Saved teams below only load when you press Load now.`:'Not on the Gym rankings, so teams change only when you load them. Each saved team has a badge mark; damage, nicknames and changes to the current team are not kept when another loads, so save it first if you want them.'}</p>
     ${st.length?h`<ul class="mini-list">${st.map(x=>h`<li><div class="row sp"><span><b>${num(x.bd)} badge${num(x.bd)===1?'':'s'}</b>${x.label?h` <span class="sub">${x.label}</span>`:''}${x.qr&&qnOf(nt)?h` <span class="pill">${qnRankName(x.qr)}</span>`:''} ${cur&&cur.id===x.id?h`<span class="pill good">In use</span>`:''}<br><span class="sub">${(x.team||[]).map(m=>m.nick||m.sp).join(', ')||'No Pokémon'}</span></span>
       <span class="row"><button class="btn sm" data-act="nt_stload" data-id="${id}" data-sid="${x.id}">Load now</button><button class="btn sm ghost" data-act="nt_stsave" data-id="${id}" data-sid="${x.id}" title="Replace this saved team with the current team">Overwrite</button><button class="btn sm ghost" data-act="nt_strm" data-id="${id}" data-sid="${x.id}">Remove</button></span></div></li>`)}</ul>`:''}
     <div class="row"><label class="fld inl"><span class="fl">At badges</span><input type="number" min="0" max="8" data-u="nt.stb_${id}" data-nr value="${u['stb_'+id]==null?'':u['stb_'+id]}" placeholder="${bd!=null?bd:0}"></label><button class="btn sm" data-act="nt_stnew" data-id="${id}">Save the current team at that mark</button></div>

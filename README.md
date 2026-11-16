@@ -979,3 +979,21 @@ Item pictures were squeezed out of shape in the read-first bag (Update 49) and c
   - **Copy the log to the journal** has an *Include encounters and events* tick box.
   - Ending a trip clears both parts.
 - `tests/t_init.js` and `tests/t_trip.js` check them.
+
+## Team growth (Update 58)
+
+Circuit trainers' teams now change as badges are won. Everything is kept in `gm/teams`, which only the GM can read. The **Team growth** panel on the GM Desk shows it.
+
+- **When.** A trainer gets one growth check each time they win a badge: when you run a rankings week, or when a rival paced to the players follows them. Everyone also gets one check each time the party's average badge count goes up.
+- **How often.** A check becomes a step every time at 0–2 badges, half the time at 3–5, rarely (15%) at 6–7, and never at 8. Nobody grows past six fully evolved Pokémon, so veterans stay as they are.
+- **A step** is one of these:
+  - **Catch a Pokémon.** It comes from the routes between home and their latest Gym, or less often from elsewhere in Sinnoh. Catches lean toward their favourite type and suit their style, and about 1 in 12 comes from another region.
+  - **Evolve one.** Natural evolutions can happen any time. Stone, item and place evolutions need 3+ badges, the last of three stages needs 4+, and pseudo-legends need 6+.
+  - **Learn a stronger move.** This is for rivals with sheets, capped by their badges.
+  - **Swap out** the weakest member of a full team.
+- **Field trainers** each get a saved team the first time the GM opens the site after this update. It is sized by their badges, and the first Pokémon is always their favourite type. Their changes apply by themselves and are listed with **Undo**. Undoing a rankings week takes that week's changes back out. Road battles now meet the trainer's saved team.
+- **Rivals with an NPC sheet** get proposals instead, and you **Accept**, **Reroll** or **Skip** each one.
+  - Accepting writes the change to the sheet. A catch or swap builds the new Pokémon from the Pokédex; an evolution keeps the nickname, item and moves.
+  - A rival's Quick NPC rank rises with their badges: Skilled at 2, Experienced at 4, Ace at 6.
+  - Hand-written saved teams no longer load by themselves for rivals on the rankings, but **Load now** still works.
+- `tests/t_growth.js` checks it, using a small Pokédex fixture (`tests/fixtures/growth-species.json`).

@@ -253,11 +253,17 @@ function rdbFoe(r,L,W){
   const homeNm=rdbHomeName(r.home);
   let ty=q&&q.ty?q.ty:'',team=[];
   if(nt&&Array.isArray(nt.team)&&nt.team.length){team=nt.team.map(m=>m.sp||m.species).filter(Boolean).slice(0,n);if(!ty)ty=rdbMainType(nt.team);}
+  const saved=!nt?grTeamOf(r,W):null;
+  if(saved&&saved.sp.length){
+    if(!ty)ty=saved.ty||'';
+    const pool=saved.sp.slice(),h0=rkStrHash(r.name+'|'+W);
+    for(let j=0;j<n&&pool.length;j++){const i=Math.floor(rkHash(h0,j,61)*pool.length);team.push(pool[i]);pool.splice(i,1);}
+  }
   if(!ty)ty=rdbHomeType(r.name,homeNm);
-  team=team.concat(rdbTeam(ty,rank,n-team.length,r.name+'|'+W,team));
+  if(team.length<n&&!(saved&&saved.sp.length))team=team.concat(rdbTeam(ty,rank,n-team.length,r.name+'|'+W,team));
   const rb=qnRankNum(rank)||1,bb=rdbBdBonus(r.bd);
   return {k:rkKey(),id:r.id,kind:r.kind,name:r.name,home:homeNm||String(r.home||'').split(/[;,]/)[0].trim(),lab:r.lab||'',rank,bd:num(r.bd),pos:r.pos,rec:r.recTxt||'',
-    ty,n,team,where:L.txt,jt:L.jt||'',rb,bb,st:'open'};
+    ty,n:team.length?Math.min(n,team.length):n,team,where:L.txt,jt:L.jt||'',rb,bb,st:'open'};
 }
 
 /* ----- the battle ----- */
