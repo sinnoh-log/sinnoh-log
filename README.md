@@ -997,3 +997,17 @@ Circuit trainers' teams now change as badges are won. Everything is kept in `gm/
   - A rival's Quick NPC rank rises with their badges: Skilled at 2, Experienced at 4, Ace at 6.
   - Hand-written saved teams no longer load by themselves for rivals on the rankings, but **Load now** still works.
 - `tests/t_growth.js` checks it, using a small Pokédex fixture (`tests/fixtures/growth-species.json`).
+
+## GM Dashboard (Update 59)
+
+A GM-only **GM Dashboard** page (first item under Game Master in the menu, with a count of waiting reminders). Its own data is kept in `gm/dash`, which only the GM can read.
+
+- **Today.** The date and conditions, with **Start the next day**, **Next time of day**, **Roll the weather**, **Rest everyone** and **Pokémon Center: everyone** (two taps).
+- **Reminders**, each with a button where one fits: rankings week due or overdue, unpublished headlines, rival team changes waiting, eggs ready, an unrolled travel day, open road challenges and unpaid prizes, fainted Pokémon, a running battle, calendar events today and tomorrow, and open to-do items.
+- **Today's checklist.** Rest, once-a-day gear, the travel day, road trainers, the weekly rankings, eggs and today's events. It starts again each new day. Jobs the site can see (a rolled day, a run week) tick themselves.
+- **The party.** A card per PC: level, HP, credits, badges, ribbons and rank on each circuit. Each party Pokémon shows HP, fainted, status, daily uses spent, loyalty and an allow-evolution switch. Each card has **Rest 8h** and **Pokémon Center**.
+- **On the road** and **Road battles**: the same panels as on the Calendar.
+- **Weekly.** Pick the rankings day (Sunday by default). Run either circuit's week and publish its headlines from here. A week not run by its day shows as overdue.
+- **Eggs.** Add an egg for a trainer; the hatch time comes from the Pokédex unless you type one. It counts down with the calendar, and **Hatch** gives the Pokémon to the player.
+- **To do.** A plain list to tick off.
+- `tests/t_dash.js` checks it, including that players get neither the page nor its data.

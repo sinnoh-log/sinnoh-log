@@ -646,6 +646,29 @@ input[type=search]{appearance:none}
 .calsel{margin-top:10px;border-top:1px solid var(--line-soft);padding-top:8px}
 .calev{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}.calev li{display:flex;justify-content:space-between;gap:10px;align-items:center;border-top:1px solid var(--line-soft);padding:6px 0}
 .tplog{list-style:none;margin:8px 0;padding:0;display:flex;flex-direction:column}.tplog li{border-top:1px solid var(--line-soft);padding:7px 0;font-size:14px;display:flex;flex-direction:column;gap:2px}
+/* GM dashboard (Update 59) */
+.dashnow{font-weight:600;margin:2px 0 10px}
+.dashh{margin:14px 0 6px;font-size:15px;display:flex;align-items:center;gap:8px}
+.dashrem,.dashlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.dashrem li{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px 10px;padding:7px 10px;border:2px solid var(--line);border-left-width:5px;border-radius:10px}
+.dashrem li>span:first-child{flex:1 1 240px;min-width:0}
+.dashrem li.warn{border-left-color:var(--warn)}.dashrem li.good{border-left-color:var(--good)}
+.dashlist li{display:flex;align-items:center;gap:10px;padding:7px 10px;border:2px solid var(--line);border-radius:10px;flex-wrap:wrap}
+.dashlist li.on .dashit b{text-decoration:line-through;opacity:.65}
+.dashit{flex:1 1 200px;min-width:0;display:flex;flex-direction:column}
+.dashbox{flex:none;width:28px;height:28px;border:2px solid var(--line);border-radius:8px;background:var(--raised);color:inherit;font-weight:800;display:inline-grid;place-items:center;cursor:pointer;padding:0}
+span.dashbox{border-radius:50%;cursor:default}
+.dashbox.on{background:var(--good);border-color:var(--good);color:#fff}
+.dashpcs{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
+.dashpc{border:2px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:var(--raised);min-width:0}
+.dashpc h3{margin:0;font-size:17px}
+.dashfacts{display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:6px 10px;margin:0}
+.dashfacts dt{font-size:11px;text-transform:uppercase;letter-spacing:.04em;opacity:.75}.dashfacts dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
+.dashmons{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.dashmons li{display:flex;flex-direction:column;gap:4px;padding-top:8px;border-top:1px solid var(--line-soft)}
+.dashmons li.down b{opacity:.6}
+.dashtags{gap:5px;flex-wrap:wrap}
+.dashgrow{flex:1 1 220px}
 /* team growth (Update 58) */
 .grq{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
 .grq>li{display:flex;flex-direction:column;gap:6px}
@@ -1561,18 +1584,19 @@ input,select,textarea{border-radius:9px}
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
 <!-- The app, in load order. These files share one scope; keep the order. -->
-<script src="js/01-core.js?v=2026-11-16-grow"></script>
-<script src="js/02-species.js?v=2026-11-16-grow"></script>
-<script src="js/03-rolls.js?v=2026-11-16-grow"></script>
-<script src="js/04-battle.js?v=2026-11-16-grow"></script>
-<script src="js/04b-battle-helper.js?v=2026-11-16-grow"></script>
-<script src="js/05-pokedex-contests.js?v=2026-11-16-grow"></script>
-<script src="js/06-world.js?v=2026-11-16-grow"></script>
-<script src="js/07-npc.js?v=2026-11-16-grow"></script>
-<script src="js/07b-quick-npc.js?v=2026-11-16-grow"></script>
-<script src="js/08-battlemap.js?v=2026-11-16-grow"></script>
-<script src="js/09-sheets.js?v=2026-11-16-grow"></script>
-<script src="js/09b-road.js?v=2026-11-16-grow"></script>
-<script src="js/09c-growth.js?v=2026-11-16-grow"></script>
-<script src="js/10-calendar-main.js?v=2026-11-16-grow"></script>
+<script src="js/01-core.js?v=2026-11-16-dash"></script>
+<script src="js/02-species.js?v=2026-11-16-dash"></script>
+<script src="js/03-rolls.js?v=2026-11-16-dash"></script>
+<script src="js/04-battle.js?v=2026-11-16-dash"></script>
+<script src="js/04b-battle-helper.js?v=2026-11-16-dash"></script>
+<script src="js/05-pokedex-contests.js?v=2026-11-16-dash"></script>
+<script src="js/06-world.js?v=2026-11-16-dash"></script>
+<script src="js/07-npc.js?v=2026-11-16-dash"></script>
+<script src="js/07b-quick-npc.js?v=2026-11-16-dash"></script>
+<script src="js/08-battlemap.js?v=2026-11-16-dash"></script>
+<script src="js/09-sheets.js?v=2026-11-16-dash"></script>
+<script src="js/09b-road.js?v=2026-11-16-dash"></script>
+<script src="js/09c-growth.js?v=2026-11-16-dash"></script>
+<script src="js/09d-dash.js?v=2026-11-16-dash"></script>
+<script src="js/10-calendar-main.js?v=2026-11-16-dash"></script>
 </body></html>

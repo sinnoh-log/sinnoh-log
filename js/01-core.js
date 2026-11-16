@@ -1,6 +1,6 @@
 'use strict';
 /* Sinnoh Trainer Log · 01-core. The files in js/ are classic scripts that share one scope: load them in order (see index.html). */
-const BUILD='2026-11-16 · Update 58';
+const BUILD='2026-11-16 · Update 59';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -70,8 +70,8 @@ const NAV=[
   ['World',[['people','People'],['leads','Leads'],['map','Map']]],
   ['Table',[['trainer','Trainer'],['pokemon','Pokémon'],['dex','Pokédex'],['battle','Battle'],['moves','Moves'],['contest','Contests'],['rank','Rankings'],['shop','Shop']]]
 ];
-const GM_NAV=['Game Master',[['gm','GM Desk'],['npc','NPC Trainers']]];
-const PAGE_LABEL={cal:'Calendar',overview:'Overview',journal:'Journal',timeline:'Timeline',people:'People',leads:'Leads',map:'Map',place:'Place',trainer:'Trainer sheet',pokemon:'Pokémon',dex:'Pokédex',battle:'Battle',moves:'Moves',contest:'Contests',rank:'Rankings',shop:'Shop',gm:'GM Desk',npc:'NPC Trainers',account:'Account'};
+const GM_NAV=['Game Master',[['dash','GM Dashboard'],['gm','GM Desk'],['npc','NPC Trainers']]];
+const PAGE_LABEL={cal:'Calendar',overview:'Overview',journal:'Journal',timeline:'Timeline',people:'People',leads:'Leads',map:'Map',place:'Place',trainer:'Trainer sheet',pokemon:'Pokémon',dex:'Pokédex',battle:'Battle',moves:'Moves',contest:'Contests',rank:'Rankings',shop:'Shop',dash:'GM Dashboard',gm:'GM Desk',npc:'NPC Trainers',account:'Account'};
 const PIN_KINDS=[['place','Place'],['party','Party'],['danger','Danger'],['lead','Lead']];
 const AWARD_TYPES=['Gym Badge','Trial Medal','Frontier Symbol','Contest Ribbon','Certificate','Emblem of Recognition','Loyal Partner','Moment of Destiny','Other'];
 
@@ -117,7 +117,7 @@ const S={
   ready:false,noDb:false,db:null,user:null,dl:null,
   me:{id:null,admin:false,canWrite:true},
   tab:'overview',viewUid:null,
-  megaOk:{},battle:{},battleGm:{},trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},gmNt:{},npcPub:{},shopPub:{},shopGm:{},roadGm:{},teamGm:{},
+  megaOk:{},battle:{},battleGm:{},trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},gmNt:{},npcPub:{},shopPub:{},shopGm:{},roadGm:{},teamGm:{},dashGm:{},
   awards:{},timeline:{},pins:{},banner:{},cond:{},places:{},gmPl:{},placeId:null,members:{},invite:null,mapChunks:{},mapSrc:'',room:null,peers:[],avatars:{},
   pick:null,names:{},save:{cls:'',text:'Saved'},rolls:[],_tsig:'',
   ui:{open:{},flip:{},sheetTab:'',lbx:null,adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},pop:null,megaPop:null,
@@ -187,7 +187,7 @@ const PD_BY={};PD.forEach(f=>{PD_BY[f.id]=f;});
 const PLACES=PD.map(f=>f.name).sort();
 
 /* ---------- store: refs, local copies, write queue ---------- */
-const SET_ALWAYS=new Set(['meta','gl','gn','bn','pl','gp','mg','bt','gb','gt','np','bm','bg','sh','sg','gr','gf','cd']);
+const SET_ALWAYS=new Set(['meta','gl','gn','bn','pl','gp','mg','bt','gb','gt','np','bm','bg','sh','sg','gr','gf','gd','cd']);
 function refFor(sc,id){
   const db=S.db;
   switch(sc){
@@ -217,6 +217,7 @@ function refFor(sc,id){
     case 'sg':return db.collection('gm').doc('shops');
     case 'gr':return db.collection('gm').doc('road');
     case 'gf':return db.collection('gm').doc('teams');
+    case 'gd':return db.collection('gm').doc('dash');
     case 'cd':return db.collection('meta').doc('conditions');
   }
 }
@@ -248,6 +249,7 @@ function getLocal(sc,id){
     case 'sg':return S.shopGm;
     case 'gr':return S.roadGm;
     case 'gf':return S.teamGm;
+    case 'gd':return S.dashGm;
     case 'cd':return S.cond;
   }
 }
@@ -279,6 +281,7 @@ function putLocal(sc,id,d){
     case 'sg':S.shopGm=d;break;
     case 'gr':S.roadGm=d;break;
     case 'gf':S.teamGm=d;break;
+    case 'gd':S.dashGm=d;break;
     case 'cd':S.cond=d;break;
   }
 }
@@ -359,7 +362,7 @@ function withPending(sc,id,d){
 function edit(sc,id,path,v){
   let doc=getLocal(sc,id);
   if(!doc){
-    if(sc==='gl'||sc==='gn'||sc==='pl'||sc==='gp'||sc==='mg'||sc==='bt'||sc==='gb'||sc==='np'||sc==='bm'||sc==='sh'||sc==='sg'||sc==='gr'||sc==='gf'||sc==='cd'){doc={};putLocal(sc,id,doc);}
+    if(sc==='gl'||sc==='gn'||sc==='pl'||sc==='gp'||sc==='mg'||sc==='bt'||sc==='gb'||sc==='np'||sc==='bm'||sc==='sh'||sc==='sg'||sc==='gr'||sc==='gf'||sc==='gd'||sc==='cd'){doc={};putLocal(sc,id,doc);}
     else return;
   }
   const parts=path.split('.');
@@ -471,12 +474,13 @@ function startWatches(){
   if(S.me.admin){
     watch(db.collection('gm'),s=>{
       const loy={},npc={},gpl={},gnt={},bch={};
-      let gbat=null,gbm=null,gsh=null,grd=null,gtm=null;
+      let gbat=null,gbm=null,gsh=null,grd=null,gtm=null,gds=null;
       s.docs.forEach(d=>{
         if(d.id==='battle')gbat=withPending('gb','battle',d.data());
         else if(d.id==='shops')gsh=withPending('sg','shops',d.data());
         else if(d.id==='road')grd=withPending('gr','road',d.data());
         else if(d.id==='teams')gtm=withPending('gf','teams',d.data());
+        else if(d.id==='dash')gds=withPending('gd','dash',d.data());
         else if(d.id==='bmap')gbm=withPending('bg','bmap',d.data());
         else if(d.id.indexOf('bmi_')===0)bch[+d.id.slice(4)]=d.data();
         else if(d.id.indexOf('loy_')===0)loy[d.id.slice(4)]=withPending('gl',d.id.slice(4),d.data());
@@ -494,6 +498,7 @@ function startWatches(){
       if(gsh)S.shopGm=gsh;else if(!Q.has('sg|shops'))S.shopGm={};
       if(grd)S.roadGm=grd;else if(!Q.has('gr|road'))S.roadGm={};
       if(gtm)S.teamGm=gtm;else if(!Q.has('gf|teams'))S.teamGm={};
+      if(gds)S.dashGm=gds;else if(!Q.has('gd|dash'))S.dashGm={};
       if(!S.gmIn)setTimeout(()=>{try{grEnsure();}catch(e){}},2500);
       S.gmIn=true;   /* the GM's own documents have arrived at least once */
       shPubSoon();

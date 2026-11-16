@@ -955,6 +955,7 @@ function rkAct(b){
       const hist=(Array.isArray(bb.hist)?bb.hist:[]).filter(e=>num(e.w)<=W);
       if(!hist.some(e=>num(e.w)===W))hist.push(rkSnap(W));
       rkSaveB({wk:W+1});
+      dashWeekRan(rkC()===RK_C.gym?'gym':'con');
       rkSaveB({hist:hist.concat([rkSnap(W+1)]).slice(-80)});
       const dr=rkDraftHeads(W+1);if(dr.length)rkSave({heads:rkHeads().concat(dr).slice(-200)});
       const gr=rkC()===RK_C.gym?ntGrowAll('week',W+1):[];
@@ -1632,6 +1633,7 @@ const navGroups=()=>{const g=S.me.admin?NAV.concat([GM_NAV]):NAV;return CFG?g.co
 function tabCount(k){
   if(k==='people')return Object.keys(S.people).length;
   if(k==='battle')return S.battle&&S.battle.on?'LIVE':0;
+  if(k==='dash')return S.me.admin?dashReminders().length:0;
   if(k==='leads')return entriesOf(S.leads).filter(l=>!l.status||l.status==='open'||l.status==='chasing').length;
   return 0;
 }
@@ -1660,9 +1662,9 @@ function mainHtml(){
   if(S.noDb)return emptyState('This tracker needs a signed-in view','Open it from your claude.ai link while signed in. The shared table is stored with the page, so it cannot load anywhere else.');
   if(!S.ready)return h`<p class="loading">OPENING THE TABLE…</p>`;
   if(S.mapWin)return bmWinHtml();
-  const views={cal:calTab,overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,dex:dexTab,battle:battleTab,moves:mvxTab,contest:ctTab,rank:rkTab,shop:shopTab,gm:gmTab,npc:npcTab,account:accountTab};
+  const views={cal:calTab,overview:overviewTab,journal:journalTab,timeline:timelineTab,people:peopleTab,leads:leadsTab,map:mapTab,place:placeTab,trainer:trainerTab,pokemon:pokemonTab,dex:dexTab,battle:battleTab,moves:mvxTab,contest:ctTab,rank:rkTab,shop:shopTab,dash:dashTab,gm:gmTab,npc:npcTab,account:accountTab};
   let tab=S.tab;
-  if((tab==='gm'||tab==='npc')&&!S.me.admin)tab='overview';
+  if((tab==='gm'||tab==='npc'||tab==='dash')&&!S.me.admin)tab='overview';
   if(tab==='account'&&!CFG)tab='overview';
   return h`${banners()}${(views[tab]||overviewTab)()}${footer()}`;
 }
@@ -1887,6 +1889,7 @@ function act(b,e){
   if(d.act&&d.act.indexOf('rk_')===0){rkAct(b);return;}
   if(d.act&&d.act.indexOf('rdb_')===0){rdbAct(b);return;}
   if(d.act&&d.act.indexOf('gr_')===0){grAct(b);return;}
+  if(d.act&&d.act.indexOf('gd_')===0){dashAct(b);return;}
   if(d.act&&d.act.indexOf('tm_')===0){tmAct(b);return;}
   if(d.act&&d.act.indexOf('br_')===0){brAct(b);return;}
   if(d.act==='zn_load'){znLoad();return;}
@@ -2248,6 +2251,7 @@ document.addEventListener('click',e=>{
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t&&t.dataset&&rkChange(t))return;
+  if(t&&t.dataset&&dashChange(t))return;
   if(t&&t.dataset&&t.dataset.clcat&&S.me.admin){edit('cd','conditions','ev',clEvents().map(x=>x.k===t.dataset.clcat?Object.assign({},x,{c:t.value}):x));render();return;}
   if(t&&t.dataset&&t.dataset.b&&onSpeciesChange(t))return;
   if(t&&t.dataset&&t.dataset.evot!=null){evoTarget(t.dataset.pid,t.value);return;}

@@ -121,7 +121,7 @@ function heroHtml(){
 /* phone home: app tiles (Update 30); hidden on wide screens by CSS */
 const TILES=[['trainer','Trainer'],['pokemon','Pokémon'],['dex','Pokédex'],['map','Map'],['journal','Journal'],['people','People'],['leads','Leads'],['battle','Battle'],['moves','Moves'],['contest','Contests'],['shop','Shop']];
 function appTiles(){
-  const tl=TILES.concat(S.me.admin?[['npc','NPCs'],['gm','GM Desk']]:[]);
+  const tl=TILES.concat(S.me.admin?[['dash','GM Dashboard'],['npc','NPCs'],['gm','GM Desk']]:[]);
   return h`<nav class="apptiles" aria-label="Apps">${tl.map(([k,l])=>h`<button class="at" data-act="tab" data-tab="${k}"><span class="atic" aria-hidden="true"></span><b>${l}</b>${tabCount(k)?h`<span class="n">${tabCount(k)}</span>`:''}</button>`)}</nav>`;
 }
 function overviewTab(){
