@@ -1036,3 +1036,10 @@ A GM-only **GM Dashboard** page (first item under Game Master in the menu, with 
   - Prize money only, never ranking points; a Leader who loses pays 2,700 P.
   - Badge battles are never settled this way.
   - Unfinished Gym battles stay on the list when you roll for road trainers.
+
+## Battle styles are the GM's (Update 62)
+
+- On the Gym circuit rankings, players no longer see the Style column, cannot search by style, and are not shown the note about style labels.
+- The GM still sees, sets and searches styles, with a reminder that players don't see them. Road battles and team growth still use them behind the scenes.
+- Contest circuit specialties are unchanged and still visible.
+- This hides styles on screen only; the labels stay in the shared rankings record. `tests/t_styles.js` checks it.

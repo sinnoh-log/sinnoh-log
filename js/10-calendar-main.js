@@ -568,6 +568,9 @@ function rkEst(p){
 }
 const rkTier=p=>rkC().tiers.find(t=>p>=t[0]);
 const rkSgn=n=>n>0?'+'+n:n<0?'−'+Math.abs(n):'0';
+/* Update 62: battle styles on the Gym circuit are the GM's; players see no Style column, cannot search by style and
+   are not told about the labels. Contest specialties still show. */
+const rkShowLab=()=>!!S.me.admin||rkC()!==RK_C.gym;
 function rkLabSel(attr,cur){
   return h`<select class="clcatsel" ${raw(attr)} aria-label="${rkC().labWord}"><option value="">No label yet</option>${rkC().labels.map(l=>h`<option ${l===cur?raw('selected'):''}>${l}</option>`)}</select>`;
 }
@@ -576,7 +579,7 @@ function rkVisible(rows){
   const u=S.ui.rk,q=String(u.q||'').trim().toLowerCase();
   const big=rows.length>40;
   let out=rows;
-  if(q)out=rows.filter(r=>(r.name+' '+(r.home||'')+' '+(r.lab||'')).toLowerCase().includes(q));
+  if(q)out=rows.filter(r=>(r.name+' '+(r.home||'')+' '+(rkShowLab()?r.lab||'':'')).toLowerCase().includes(q));
   else if(u.view==='known')out=rows.filter(r=>r.kind!=='bg'||r.met);
   else if(u.view==='near'&&big){
     const keep=new Set();
@@ -691,17 +694,17 @@ function rkProfile(r,nameOf){
     ${gm&&r.kind!=='pc'?h`<div class="row"><button class="btn sm ghost" data-act="rk_met" data-id="${r.id}" aria-pressed="${r.met?'true':'false'}">${r.met?'Met ✓':'Mark met'}</button>${r.kind==='bg'?h`<button class="btn sm ghost" data-act="rk_track" data-i="${r.i}">Make a rival</button>`:''}</div>`:''}</div>`;
 }
 function rkBoardHtml(){
-  const gm=!!S.me.admin,C=rkC(),rows=rkRows(),vis=rkVisible(rows),nameOf=rkNamer(rows);
+  const gm=!!S.me.admin,C=rkC(),rows=rkRows(),vis=rkVisible(rows),nameOf=rkNamer(rows),sl=rkShowLab(),cols=sl?5:4;
   if(!vis.length)return h`<p class="sub">${S.ui.rk.q?'No one matches that search.':S.ui.rk.view==='known'?'The party hasn’t met anyone on the board yet.':'No one is on the board yet.'}</p>`;
   const cell=r=>h`<tr class="${r.kind==='pc'?'rkpc':''} ${r.met?'rkmet':''}">
       <td data-l="#"><div class="cxc"><b class="mono">${r.pos}</b></div></td>
       <td data-l="Trainer"><div class="cxc"><button class="rkname" data-act="rk_open" data-id="${r.id}" aria-expanded="${S.ui.rk.open===r.id?'true':'false'}"><b>${r.name}</b></button>${r.kind==='pc'?h` <span class="pill rkpill">Player</span>`:''}${r.met?h` <span class="pill rkmetp">Met</span>`:''}${r.kind==='rival'?h` <span class="pill">Rival</span>`:''}${r.home?h`<br><span class="sub">${r.home}</span>`:''}</div></td>
       <td data-l="${C.unit}"><div class="cxc"><b class="mono">${r.pts<0?'−'+Math.abs(r.pts):r.pts}</b>${r.wk?h` <span class="sub rkwk ${r.wk>0?'up':'down'}">${rkSgn(r.wk)}</span>`:''}</div></td>
-      <td data-l="${C.labWord}"><div class="cxc">${gm&&r.kind==='pc'?rkLabSel('data-rklab="'+r.id+'"',r.lab):gm&&r.kind==='rival'?rkLabSel('data-rknlab="'+r.k+'"',r.lab):r.lab?h`<span class="pill">${r.lab}</span>`:h`<span class="sub">None yet</span>`}</div></td>
+      ${sl?h`<td data-l="${C.labWord}"><div class="cxc">${gm&&r.kind==='pc'?rkLabSel('data-rklab="'+r.id+'"',r.lab):gm&&r.kind==='rival'?rkLabSel('data-rknlab="'+r.k+'"',r.lab):r.lab?h`<span class="pill">${r.lab}</span>`:h`<span class="sub">None yet</span>`}</div></td>`:''}
       <td data-l="Record"><div class="cxc"><span class="sub">${rkRecText(r)}</span></div></td></tr>
-    ${S.ui.rk.open===r.id?h`<tr class="rkcardrow"><td colspan="5"><div class="cxc">${rkProfile(r,nameOf)}</div></td></tr>`:''}`;
-  return h`<div class="cxw"><table class="cxt rkt"><thead><tr>${['#','Trainer',C.unit,C.labWord,'Record'].map(c=>h`<th scope="col">${c}</th>`)}</tr></thead><tbody>
-    ${vis.map(r=>r===null?h`<tr class="rkgap"><td colspan="5"><div class="cxc sub">⋮</div></td></tr>`:r==='more'?h`<tr class="rkgap"><td colspan="5"><div class="cxc"><button class="btn sm ghost" data-act="rk_more">Show 50 more</button></div></td></tr>`:cell(r))}
+    ${S.ui.rk.open===r.id?h`<tr class="rkcardrow"><td colspan="${cols}"><div class="cxc">${rkProfile(r,nameOf)}</div></td></tr>`:''}`;
+  return h`<div class="cxw"><table class="cxt rkt"><thead><tr>${['#','Trainer',C.unit].concat(sl?[C.labWord]:[],['Record']).map(c=>h`<th scope="col">${c}</th>`)}</tr></thead><tbody>
+    ${vis.map(r=>r===null?h`<tr class="rkgap"><td colspan="${cols}"><div class="cxc sub">⋮</div></td></tr>`:r==='more'?h`<tr class="rkgap"><td colspan="${cols}"><div class="cxc"><button class="btn sm ghost" data-act="rk_more">Show 50 more</button></div></td></tr>`:cell(r))}
   </tbody></table></div>`;
 }
 function rkListRefresh(){const el=document.getElementById('rklist');if(el)el.innerHTML=rkBoardHtml().s;}
@@ -840,7 +843,7 @@ function rkTab(){
     <p class="sub">${C.intro}</p>
     ${pcs.length&&big?h`<div class="rkme">${pcs.map(r=>h`<span><b>${r.name}</b> <span class="mono">#${r.pos}</span> <span class="sub">of ${rows.length} · ${r.pts} ${C.unit}</span></span>`)}</div>`:''}
     ${big?h`<div class="shtabs" role="group" aria-label="Which trainers">${seg('near','Near us')}${seg('known','People we know'+(known?' ('+known+')':''))}${seg('all','Everyone')}</div>
-      <label class="fld"><span class="fl">Search by name, town or ${C.labWord.toLowerCase()}</span><input type="search" data-u="rk.q" value="${u.q}" placeholder="${C.qph}"></label>`:''}
+      <label class="fld"><span class="fl">Search by name, town${rkShowLab()?' or '+C.labWord.toLowerCase():''}</span><input type="search" data-u="rk.q" value="${u.q}" placeholder="${rkShowLab()?C.qph:C.qph.replace(/, Defender/,'')}"></label>`:''}
     <div id="rklist">${rkBoardHtml()}</div>
     <p class="sub">${big&&u.view==='near'&&!u.q?'Showing the five trainers above and below each player. ':''}Tap a name for their ${gymC?'record and head-to-head':'contest results'}.</p>
   </section>
@@ -874,7 +877,7 @@ function rkTab(){
   <section class="panel"><div class="ph"><h2>What the standings get you</h2></div>
     ${cxTable([C.unit,'Standing','What it gets you'],C.tiers.map((t,i)=>[i===C.tiers.length-1?'0–49':t[0]+(i?'–'+(C.tiers[i-1][0]-1):'+'),t[1],t[2]]))}
     ${gm?cxTable(['Result',C.unit],C.events.filter(e=>e[0]!=='other').map(e=>[e[1],rkSgn(e[2])])):''}
-    <p class="sub">Results count in full for a year, at half for six months more, then drop off. ${C.note}</p>
+    <p class="sub">Results count in full for a year, at half for six months more, then drop off. ${rkShowLab()?C.note:''}${gm&&C===RK_C.gym?' Players do not see style labels; use them in the story when you like.':''}</p>
   </section>
   ${gm?h`<section class="panel"><div class="ph"><h2>Rivals</h2><span class="sub">${rkNpcs().length}</span></div>
     ${rkNpcs().length?h`<ul class="mini-list">${rkNpcs().map(n=>h`<li><div class="row sp"><span><b>${n.n}</b> <span class="sub">${n.b!=null?'from the field':'started at '+num(n.p)+' '+C.unit}${n.h?' · '+n.h:''}</span></span><span class="row">${n.nt&&NTS()[n.nt]?h`<button class="btn sm" data-act="rk_ntopen" data-id="${n.nt}">NPC sheet</button>`:''}<button class="btn sm ghost" data-act="rk_ndel" data-k="${n.k}">Remove</button></span></div></li>`)}</ul>`:h`<p class="sub">Rivals are the trainers the players keep running into. They ${gymC?'battle':'compete'} every week like the field, and you can record their results by hand too.</p>`}

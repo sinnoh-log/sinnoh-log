@@ -1,6 +1,6 @@
 'use strict';
 /* Sinnoh Trainer Log · 01-core. The files in js/ are classic scripts that share one scope: load them in order (see index.html). */
-const BUILD='2026-11-16 · Update 61';
+const BUILD='2026-11-17 · Update 62';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
