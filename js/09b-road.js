@@ -142,8 +142,9 @@ function rdbLoc(r,W,day){
   const to=RDB_GYM_AT[goal.k];
   const jt=from===to?'Training around '+trName(to)+' for the '+goal.badge+' Badge':'On the way from '+trName(from)+' to '+trName(to)+' for the '+goal.badge+' Badge';
   const w=rdbWalk(r,from,to,days,pace,'',jt);
-  if(w)return w;
-  return rdbAround(r,to,day,'Training around '+trName(to)+' for the '+goal.badge+' Badge');
+  if(w)return Object.assign(w,{goal:goal.k});
+  /* here: in or around the next Gym's town, waiting to win its badge (Update 63: badge battle partners) */
+  return Object.assign(rdbAround(r,to,day,'Training around '+trName(to)+' for the '+goal.badge+' Badge'),{goal:goal.k,here:1});
 }
 /* once there, they train in and around the town until they win, on a different road each day */
 function rdbAround(r,at,day,jt){

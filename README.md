@@ -1043,3 +1043,13 @@ A GM-only **GM Dashboard** page (first item under Game Master in the menu, with 
 - The GM still sees, sets and searches styles, with a reminder that players don't see them. Road battles and team growth still use them behind the scenes.
 - Contest circuit specialties are unchanged and still visible.
 - This hides styles on screen only; the labels stay in the shared rankings record. `tests/t_styles.js` checks it.
+
+## Badge battles are double battles (Update 63)
+
+- A Gym Leader's NPC sheet has a GM-only **Badge battle** box (`js/09e-badge.js`). Choose **Solo** (one challenger commands two Pokémon on the field) or **Tag** (two challengers, one Pokémon each, against the Leader and the Gym's Head Gym Trainer), then the challenger.
+- **Tier** comes from the challenger's badges; in a tag battle, from the partner with more: 0–1 tier 1, 2–4 tier 2, 5–6 tier 3, 7 tier 4. Solo is 2 / 3 / 4 / 6 Pokémon a side; in tag each trainer brings 1 / 2 / 2 / 3.
+- The Leader uses the team saved for that badge count at the tier's rank. The Head Gym Trainer is the NPC whose sheet names the Gym (**Head Gym Trainer at**, in Edit details, or `gym` in an NPC pack row) and is one Quick NPC rank below the Leader.
+- **Partners:** another player, a circuit trainer training around that Gym's town for its badge, or a tracked rival who still needs it. Choosing a field trainer saves their circuit team.
+- **Load these teams** puts the tier's saved teams on both sheets; **Send to the battle** adds the picked Pokémon as foes, hidden until shown.
+- Rankings: a new event, **Won a Gym badge solo** (+30). A badge logged for a circuit trainer or rival now counts toward their badges.
+- `tests/t_badgebat.js` checks it (the pack part runs with `PACKS=folder`).

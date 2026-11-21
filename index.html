@@ -720,6 +720,25 @@ input[type=search]{appearance:none}
 .rdbko{color:var(--bad);font-weight:700}
 .rdbwarn{color:var(--warn)}
 .rdbgym{border:2px dashed var(--line);border-radius:12px;padding:8px 12px;margin-top:10px;display:flex;flex-direction:column;gap:6px}
+/* badge battles (Update 63) */
+.bdb{display:flex;flex-direction:column;gap:8px;border:2px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0;background:var(--raised)}
+.bdb > .row{flex-wrap:wrap}
+.bdb .seg{max-width:100%}
+.bdbtier{border-left:4px solid var(--accent);padding:4px 10px;display:flex;flex-direction:column;gap:2px}
+.bdbside{border:2px solid var(--line-soft);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+.bdbside.ally{border-style:dashed}
+.bdbside .row.sp{flex-wrap:wrap;gap:4px 10px}
+.bdbmons{align-self:flex-start}
+.bdbmons button{display:inline-flex;gap:6px;align-items:baseline}
+.bdb .seg button[aria-pressed="true"] .sub{color:inherit;opacity:.85}
+.bdbside p{margin:0}
+.bdbwarn{color:var(--warn)}
+.bdbfield{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.bdbfield li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line-soft)}
+.bdbfield li:last-child{border-bottom:0}
+.bdbfield li > span{min-width:0}
+.bdbstake{margin:0}
+@media (max-width:560px){.bdbfield li{flex-direction:column;align-items:flex-start}}
 .tpenc{color:var(--bad);font-weight:600}.tdcal{cursor:pointer;font:inherit;color:inherit}
 .clrleg{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:13px;margin-top:6px}
 .clrleg span{display:inline-flex;align-items:center;gap:6px}
@@ -1604,19 +1623,20 @@ input,select,textarea{border-radius:9px}
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
 <!-- The app, in load order. These files share one scope; keep the order. -->
-<script src="js/01-core.js?v=2026-11-17-styles"></script>
-<script src="js/02-species.js?v=2026-11-17-styles"></script>
-<script src="js/03-rolls.js?v=2026-11-17-styles"></script>
-<script src="js/04-battle.js?v=2026-11-17-styles"></script>
-<script src="js/04b-battle-helper.js?v=2026-11-17-styles"></script>
-<script src="js/05-pokedex-contests.js?v=2026-11-17-styles"></script>
-<script src="js/06-world.js?v=2026-11-17-styles"></script>
-<script src="js/07-npc.js?v=2026-11-17-styles"></script>
-<script src="js/07b-quick-npc.js?v=2026-11-17-styles"></script>
-<script src="js/08-battlemap.js?v=2026-11-17-styles"></script>
-<script src="js/09-sheets.js?v=2026-11-17-styles"></script>
-<script src="js/09b-road.js?v=2026-11-17-styles"></script>
-<script src="js/09c-growth.js?v=2026-11-17-styles"></script>
-<script src="js/09d-dash.js?v=2026-11-17-styles"></script>
-<script src="js/10-calendar-main.js?v=2026-11-17-styles"></script>
+<script src="js/01-core.js?v=2026-11-18-badge"></script>
+<script src="js/02-species.js?v=2026-11-18-badge"></script>
+<script src="js/03-rolls.js?v=2026-11-18-badge"></script>
+<script src="js/04-battle.js?v=2026-11-18-badge"></script>
+<script src="js/04b-battle-helper.js?v=2026-11-18-badge"></script>
+<script src="js/05-pokedex-contests.js?v=2026-11-18-badge"></script>
+<script src="js/06-world.js?v=2026-11-18-badge"></script>
+<script src="js/07-npc.js?v=2026-11-18-badge"></script>
+<script src="js/07b-quick-npc.js?v=2026-11-18-badge"></script>
+<script src="js/08-battlemap.js?v=2026-11-18-badge"></script>
+<script src="js/09-sheets.js?v=2026-11-18-badge"></script>
+<script src="js/09b-road.js?v=2026-11-18-badge"></script>
+<script src="js/09c-growth.js?v=2026-11-18-badge"></script>
+<script src="js/09d-dash.js?v=2026-11-18-badge"></script>
+<script src="js/09e-badge.js?v=2026-11-18-badge"></script>
+<script src="js/10-calendar-main.js?v=2026-11-18-badge"></script>
 </body></html>

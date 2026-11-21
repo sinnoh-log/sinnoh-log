@@ -325,7 +325,7 @@ const clAllPresetNames=()=>CL_PRESET.map(p=>p[0]).concat(CL_CONTESTS.map(c=>c[0]
                                        field trainers turned into rivals, and each player's place by week.
    Results count in full for 52 weeks and at half until week 78. Players move only by what the GM records; the field and the
    rivals also battle (or enter contests) every week in a simulation replayed from the seed. */
-const RK_EVENTS=[['trial','Passed a Gym Trial',5],['badge','Won a Gym badge',25],['gymloss','Lost a Gym challenge',-10],['up','Beat a higher-ranked trainer',10],['down','Beat a lower-ranked trainer',5],['loss','Lost a public battle',-5],['viral','A moment went viral',5],['scandal','Scandal or bad press',-15],['break','Won against their label',10],['other','Something else',0]];
+const RK_EVENTS=[['trial','Passed a Gym Trial',5],['badge','Won a Gym badge',25],['solo','Won a Gym badge solo',30],['gymloss','Lost a Gym challenge',-10],['up','Beat a higher-ranked trainer',10],['down','Beat a lower-ranked trainer',5],['loss','Lost a public battle',-5],['viral','A moment went viral',5],['scandal','Scandal or bad press',-15],['break','Won against their label',10],['other','Something else',0]];
 const RK_TIERS=[[300,'Top 10','Headline matches, the Champion’s attention, enemies'],[200,'Top 50','Interviews, agency offers, Ace recruiters watching'],[100,'Top 150','Sponsor offers start; Halfway Cup seeding'],[50,'Ranked','A name on the board; local fans'],[-Infinity,'Unranked rookie','Nothing yet']];
 const RK_LABELS=['Aggressor','Defender','Generalist','Trickster','Specialist','Showman'];
 const RK_CURVE=[[50,300],[100,150],[200,50],[300,10],[400,1]];
@@ -483,7 +483,11 @@ function rkEngine(){
   const R=(e,w,k)=>rkHash(seed+(gymC?0:977),e.g.sid*131+k,w);
   const con=id=>CON[id]||(CON[id]={e:0,r:0,s:0,f:0,seq:[]});
   const endOfWeek=w=>{
-    (logW[w]||[]).forEach(x=>add(E[x.u],w,num(x.p)));
+    (logW[w]||[]).forEach(x=>{
+      const e=E[x.u];add(e,w,num(x.p));
+      /* a badge the GM logs for a circuit trainer (a tag partner, Update 63) counts toward their badges: the next one in order */
+      if(gymC&&(x.e==='badge'||x.e==='solo')){let gi=0;while(e.held[gi]!=null)gi++;if(gi<RK_GYMS.length)e.held[gi]=w;}
+    });
     if(gymC)(btW[w]||[]).forEach(x=>{if(x.kind==='trial')return;const aw=x.win==='a';rkRecAdd(REC,x.a,x.b,aw,x.kind,w);rkRecAdd(REC,x.b,x.a,!aw,x.kind,w);});
     if(!gymC)(logW[w]||[]).concat((log.filter(e=>!E[e.u]&&Math.max(0,num(e.wk))===w))).forEach(x=>{
       const pl={ribbon:1,second:2,final:4,early:8}[x.e];if(!pl)return;
@@ -1895,6 +1899,7 @@ function act(b,e){
   if(d.act&&d.act.indexOf('rdb_')===0){rdbAct(b);return;}
   if(d.act&&d.act.indexOf('gr_')===0){grAct(b);return;}
   if(d.act&&d.act.indexOf('gd_')===0){dashAct(b);return;}
+  if(d.act&&d.act.indexOf('bdb_')===0){bdbAct(b);return;}
   if(d.act&&d.act.indexOf('tm_')===0){tmAct(b);return;}
   if(d.act&&d.act.indexOf('br_')===0){brAct(b);return;}
   if(d.act==='zn_load'){znLoad();return;}

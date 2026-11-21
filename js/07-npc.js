@@ -381,7 +381,7 @@ function ntNew(){
 }
 /* ----- NPC packs: a JSON file of trainers with teams (format sinnoh-npc-pack). Each becomes an NPC trainer;
    one with a board and RP also joins the Gym or Contest rankings as a rival, linked to its NPC by nt.
-   Pack rows: {name, role, cat, place, level, notes, secret, board:'gym'|'con', rp, label,
+   Pack rows: {name, role, cat, place, level, notes, secret, board:'gym'|'con', rp, label, gym (a Head Gym Trainer's badge key, Update 63),
                team:[{sp, nick, mv:[move names], item, notes}]}. Species and moves are filled from the handbook data. */
 /* the Pokémon of one team in an NPC pack, filled from the handbook data */
 async function ntPackTeam(list,L,miss,cnt){
@@ -435,6 +435,9 @@ async function ntImportPack(file){
         grow.push({id:ex,st});did=true;
       }
       /* an NPC already here becomes a Quick NPC from the pack, unless the GM has already given it a rank (Update 54) */
+      /* a Head Gym Trainer already here learns their Gym (Update 63) */
+      const pg=BADGES.some(x=>x[0]===p.gym)?p.gym:'';
+      if(ex&&pg&&!NTS()[ex].gym){edit('gt',ex,'gym',pg);did=true;}
       const pq=qnFromPack(p.q),cur=ex&&NTS()[ex];
       if(pq&&cur&&!(cur.q&&cur.q.r)){
         edit('gt',ex,'q',Object.assign({},cur.q||{},pq));quick++;did=true;
@@ -453,7 +456,8 @@ async function ntImportPack(file){
     const pq=qnFromPack(p.q);if(pq)quick++;
     newDoc('gt',id,{name,role:String(p.role||''),cat,place:String(p.place||''),notes:String(p.notes||''),secret:String(p.secret||''),cls:'',adv:'',
       level:Math.max(1,Math.round(num(p.level))||1),hp:{cur:20,max:20},stats:{atk:2,def:2,spa:2,spd:2,spe:2},talents:{},features:[],items:[],megaUsed:false,team,
-      rev:{on:false,role:false,place:false,notes:false,pic:false,cls:false,stats:false,items:false},img:'',order:t0+i,createdAt:t0+i,...(pq?{q:pq}:{})});
+      rev:{on:false,role:false,place:false,notes:false,pic:false,cls:false,stats:false,items:false},img:'',order:t0+i,createdAt:t0+i,...(pq?{q:pq}:{}),
+      ...(BADGES.some(x=>x[0]===p.gym)?{gym:p.gym}:{})});
     made++;
     if(Array.isArray(p.stages)&&p.stages.length){const st=[];for(const g of p.stages)st.push({gain:num(g.gain),label:String(g.label||''),qr:qnPackRank(g.r),team:await ntPackTeam(g.team,L,miss,cnt)});grow.push({id,st});}
     const b=p.board==='con'?'con':p.board==='gym'?'gym':'';
@@ -941,7 +945,8 @@ function ntBody(id,nt){
     ${ed?edBar(ek,'Editing '+ntName(nt)):h`<div class="rdtop foe"><div class="rdtx">${rdFacts([['Role or title',nt.role],['Where you met',nt.place],['Category',ntCat(nt)?npcCatName(ntCat(nt)):''],qnOf(nt)?['Quick NPC',[qnRankName(nt.q.r),(qnCls(nt.q.cls)||{}).n,num(nt.q.sq)>=3?'squad of '+num(nt.q.sq):''].filter(Boolean).join(' ')||'not set up yet']:['Level and class',['Level '+(num(nt.level)||1),nt.cls,nt.adv].filter(Boolean).join(' · ')]])}</div>${edBtn(ek)}</div>
     <div class="mgate secret rdsee"><span class="fl">GM only · what the players see</span><p class="sub">${on?h`Shown to the table: ${ntPreview(nt)}.`:'Hidden from the table.'} Change this in Edit details.</p></div>
     ${String(nt.notes||'').trim()?h`<div class="rdsec"><span class="fl">Notes the table learns once you show them</span><p class="rdnote">${nt.notes}</p></div>`:''}
-    ${String(nt.secret||'').trim()?h`<div class="rdsec secret"><span class="fl">GM only · Secret</span><p class="rdnote">${nt.secret}</p></div>`:''}`}
+    ${String(nt.secret||'').trim()?h`<div class="rdsec secret"><span class="fl">GM only · Secret</span><p class="rdnote">${nt.secret}</p></div>`:''}
+    ${glIs(nt)?bdbPanel(id,nt):''}`}
     ${!ed?'':h`<div class="mgate secret"><span class="fl">GM only · what the players see</span>
       <label class="row"><input type="checkbox" ${bd('gt',id,'rev.on')} ${on?raw('checked'):''}><span><b>Show this NPC to the table</b></span></label>
       <div class="row evchips" role="group" aria-label="Also show">
@@ -955,6 +960,7 @@ function ntBody(id,nt){
       ${fText('Role or title','gt',id,'role',nt,{ph:'e.g. Gym Leader, Team Galactic grunt'})}
       ${fText('Where you met','gt',id,'place',nt,{list:'dl-places'})}
       ${fSel('Category','gt',id,'cat',nt,npcCatList(true),{blank:'Auto'+(ntCat(nt)?': '+npcCatName(ntCat(nt)):' (no guess yet)')})}
+      ${glIs(nt)?'':fSel('Head Gym Trainer at','gt',id,'gym',nt,RK_GYMS.map(g=>[g.k,bdbTown(g.k)+' Gym · '+rkGymName(g)]),{blank:'Not a Head Trainer'})}
       ${fArea('Notes the table learns once you show them','gt',id,'notes',nt,{rows:3,cls:'wide'})}
       ${fArea('Secret (only you see this)','gt',id,'secret',nt,{rows:3,cls:'wide'})}
     </div></div>`}
