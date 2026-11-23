@@ -1082,3 +1082,17 @@ A GM-only **GM Dashboard** page (first item under Game Master in the menu, with 
 - **Everyone sees** the judges' Voltage, every contestant's Heart Points and the round's appeals. The hidden goals stay in `gm/contest` until revealed.
 - **Awards:** after round 5 the GM sees who has earned each goal (and can overrule a count, or choose the winner of a goal they judge), then **Reveal the awards** for everyone: each judge's goals and winners, Star Points, and the winner (ties share first place). **Record ribbon and rankings** ticks the hall's ribbon in each winning player's case with a Contest Ribbon honor, and logs Won a contest ribbon and Placed second on the contest circuit rankings (for NPCs on the board too).
 - `tests/t_stage.js` checks it.
+
+## More for the contest stage (Update 67)
+
+- **Hall presets:** picking a hall at setup fills in its contest type, variations, stages, theme and twist (`js/05c-shows.js`, `CS_PRESETS`, one for each of the 16 halls; Majolica takes this month's category). **Save as this hall's preset** keeps your own version in `gm/contest`, and it is used before the built-in one.
+- **Trainer Appeal** (once per contest): tick it on one appeal and pick a skill. The check is the trainer's skill (stat modifier and talent; an NPC uses the check bonus set at setup) against the **Trainer Appeal target** (15 by default). A success adds 2d4 Heart Points to that appeal; beating the target by 5 or more adds 4d4. An Electrified judge doesn't double these.
+- **Rival Showcase:** pair contestants at setup. When a round ends, whoever in each pair earned more Heart Points that round gets 2d4 more, counted for the judge they appealed to (a tie gets nothing). The bonus is its own line in the log and is not an appeal for the judges' goals.
+- **Audience Participation:** a crowd meter everyone sees, 0 to 10, with a favourite contest type. An appeal of that type fills it by 2, a raised Voltage by 1, Electrifying a judge by 2, a Trainer Appeal that lands by 1 and creativity by 1; a repeated move only takes 1 away. The appeal that fills it earns 3d4 and the meter empties.
+- **Before the appeals,** in this order: the Poffin Cook-Off (Chocovine), the Super Contest's **Visual** and **Dance** stages, then any extra stages. The GM rolls each stage, typing a player's d20 when they roll one.
+  - **Visual:** a check (Perform unless you pick another skill) + the Pokémon's contest stat in the contest type + 2 for fitting the theme; every 5 points is 1d4 Heart Points.
+  - **Dance:** four beats, the lead turning through the contestants. Each beat everyone rolls: a dancer who matches or beats the lead gets 1d4, and the lead gets 1d4 for each dancer who misses.
+  - Cook-Off, Visual and Dance Heart Points count toward every judge's Heart Point goals.
+  - **Extra stages** (Fashion Show, Pokéathlon, PokéStar Heroes, Talent Show, Dummy round, Tasting round): one roll each, and the top contestant earns a Star Point. The Dummy round is one damaging move each at a stage dummy.
+- **Hall twists:** Celestic (composure: a move whose contest type clashes with the judge's favourite loses 1d4), Chocovine (the Cook-Off the night before), Daybreak (final-round appeals get +1d4).
+- `tests/t_shows.js` checks it.

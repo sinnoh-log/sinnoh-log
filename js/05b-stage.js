@@ -116,8 +116,11 @@ function csWork(C,eid,ap){
     if(v1>v0)parts.push({n:v1,why:'High Voltage: the judge rose to '+v1});
     if(J.el)parts.push({n:5,why:'High Voltage: the judge is Electrified'});
   }
+  /* hall twists (Update 67) */
+  if(C.tw&&C.tw.dawn&&R===5&&!c.zero)parts.push({n:1,why:'first light'});
+  const pen=!!(C.tw&&C.tw.celestic&&rel==='x'&&!c.zero);
   const dice=parts.reduce((a,p)=>a+p.n,0);
-  return {E,J,j,dbl,m0,m1,mA,mK,type,kw,ctype,c,parts,dice,stat,stLeft,v0,v1,reach,zero:c.zero,x2:!hv&&c.x2,used,hv};
+  return {E,J,j,dbl,m0,m1,mA,mK,type,kw,ctype,c,parts,dice,stat,stLeft,v0,v1,reach,zero:c.zero,x2:!hv&&c.x2,used,hv,pen};
 }
 const csPartsTxt=w=>w.parts.length?w.parts.map(p=>p.n+'d4 '+p.why).join(' + '):'no dice';
 /* the GM scores an appeal: rolls (or takes the typed total), and writes the result for everyone */
@@ -135,7 +138,14 @@ function csApply(eid,ap,by){
   const rolled=[];
   if(!typed)for(let i=0;i<w.dice;i++)rolled.push(rnd(4));
   const sum=typed?clamp(t,w.dice,w.dice*4):rolled.reduce((a,b)=>a+b,0);
-  const sub=sum+w.stat,total=w.zero?0:(w.x2?sub*2:sub);
+  const sub=sum+w.stat;
+  let total=w.zero?0:(w.x2?sub*2:sub);
+  const pen=w.pen?rnd(4):0;
+  total=Math.max(0,total-pen);
+  const ta=C.var&&C.var.ta&&ap.ta&&!w.E.ta?csTaRoll(C,eid,ap.tsk||'perform',ap.td):null;
+  if(ta)total+=ta.hp;
+  const cr=csCrowdAfter(C,w.zero?-1:(C.cfav&&w.type===C.cfav?2:0)+(w.v1>w.v0?1:0)+(w.reach?2:0)+(ta&&ta.hp?1:0));/* a repeated move only costs the crowd */
+  total+=cr.pay;
   const judges=(C.judges||[]).map((J,k)=>{
     const o=Object.assign({},J);
     if(k===w.j)o.v=w.v1;
@@ -146,13 +156,17 @@ function csApply(eid,ap,by){
     if(k===w.j&&w.kw==='Hold That Thought')o.hold=true;
     return o;
   });
-  const E=Object.assign({},w.E,{hp:num(w.E.hp)+total,lastMv:w.used});
+  const E=Object.assign({},w.E,{hp:num(w.E.hp)+total,lastMv:w.used},ta?{ta:1}:{});
   if(w.stat){E.spent=Object.assign({},E.spent||{});E.spent[w.type]=num(E.spent[w.type])+w.stat;}
   const ready=Object.assign({},C.ready||{});
   if(w.kw==='Get Ready!')ready[eid]=1;else delete ready[eid];
   const bts=[w.m0.bt].concat(w.m1?[w.m1.bt]:[]).filter(Boolean);
   const entry={r:num(C.round),e:eid,n:E.name,mon:[csMonName(E,0)].concat(w.dbl?[csMonName(E,1)]:[]).join(' & '),mv:w.used.join(' + '),t:w.type,bt:bts,kw:w.kw,j:w.j,
     dice:w.dice,rolled,sum,stat:w.stat,x2:w.x2?1:0,tot:total,v0:w.v0,v1:w.v1,rs:w.reach?1:0,zero:w.zero?1:0,rd:typed?1:0,by:by||'gm',at:Date.now()};
+  if(pen)entry.pen=pen;
+  if(ta)entry.ta=ta;
+  if(cr.pay){entry.cr=cr.pay;entry.crr=cr.rolled;}
+  if(C.var&&C.var.ap)edit('cs','contest','crowd',cr.crowd);
   const done=(C.done||[]).concat([eid]);
   const next=(C.order||[]).find(x=>done.indexOf(x)<0)||'';
   edit('cs','contest','judges',judges);
@@ -213,21 +227,21 @@ function csScores(C,G){
       const sc={};ents.forEach(e=>{sc[e]=0;});
       const mine=e=>log.filter(x=>x.e===e&&(!CS_JUDGED.has(g.k)||num(x.j)===j));
       ents.forEach(e=>{
-        const L=mine(e);
+        const L=mine(e),A=L.filter(x=>!x.k);   /* A: the appeals themselves; L also has Rival Showcase bonuses */
         switch(g.k){
-          case 'hp':sc[e]=L.reduce((a,x)=>a+num(x.tot),0);break;
-          case 'ct':sc[e]=L.filter(x=>x.t===g.t).reduce((a,x)=>a+num(x.tot),0);break;
-          case 'ty':sc[e]=L.filter(x=>(x.bt||[]).indexOf(g.t)>=0).reduce((a,x)=>a+num(x.tot),0);break;
-          case 'one':sc[e]=L.reduce((a,x)=>Math.max(a,num(x.tot)),0);break;
-          case 'cnt':sc[e]=L.length;break;
-          case 'up':sc[e]=L.filter(x=>num(x.v1)>num(x.v0)).length;break;
+          case 'hp':sc[e]=L.reduce((a,x)=>a+num(x.tot),0)+num(C.ents[e].sh);break;
+          case 'ct':sc[e]=A.filter(x=>x.t===g.t).reduce((a,x)=>a+num(x.tot),0);break;
+          case 'ty':sc[e]=A.filter(x=>(x.bt||[]).indexOf(g.t)>=0).reduce((a,x)=>a+num(x.tot),0);break;
+          case 'one':sc[e]=A.reduce((a,x)=>Math.max(a,num(x.tot)),0);break;
+          case 'cnt':sc[e]=A.length;break;
+          case 'up':sc[e]=A.filter(x=>num(x.v1)>num(x.v0)).length;break;
           case 'fin':sc[e]=L.filter(x=>num(x.r)===5).reduce((a,x)=>a+num(x.tot),0);break;
-          case 'var':sc[e]=new Set(L.map(x=>x.mv)).size;break;
+          case 'var':sc[e]=new Set(A.map(x=>x.mv)).size;break;
           case 'stat':{const E=C.ents[e];sc[e]=E.k==='pc'?Math.max(0,...(E.mons||[]).map(mo=>{const m=getLocal('p',E.u+'/'+mo.pid);return m?num(ctStatsOf(m)[g.t]):0;})):0;break;}
           default:break;
         }
       });
-      if(g.k==='el'){const f=log.find(x=>x.rs&&num(x.j)===j);if(f)sc[f.e]=1;}
+      if(g.k==='el'){const f=log.find(x=>!x.k&&x.rs&&num(x.j)===j);if(f)sc[f.e]=1;}
       const ov=(G.ov||{})[j+'-'+gi];
       let win=[];
       if(ov==='none')win=[];
@@ -238,8 +252,11 @@ function csScores(C,G){
   });
   const stars={};ents.forEach(e=>{stars[e]=0;});
   out.forEach(J=>J.goals.forEach(x=>x.win.forEach(e=>{stars[e]++;})));
+  /* an extra stage's winner earns a Star Point (Update 67) */
+  const X=(C.pre||[]).filter(k=>k.indexOf('x:')===0&&(C.pr||{})[k]&&C.pr[k].done).map(k=>({n:csPreName(k),win:(C.pr[k].win||[]).filter(e=>stars[e]!=null)}));
+  X.forEach(x=>x.win.forEach(e=>{stars[e]++;}));
   const rank=ents.slice().sort((a,z)=>stars[z]-stars[a]||num(C.ents[z].hp)-num(C.ents[a].hp));
-  return {J:out,stars,rank};
+  return {J:out,X,stars,rank};
 }
 function csPlaces(C,aw){
   const r=aw.rank||[],st=aw.stars||{};
@@ -253,7 +270,7 @@ function csPlaces(C,aw){
 function csReveal(){
   if(!S.me.admin)return;
   const C=CSC(),A=csScores(C,CSG());
-  edit('cs','contest','aw',{J:A.J.map(J=>({n:J.n,goals:J.goals.map(x=>({txt:x.txt,win:x.win}))})),stars:A.stars,rank:A.rank});
+  edit('cs','contest','aw',{J:A.J.map(J=>({n:J.n,goals:J.goals.map(x=>({txt:x.txt,win:x.win}))})),X:A.X,stars:A.stars,rank:A.rank});
   edit('cs','contest','stage','awards');
   edit('cs','contest','cur','');
   render();
@@ -291,9 +308,11 @@ function csRecord(){
 function csDraft(){
   if(S.ui.cs)return S.ui.cs;
   const halls=ribHalls();
-  S.ui.cs={hall:halls[0]?halls[0].k:'',type:'Beauty',var:{dbl:false,sup:false,fest:false,hv:false},
+  S.ui.cs={hall:halls[0]?halls[0].k:'',type:'Beauty',var:{dbl:false,sup:false,fest:false,hv:false,ta:false,rs:false,ap:false,vis:false,dan:false},xs:{},tw:{},tdc:15,theme:'',note:'',
+    sk:{vis:'perform',dan:'perform',cook:'nature',fashion:'perform',athlon:'athletics',heroes:'perform',talent:'sleight',tasting:'nature'},pairs:{},
     judges:CS_JUDGES.map(n=>({n,goals:[]})),pcs:{},npcs:[],nn:'',nsp:'',nnt:''};
-  S.ui.cs.judges.forEach((J,j)=>csRollGoals(J,'Beauty',j===0));
+  csApplyPreset(S.ui.cs,S.ui.cs.hall);
+  S.ui.cs.judges.forEach((J,j)=>csRollGoals(J,S.ui.cs.type,j===0));
   return S.ui.cs;
 }
 /* the announced type decides one Star Point, so only the first judge's first goal is fixed to it */
@@ -308,8 +327,8 @@ async function csNpcMons(D){
   const dbl=!!D.var.dbl,out=[];
   if(D.nnt&&NTS()[D.nnt]){
     const nt=NTS()[D.nnt];
-    ntTeam(nt).slice(0,dbl?2:1).forEach(m=>out.push({sp:m.sp,name:m.nick||m.sp,mv:(m.mv||[]).map(x=>({n:x.name,t:x.type||''})).filter(x=>x.n)}));
-    return {name:ntName(nt),nt:D.nnt,mons:out,spd:num(((ntTeam(nt)[0]||{}).base||{}).spe)};
+    ntTeam(nt).slice(0,dbl?2:1).forEach(m=>out.push({sp:m.sp,name:m.nick||m.sp,ty:(m.ty||[]).filter(Boolean),mv:(m.mv||[]).map(x=>({n:x.name,t:x.type||''})).filter(x=>x.n)}));
+    return {id:'n_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),name:ntName(nt),nt:D.nnt,mons:out,spd:num(((ntTeam(nt)[0]||{}).base||{}).spe),cb:3};
   }
   const sps=String(D.nsp||'').split(/[,+&]/).map(x=>x.trim()).filter(Boolean).slice(0,dbl?2:1);
   for(const sp of sps){
@@ -317,9 +336,9 @@ async function csNpcMons(D){
     let rec=null;
     if(pr)rec=ptaRec(pr)||await ptaChunk(ptaLetter(ptaKey(pr))).then(()=>ptaRec(pr));
     const base=foeFromRec(rec,rec?null:speciesInfo(sp),sp);
-    out.push({sp:base.sp||sp,name:base.sp||sp,mv:(base.mv||[]).map(x=>({n:x.name,t:x.type||''})).filter(x=>x.n)});
+    out.push({sp:base.sp||sp,name:base.sp||sp,ty:(base.ty||[]).filter(Boolean),mv:(base.mv||[]).map(x=>({n:x.name,t:x.type||''})).filter(x=>x.n)});
   }
-  return {name:String(D.nn||'').trim()||'Coordinator',nt:'',mons:out,spd:0};
+  return {id:'n_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),name:String(D.nn||'').trim()||'Coordinator',nt:'',mons:out,spd:0,cb:3};
 }
 function csOpen(){
   if(!S.me.admin)return;
@@ -332,13 +351,18 @@ function csOpen(){
     if(!mons.length||(dbl&&mons.length<2))return;
     const e='p_'+uid;ents[e]={k:'pc',u:uid,name:tName(S.trainers[uid]),mons,hp:0,spent:{},lastMv:[]};eord.push(e);
   });
-  D.npcs.forEach((n,i)=>{const e='n_'+i+'_'+Date.now().toString(36);ents[e]=Object.assign({k:'npc',hp:0,spent:{},lastMv:[]},n);eord.push(e);});
+  D.npcs.forEach((n,i)=>{const e=n.id||('n_'+i+'_'+Date.now().toString(36));ents[e]=Object.assign({k:'npc',hp:0,sh:0,spent:{},lastMv:[]},n);eord.push(e);});
   if(eord.length<2){toast('A contest needs at least two contestants'+(dbl?' with two Pokémon each':'')+'.');return;}
   const hall=ribHalls().find(x=>x.k===D.hall);
   const hv=!!D.var.hv;
-  const C={v:1,on:true,id:'c'+Date.now().toString(36),hall:D.hall,name:hall?hall.n+' Contest':'Contest',type:D.var.sup?'':D.type,var:Object.assign({},D.var),
+  const pairs=[],seen=new Set();
+  if(D.var.rs)Object.keys(D.pairs||{}).forEach(a=>{const z=D.pairs[a];if(!z||!ents[a]||!ents[z]||seen.has(a)||seen.has(z))return;seen.add(a);seen.add(z);pairs.push([a,z]);});
+  const vr={};CS_VARK.forEach(k=>{vr[k]=!!D.var[k];});
+  const C={v:2,on:true,id:'c'+Date.now().toString(36),hall:D.hall,name:hall?hall.n+' Contest':'Contest',type:D.var.sup?'':D.type,var:vr,
     stage:'intro',round:0,rt:'',judges:D.judges.map(J=>({n:String(J.n||'Judge').trim()||'Judge',fav:D.type,v:hv?1:0,el:false,hold:false,exc:false})),
-    ents,eord,order:[],done:[],cur:'',log:[],ready:{},scr:0,gl:{},aw:null,rec:0,at:Date.now()};
+    ents,eord,order:[],done:[],cur:'',log:[],ready:{},scr:0,gl:{},aw:null,rec:0,at:Date.now(),
+    pre:csPreList(D),pi:0,pr:{},sk:Object.assign({},D.sk),theme:String(D.theme||''),tdc:clamp(Math.round(num(D.tdc))||15,5,40),tw:Object.assign({},D.tw),
+    pairs,rsd:{},crowd:0,cfav:vr.ap?csRnd(CT_TYPES):''};
   Object.keys(C).forEach(k=>edit('cs','contest',k,C[k]));
   edit('cg','contest','goals',D.judges.map(J=>J.goals.map(g=>({k:g.k,t:g.t||'',x:g.x||''}))));
   edit('cg','contest','ov',{});
@@ -370,7 +394,8 @@ function csBoardHtml(C,gm){
   const ents=csEnts(),mx=Math.max(1,...ents.map(e=>num(C.ents[e].hp)));
   const sorted=ents.slice().sort((a,z)=>num(C.ents[z].hp)-num(C.ents[a].hp));
   return h`<ol class="score">${sorted.map((e,i)=>{const E=C.ents[e],now=C.cur===e,done=(C.done||[]).indexOf(e)>=0;
-    return h`<li class="${now?'now':''}"><span class="bn">${i+1}</span><div><b>${E.name}</b> <span class="sub">${[0,1].map(k=>csMonName(E,k)).filter(Boolean).join(' & ')}</span>${now?h` <span class="pill good">Appealing</span>`:done&&C.stage==='appeal'?h` <span class="pill">Done</span>`:''}
+    const pr=(C.pairs||[]).find(p=>p.indexOf(e)>=0),riv=pr?C.ents[pr[0]===e?pr[1]:pr[0]]:null;
+    return h`<li class="${now?'now':''}"><span class="bn">${i+1}</span><div><b>${E.name}</b> <span class="sub">${[0,1].map(k=>csMonName(E,k)).filter(Boolean).join(' & ')}${riv?' · vs '+riv.name:''}</span>${C.var&&C.var.ta&&E.ta?h` <span class="pill">Trainer Appeal used</span>`:''}${now?h` <span class="pill good">Appealing</span>`:done&&C.stage==='appeal'?h` <span class="pill">Done</span>`:''}
       ${gm&&C.stage==='appeal'&&!now&&!done?h` <button class="btn sm ghost" data-act="cs_now" data-e="${e}">Goes now</button>`:''}
       ${gm&&C.stage==='intro'?h` <button class="btn sm ghost" data-act="cs_bonus" data-e="${e}" title="Add 1d4 Heart Points for the introduction">+1d4 intro</button>`:''}
       <span class="heartbar" style="${raw('width:'+Math.round(num(E.hp)/mx*100)+'%')}"></span></div><span class="hearts">♥ ${num(E.hp)}</span></li>`;})}</ol>`;
@@ -378,7 +403,7 @@ function csBoardHtml(C,gm){
 function csLogHtml(C,all){
   const R=num(C.round),rows=(C.log||[]).filter(x=>all||num(x.r)===R);
   if(!rows.length)return h`<p class="sub">No appeals yet${all?'':' this round'}.</p>`;
-  return h`<ul class="applog">${rows.slice().reverse().map(x=>h`<li><b>${x.n}</b> · ${x.mon} · ${x.mv} (${x.t}, ${x.kw}) → ${((C.judges||[])[num(x.j)]||{}).n||'a judge'}: ${x.zero?'repeated move, no Heart Points':(num(x.dice)?x.dice+'d4 '+(x.rd?'typed '+x.sum:'['+(x.rolled||[]).join(', ')+']'):'no dice')+(num(x.stat)?' + '+x.stat+' stat':'')+(x.x2?' × 2':'')+' = '+x.tot+' ♥'}${num(x.cb)?' (+'+x.cb+' creativity)':''} · Voltage ${x.v0} → ${x.v1}${x.rs?' · Electrified!':''}${x.rd?h` <span class="pill rdp">real dice</span>`:''}</li>`)}</ul>`;
+  return h`<ul class="applog">${rows.slice().reverse().map(x=>x.k==='rs'?h`<li><b>${x.n}</b> · Rival Showcase: beat ${x.vs} this round, 2d4 [${(x.rolled||[]).join(', ')}] = +${x.tot} ♥</li>`:h`<li><b>${x.n}</b> · ${x.mon} · ${x.mv} (${x.t}, ${x.kw}) → ${((C.judges||[])[num(x.j)]||{}).n||'a judge'}: ${x.zero?'repeated move, no Heart Points':(num(x.dice)?x.dice+'d4 '+(x.rd?'typed '+x.sum:'['+(x.rolled||[]).join(', ')+']'):'no dice')+(num(x.stat)?' + '+x.stat+' stat':'')+(x.x2?' × 2':'')+' = '+x.tot+' ♥'}${num(x.cb)?' (+'+x.cb+' creativity)':''}${x.pen?' (−'+x.pen+' composure)':''}${x.ta?' · Trainer Appeal: '+csSkName(x.ta.sk)+' '+x.ta.t+' vs '+x.ta.dc+(x.ta.hp?', +'+x.ta.hp:', no Heart Points'):''}${x.cr?' · the crowd erupts: +'+x.cr:''} · Voltage ${x.v0} → ${x.v1}${x.rs?' · Electrified!':''}${x.rd?h` <span class="pill rdp">real dice</span>`:''}</li>`)}</ul>`;
 }
 /* the appeal form: for the GM (any contestant) or a player (their own, on their turn) */
 function csFormHtml(C,eid,gm){
@@ -406,6 +431,8 @@ function csFormHtml(C,eid,gm){
     ${w.err?h`<p class="sub">${w.err}</p>`:h`<div class="row">${ctChip(w.type)} <span class="pill">${w.kw}</span> <span class="sub">${{m:'matches',c:'gets along with',x:'clashes with',n:'is neutral to'}[w.c.rel]} the judge’s ${w.ctype||'type'}</span></div>
       <p class="dhint">${w.zero?'A repeated move earns no Heart Points (its effects still happen).':'Roll '+w.dice+'d4: '+csPartsTxt(w)+'.'}${w.x2?' The judge is Electrified, so the total doubles.':''}${w.stat?' Plus '+w.stat+' from the '+w.type+' stat.':''} Voltage ${w.v0} → ${w.v1}${w.reach?': Electrified!':''}.</p>
       ${w.c.notes.length&&!w.zero?h`<p class="sub">${w.c.notes.join(' ')}</p>`:''}`}
+    ${C.var&&C.var.ta&&!E.ta?csTaForm(C,eid,a):''}
+    ${!w.err&&w.pen?h`<p class="sub">Composure (Celestic): this move clashes, so it loses 1d4.</p>`:''}
     <div class="dicesw"><span class="fl">Dice</span><div class="seg" role="group" aria-label="Who rolls"><button data-act="cs_real" data-v="0" aria-pressed="${String(!a.real)}">The site rolls</button><button data-act="cs_real" data-v="1" aria-pressed="${String(!!a.real)}">I rolled real dice</button></div>
       ${a.real&&!w.err&&w.dice?h`<label class="fld csum"><span class="fl">Total of your ${w.dice}d4</span><input type="number" inputmode="numeric" min="${w.dice}" max="${w.dice*4}" data-u="csa.sum" data-nr value="${a.sum||''}"></label>`:''}</div>
     <div class="row"><button class="btn primary sm" data-act="cs_go" data-e="${eid}" ${w.err||sent?raw('disabled'):''}>${sent?'Sent: waiting for the GM’s screen':'Make the appeal'}</button>${gm&&E.k==='pc'?h`<span class="sub">${E.name} can send this from their own screen too.</span>`:''}</div>
@@ -417,10 +444,12 @@ function csSetupHtml(){
   const tog=(k,l,x)=>h`<label class="chip chkc"><input type="checkbox" data-act="cs_var" data-k="${k}" ${D.var[k]?raw('checked'):''}><span>${l}</span>${x?h` <span class="sub">${x}</span>`:''}</label>`;
   return h`<div class="ctstage">
     <div class="fgrid">
-      <label class="fld"><span class="fl">Contest hall</span><select data-u="cs.hall">${halls.map(x=>h`<option value="${x.k}" ${D.hall===x.k?raw('selected'):''}>${x.n}</option>`)}</select></label>
+      <label class="fld"><span class="fl">Contest hall</span><select data-csx="hall">${halls.map(x=>h`<option value="${x.k}" ${D.hall===x.k?raw('selected'):''}>${x.n}</option>`)}</select></label>
       <label class="fld"><span class="fl">Contest type</span><select data-u="cs.type" ${D.var.sup?raw('disabled'):''}>${CT_TYPES.map(t=>h`<option ${D.type===t?raw('selected'):''}>${t}</option>`)}</select></label>
     </div>
+    <div class="row"><span class="sub">${D.note?'Preset: '+D.note:'No preset for this hall.'}</span><button class="btn sm ghost" data-act="cs_psave">Save as this hall’s preset</button></div>
     <div class="row evchips">${tog('dbl','Double Performance','two Pokémon each')}${tog('sup','Super Contest','a random type each round')}${tog('fest','Festival','each judge a type each round')}${tog('hv','High Voltage','judges start at 1')}</div>
+    ${csSetupMore(D)}
     <h3 class="refg">Judges and their hidden goals <span class="pill gm">GM only</span></h3>
     <div class="judges">${D.judges.map((J,j)=>h`<div class="judge"><label class="fld"><span class="fl">Judge ${j+1}</span><input type="text" data-csx="jn" data-j="${j}" value="${J.n}"></label>
       ${J.goals.map((g,gi)=>{const d=csGoal(g.k);return h`<div class="cgoal"><select data-csx="gk" data-j="${j}" data-g="${gi}" aria-label="Goal ${gi+1}">${CS_GOALS.map(x=>h`<option value="${x[0]}" ${g.k===x[0]?raw('selected'):''}>${x[1].replace('{t}','…')}</option>`)}</select>
@@ -433,12 +462,12 @@ function csSetupHtml(){
       return h`<div class="brl"><label class="chip chkc"><input type="checkbox" data-act="cs_pc" data-uid="${uid}" ${p.on?raw('checked'):''}><span>${tName(S.trainers[uid])}</span></label>
         ${p.on?h`<select data-csx="pm" data-uid="${uid}" data-k="m1" aria-label="Pokémon">${[h`<option value="">Pokémon…</option>`].concat(pt.map(m=>h`<option value="${m.id}" ${p.m1===m.id?raw('selected'):''}>${mName(m)}</option>`))}</select>
         ${dbl?h`<select data-csx="pm" data-uid="${uid}" data-k="m2" aria-label="Second Pokémon">${[h`<option value="">Second Pokémon…</option>`].concat(pt.map(m=>h`<option value="${m.id}" ${p.m2===m.id?raw('selected'):''}>${mName(m)}</option>`))}</select>`:''}`:''}</div>`;})}
-      ${D.npcs.map((n,i)=>h`<div class="brl"><b>${n.name}</b><span class="sub">${n.mons.map(m=>m.name+' ('+m.mv.length+' moves)').join(' & ')}</span><button class="btn sm ghost" data-act="cs_npcdel" data-i="${i}">Remove</button></div>`)}
+      ${D.npcs.map((n,i)=>h`<div class="brl csnpc"><b>${n.name}</b><span class="sub">${n.mons.map(m=>m.name+' ('+m.mv.length+' moves)').join(' & ')}</span><label class="fld csncb"><span class="fl">Check bonus</span><input type="number" inputmode="numeric" data-csx="ncb" data-i="${i}" value="${num(n.cb)}"></label><button class="btn sm ghost" data-act="cs_npcdel" data-i="${i}">Remove</button></div>`)}
     </div>
     <div class="mgd"><b>Add an NPC coordinator</b><div class="fgrid">
       <label class="fld"><span class="fl">From an NPC sheet</span><select data-u="cs.nnt"><option value="">None (type a name)</option>${nts.map(id=>h`<option value="${id}" ${D.nnt===id?raw('selected'):''}>${ntName(NTS()[id])}</option>`)}</select></label>
       ${D.nnt?'':h`<label class="fld"><span class="fl">Name</span><input type="text" data-u="cs.nn" data-nr value="${D.nn}"></label><label class="fld"><span class="fl">Species${dbl?' (two, with a comma)':''}</span><input type="text" list="dl-species" data-u="cs.nsp" data-nr value="${D.nsp}"></label>`}</div>
-      <button class="btn sm" data-act="cs_npcadd">Add coordinator</button><span class="sub">An NPC sheet brings its first ${dbl?'two Pokémon':'Pokémon'} and their moves; a species brings its natural moves.</span></div>
+      <div class="row"><button class="btn sm" data-act="cs_npcadd">Add coordinator</button><span class="sub">An NPC sheet brings its first ${dbl?'two Pokémon':'Pokémon'} and their moves; a species brings its natural moves.</span></div></div>
     <div class="row"><button class="btn primary sm" data-act="cs_open">Open the contest</button><button class="btn sm ghost" data-act="cs_cancel">Cancel</button></div>
   </div>`;
 }
@@ -446,12 +475,12 @@ function csAwardsHtml(C,gm){
   const A=gm?csScores(C,CSG()):null,aw=C.aw;
   const ents=csEnts();
   if(gm&&C.stage==='appeal'){
-    return h`<div class="csaward">${A.J.map((J,j)=>h`<div class="judge"><b>${J.n}</b><div class="goals">${J.goals.map(x=>h`<span>★ ${x.txt} → ${x.manual?'':h`<b>${x.win.map(e=>C.ents[e].name).join(', ')||'nobody'}</b>`}
+    return h`<div class="csaward">${A.X.length?h`<div class="judge"><b>Extra stages</b><div class="goals">${A.X.map(x=>h`<span>★ ${x.n} → <b>${x.win.map(e=>C.ents[e].name).join(', ')||'nobody'}</b></span>`)}</div></div>`:''}${A.J.map((J,j)=>h`<div class="judge"><b>${J.n}</b><div class="goals">${J.goals.map(x=>h`<span>★ ${x.txt} → ${x.manual?'':h`<b>${x.win.map(e=>C.ents[e].name).join(', ')||'nobody'}</b>`}
       <select data-csx="ov" data-j="${j}" data-g="${x.gi}" aria-label="Who earns it"><option value="">${x.manual?'Choose…':'As counted'}</option><option value="none" ${(CSG().ov||{})[j+'-'+x.gi]==='none'?raw('selected'):''}>Nobody</option>${ents.map(e=>h`<option value="${e}" ${(CSG().ov||{})[j+'-'+x.gi]===e?raw('selected'):''}>${C.ents[e].name}</option>`)}</select></span>`)}</div></div>`)}</div>
       <p class="sub">The goals count only appeals made to that judge (Option B), except moves used, contest stats and the ones you judge. Pick a name to overrule the count.</p>`;
   }
   if(!aw)return '';
-  return h`<div class="csaward">${(aw.J||[]).map(J=>h`<div class="judge"><b>${J.n}</b><div class="goals">${(J.goals||[]).map(x=>h`<span>★ ${x.txt} → <b>${(x.win||[]).map(e=>(C.ents[e]||{}).name).join(', ')||'nobody'}</b></span>`)}</div></div>`)}</div>`;
+  return h`<div class="csaward">${(aw.X||[]).length?h`<div class="judge"><b>Extra stages</b><div class="goals">${aw.X.map(x=>h`<span>★ ${x.n} → <b>${(x.win||[]).map(e=>(C.ents[e]||{}).name).join(', ')||'nobody'}</b></span>`)}</div></div>`:''}${(aw.J||[]).map(J=>h`<div class="judge"><b>${J.n}</b><div class="goals">${(J.goals||[]).map(x=>h`<span>★ ${x.txt} → <b>${(x.win||[]).map(e=>(C.ents[e]||{}).name).join(', ')||'nobody'}</b></span>`)}</div></div>`)}</div>`;
 }
 /* the final standings: Star Points, then Heart Points */
 function csRankHtml(C){
@@ -469,14 +498,17 @@ function csLiveView(){
   }
   const R=num(C.round),ents=csEnts();
   const myE=!gm?ents.find(e=>C.ents[e].k==='pc'&&canEditT(C.ents[e].u)&&C.cur===e):'';
-  const stageTxt={intro:'Introductions',appeal:'Round '+R+' of 5',awards:'Awards',done:'Results recorded'}[C.stage]||'';
+  const stageTxt={intro:'Introductions',pre:csPreName(csPreKey(C)),appeal:'Round '+R+' of 5',awards:'Awards',done:'Results recorded'}[C.stage]||'';
+  const V=C.var||{},tw=C.tw||{};
   return h`<div class="ctstage">
     <div class="row sp"><div class="rounds"><span class="fl">Round</span>${[1,2,3,4,5].map(i=>h`<i class="${i<R||C.stage==='awards'||C.stage==='done'?'done':i===R&&C.stage==='appeal'?'now':''}">${i}</i>`)}</div>
-      <div class="row"><b>${C.name}</b> <span class="pill">${stageTxt}</span>${C.var&&C.var.sup?h`<span class="pill">Super Contest${C.rt?': '+C.rt:''}</span>`:C.type?ctChip(C.type):''}${C.var&&C.var.dbl?h`<span class="pill">Double Performance</span>`:''}${C.var&&C.var.fest?h`<span class="pill">Festival</span>`:''}${C.var&&C.var.hv?h`<span class="pill">High Voltage</span>`:''}</div></div>
+      <div class="row"><b>${C.name}</b> <span class="pill">${stageTxt}</span>${C.var&&C.var.sup?h`<span class="pill">Super Contest${C.rt?': '+C.rt:''}</span>`:C.type?ctChip(C.type):''}${C.var&&C.var.dbl?h`<span class="pill">Double Performance</span>`:''}${C.var&&C.var.fest?h`<span class="pill">Festival</span>`:''}${C.var&&C.var.hv?h`<span class="pill">High Voltage</span>`:''}${V.ta?h`<span class="pill">Trainer Appeal</span>`:''}${V.rs?h`<span class="pill">Rival Showcase</span>`:''}${CS_TW.filter(t=>tw[t[0]]).map(t=>h`<span class="pill" title="${t[2]}">${t[1]}</span>`)}</div></div>
+    ${csCrowdHtml(C)}
     ${csJudgesHtml(C,gm)}
     <div class="field2">
       <div class="fside"><h3>Heart Points</h3>${csBoardHtml(C,gm)}</div>
-      <div class="fside"><h3>${C.stage==='appeal'?(C.cur?'Appeal · '+(C.ents[C.cur]||{}).name:'Between appeals'):C.stage==='intro'?'Introductions':'Final standings'}</h3>
+      <div class="fside"><h3>${C.stage==='appeal'?(C.cur?'Appeal · '+(C.ents[C.cur]||{}).name:'Between appeals'):C.stage==='intro'?'Introductions':C.stage==='pre'?'Before the appeals':'Final standings'}</h3>
+        ${C.stage==='pre'||(C.stage==='intro'&&(C.pre||[]).length)?h`<ol class="cspl">${(C.pre||[]).map((k,i)=>h`<li class="${C.stage==='pre'&&i===num(C.pi)?'now':((C.pr||{})[k]||{}).done?'done':''}">${csPreName(k)}${((C.pr||{})[k]||{}).done?' ✓':''}</li>`)}<li>The appeals: five rounds</li></ol>`:''}
         ${C.stage==='appeal'&&C.cur&&(gm||myE)?csFormHtml(C,C.cur,gm):''}
         ${C.stage==='appeal'&&C.cur&&!gm&&!myE?h`<p class="sub">${(C.ents[C.cur]||{}).name} is appealing.</p>`:''}
         ${C.stage==='appeal'&&!C.cur?h`<p class="sub">${(C.done||[]).length>=ents.length?'Everyone has appealed this round.':'Waiting for the GM to call the next appeal.'}</p>`:''}
@@ -484,6 +516,7 @@ function csLiveView(){
         ${C.stage==='awards'||C.stage==='done'?csRankHtml(C):''}
       </div>
     </div>
+    ${C.stage==='pre'?csPreHtml(C,gm):''}
     ${C.stage==='awards'||C.stage==='done'?h`<div class="fside"><h3>Star Points</h3>${csAwardsHtml(C,false)}</div>`:''}
     ${C.stage==='appeal'?h`<div class="fside"><h3>This round</h3>${csLogHtml(C,false)}</div>`:''}
     ${gm?csGmBar(C):''}
@@ -495,7 +528,7 @@ function csGmBar(C){
   const R=num(C.round),all=(C.done||[]).length>=csEnts().length,last=(C.log||[]).slice(-1)[0];
   const ask=S.ui.confirm==='cs|close';
   return h`<div class="row csgm">
-    ${C.stage==='intro'?h`<button class="btn primary sm" data-act="cs_start">Start the appeals</button>`:''}
+    ${C.stage==='intro'?((C.pre||[]).length?h`<button class="btn primary sm" data-act="cs_pre">Start: ${csPreName(C.pre[0])}</button>`:h`<button class="btn primary sm" data-act="cs_start">Start the appeals</button>`):''}
     ${C.stage==='appeal'?h`${!C.cur&&!all?h`<button class="btn sm" data-act="cs_next">Next appealer</button>`:''}
       ${all?(R<5?h`<button class="btn primary sm" data-act="cs_round">Start round ${R+1}</button>`:h`<button class="btn primary sm" data-act="cs_awards">Reveal the awards</button>`):h`<button class="btn sm ghost" data-act="cs_skip">Skip ${C.cur?(C.ents[C.cur]||{}).name:'the next one'}</button>`}
       ${last&&num(last.r)===R&&num(last.cb)<2?h`<button class="btn sm ghost" data-act="cs_cre" title="The GM may add one or two d4 for a creative appeal">+1d4 creativity to ${last.n}</button>`:''}
@@ -511,7 +544,9 @@ function csAct(b){
   if(d.act==='cs_go'){
     const E=(C.ents||{})[d.e];
     if(!E)return;
-    const ap={id:C.id,r:num(C.round),e:d.e,j:num(S.ui.csa.j),m0:S.ui.csa.m0||'',m1:S.ui.csa.m1||'',tf:num(S.ui.csa.tf),any:S.ui.csa.any||'',st:num(S.ui.csa.st),sum:S.ui.csa.real?String(S.ui.csa.sum||''):'',at:Date.now()};
+    const ap={id:C.id,r:num(C.round),e:d.e,j:num(S.ui.csa.j),m0:S.ui.csa.m0||'',m1:S.ui.csa.m1||'',tf:num(S.ui.csa.tf),any:S.ui.csa.any||'',st:num(S.ui.csa.st),sum:S.ui.csa.real?String(S.ui.csa.sum||''):'',
+      ta:!!S.ui.csa.ta,tsk:S.ui.csa.tsk||'perform',td:S.ui.csa.real?String(S.ui.csa.td||''):'',at:Date.now()};
+    if(ap.ta&&S.ui.csa.real&&rdNum(ap.td,1,20)==null){toast('Type the d20 for the Trainer Appeal (1 to 20).');return;}
     const w=csWork(C,d.e,ap);
     if(w.err){toast(w.err);return;}
     if(S.ui.csa.real&&w.dice&&rdNum(ap.sum,w.dice,w.dice*4)==null){toast('Type the total of your '+w.dice+'d4 ('+w.dice+' to '+(w.dice*4)+').');return;}
@@ -532,19 +567,30 @@ function csAct(b){
     case 'cs_npcadd':if(D){
       if(!D.nnt&&!String(D.nsp||'').trim()){toast('Choose an NPC sheet, or type a name and species.');break;}
       csNpcMons(D).then(n=>{if(!n.mons.length){toast('No Pokémon found for that coordinator.');return;}if(D.var.dbl&&n.mons.length<2){toast('Double Performance needs two Pokémon.');return;}D.npcs.push(n);D.nn='';D.nsp='';D.nnt='';render();});break;}
-    case 'cs_npcdel':if(D){D.npcs.splice(num(d.i),1);render();}break;
+    case 'cs_npcdel':if(D){const gone=(D.npcs[num(d.i)]||{}).id;D.npcs.splice(num(d.i),1);Object.keys(D.pairs).forEach(k=>{if(k===gone||D.pairs[k]===gone)delete D.pairs[k];});render();}break;
     case 'cs_open':csOpen();break;
     case 'cs_rev':{const g=((CSG().goals||[])[num(d.j)]||[])[num(d.g)];if(!g)break;const by=S.ui.csrb||'';edit('cs','contest','gl',Object.assign({},C.gl||{},{[d.j+'-'+d.g]:{t:csGoalTxt(g),by}}));render();break;}
     case 'cs_bonus':{const E=C.ents[d.e];if(!E)break;const r=rnd(4);edit('cs','contest','ents',Object.assign({},C.ents,{[d.e]:Object.assign({},E,{hp:num(E.hp)+r,ihp:num(E.ihp)+r})}));toast(E.name+': +'+r+' Heart Points for the introduction.',true);render();break;}
     case 'cs_start':csStartRound(1);edit('cs','contest','stage','appeal');render();break;
-    case 'cs_round':csStartRound(num(C.round)+1);render();break;
+    case 'cs_pre':edit('cs','contest','stage','pre');edit('cs','contest','pi',0);S.ui.csp={d:{},th:{},mv:{},dm:{},k:''};render();break;
+    case 'cs_pscore':csPreScore();break;
+    case 'cs_beat':csDanceBeat();break;
+    case 'cs_dscore':csDanceScore();break;
+    case 'cs_pnext':csPreNext();break;
+    case 'cs_pth':S.ui.csp.th[d.e]=!!b.checked;break;
+    case 'cs_xs':if(D){D.xs[d.k]=!!b.checked;render();}break;
+    case 'cs_tw':if(D){D.tw[d.k]=!!b.checked;render();}break;
+    case 'cs_psave':if(D){csSavePreset(D);D.note='Saved for this hall (your preset).';toast('Saved as the '+((ribHalls().find(x=>x.k===D.hall)||{}).n||'hall')+' preset.',true);render();}break;
+    case 'cs_round':csRivalBonus(num(C.round));csStartRound(num(C.round)+1);render();break;
     case 'cs_next':{const nx=(C.order||[]).find(x=>(C.done||[]).indexOf(x)<0)||'';edit('cs','contest','cur',nx);render();break;}
     case 'cs_now':edit('cs','contest','cur',d.e);S.ui.csa={};render();break;
     case 'cs_skip':{if(!C.cur)break;const done=(C.done||[]).concat([C.cur]);edit('cs','contest','done',done);edit('cs','contest','cur',(C.order||[]).find(x=>done.indexOf(x)<0)||'');render();break;}
     case 'cs_cre':{const lg=(C.log||[]).slice(),x=lg[lg.length-1];if(!x)break;const r=rnd(4),add=x.x2?r*2:r;lg[lg.length-1]=Object.assign({},x,{cb:num(x.cb)+1,tot:num(x.tot)+add});const E=C.ents[x.e];
-      edit('cs','contest','log',lg);if(E)edit('cs','contest','ents',Object.assign({},C.ents,{[x.e]:Object.assign({},E,{hp:num(E.hp)+add})}));toast(x.n+': +'+add+' Heart Points for creativity.',true);render();break;}
-    case 'cs_undo':{const prev=S.csUndo.pop();if(!prev)break;['judges','ents','ready','scr','log','done','cur'].forEach(k=>edit('cs','contest',k,prev[k]!=null?prev[k]:(k==='cur'?'':k==='scr'?0:k==='ready'?{}:[])));toast('The last appeal was undone.',true);render();break;}
-    case 'cs_awards':csReveal();break;
+      /* creativity also lifts the crowd */
+      const cr=csCrowdAfter(C,1);if(cr.pay){lg[lg.length-1].cr=num(x.cr)+cr.pay;lg[lg.length-1].tot+=cr.pay;}if(C.var&&C.var.ap)edit('cs','contest','crowd',cr.crowd);
+      edit('cs','contest','log',lg);if(E)edit('cs','contest','ents',Object.assign({},C.ents,{[x.e]:Object.assign({},E,{hp:num(E.hp)+add+cr.pay})}));toast(x.n+': +'+add+' Heart Points for creativity'+(cr.pay?', and the crowd erupts: +'+cr.pay:'')+'.',true);render();break;}
+    case 'cs_undo':{const prev=S.csUndo.pop();if(!prev)break;['judges','ents','ready','scr','log','done','cur','crowd'].forEach(k=>edit('cs','contest',k,prev[k]!=null?prev[k]:(k==='cur'?'':k==='scr'||k==='crowd'?0:k==='ready'?{}:[])));toast('The last appeal was undone.',true);render();break;}
+    case 'cs_awards':csRivalBonus(num(C.round));csReveal();break;
     case 'cs_rec':csRecord();break;
     case 'cs_close':if(S.ui.confirm!=='cs|close'){S.ui.confirm='cs|close';render();break;}S.ui.confirm='';csClose();break;
   }
@@ -560,6 +606,25 @@ function csInput(t){
     case 'gt':if(D)D.judges[num(d.j)].goals[num(d.g)].t=t.value;break;
     case 'pm':if(D&&D.pcs[d.uid])D.pcs[d.uid][d.k]=t.value;break;
     case 'ov':edit('cg','contest','ov',Object.assign({},CSG().ov||{},{[d.j+'-'+d.g]:t.value}));break;
+    case 'hall':if(D){D.hall=t.value;if(!csApplyPreset(D,D.hall))D.note='';}break;
+    case 'tdc':if(D)D.tdc=t.value;return;
+    case 'theme':if(D)D.theme=t.value;return;
+    case 'dsk':if(D)D.sk[d.k]=t.value;break;
+    case 'ncb':if(D&&D.npcs[num(d.i)])D.npcs[num(d.i)].cb=Math.round(num(t.value));return;
+    case 'pair':if(D){const e=d.e,old=D.pairs[e];if(old&&D.pairs[old]===e)delete D.pairs[old];delete D.pairs[e];
+      if(t.value){const o=t.value,oo=D.pairs[o];if(oo)delete D.pairs[oo];D.pairs[e]=o;D.pairs[o]=e;}}break;
+    case 'psk':{const C=CSC(),k=String(d.k||''),key=k.indexOf('x:')===0?k.slice(2):k;edit('cs','contest','sk',Object.assign({},C.sk||{},{[key]:t.value}));break;}
+    case 'pd':S.ui.csp.d[d.e]=t.value;return;
+    case 'pdm':S.ui.csp.dm[d.e]=t.value;return;
+    case 'pmv':S.ui.csp.mv[d.e]=t.value;break;
   }
   render();
+}
+/* the Trainer Appeal box on the appeal form (Update 67): once per contest */
+function csTaForm(C,eid,a){
+  const sk=a.tsk||'perform',b=csChkBonus(C,eid,sk),dc=num(C.tdc)||15;
+  return h`<div class="csta"><label class="chip chkc"><input type="checkbox" data-u="csa.ta" ${a.ta?raw('checked'):''}><span>Add a Trainer Appeal</span> <span class="sub">once per contest</span></label>
+    ${a.ta?h`<label class="fld"><span class="fl">Skill</span><select data-u="csa.tsk">${SKILLS.map(s=>h`<option value="${s[0]}" ${s[0]===sk?raw('selected'):''}>${s[1]}</option>`)}</select></label>
+      ${a.real?h`<label class="fld csum"><span class="fl">Trainer’s d20</span><input type="number" inputmode="numeric" min="1" max="20" data-u="csa.td" data-nr value="${a.td||''}"></label>`:''}
+      <span class="sub">d20 ${sgn(b)} vs ${dc}: success 2d4 on this appeal, ${dc+5} or more 4d4.</span>`:''}</div>`;
 }

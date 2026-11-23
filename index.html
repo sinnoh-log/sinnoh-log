@@ -778,6 +778,30 @@ input[type=search]{appearance:none}
 .csaward{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px}
 .csum{max-width:200px}
 .csgm{flex-wrap:wrap;gap:8px}
+/* more for the contest stage (Update 67) */
+.crowd{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.cmeter{display:inline-flex;gap:3px}
+.cmeter i{width:14px;height:12px;border-radius:3px;background:var(--line-soft);display:block}
+.cmeter i.on{background:#d64575}
+.cspl{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:2px;font:600 13px var(--f-body)}
+.cspl li.now{color:var(--accent)}
+.cspl li.done{opacity:.7}
+.cspreb{gap:8px}
+.cspre{display:flex;flex-direction:column;gap:8px}
+.csd{width:84px;text-align:center}
+.cssk{max-width:240px}
+.csncb{max-width:110px}
+.csta{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;border-left:4px solid var(--gold);padding:4px 10px}
+.cstab{border-collapse:collapse;width:100%;font:13px var(--f-body)}
+.cstab th,.cstab td{border-bottom:1px solid var(--line-soft);padding:5px 6px;text-align:center}
+.cstab th:first-child,.cstab td:first-child{text-align:left}
+.cstab td.lead{font-weight:800;background:color-mix(in srgb,var(--gold) 22%,transparent)}
+.cstab td.hit{color:var(--good)}
+.cstab td.miss{opacity:.6}
+.cspreb{overflow-x:auto}
+.ctstage .brl select{width:auto;min-width:170px;max-width:100%}
+.ctstage .brl .fld{margin:0}
+.ctstage .csnpc b{min-width:130px}.ctstage .csnpc .sub{min-width:150px}
 /* badge battles (Update 63) */
 .bdb{display:flex;flex-direction:column;gap:8px;border:2px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0;background:var(--raised)}
 .bdb > .row{flex-wrap:wrap}
@@ -1681,22 +1705,23 @@ input,select,textarea{border-radius:9px}
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
 <!-- The app, in load order. These files share one scope; keep the order. -->
-<script src="js/01-core.js?v=2026-11-23-stage"></script>
-<script src="js/02-species.js?v=2026-11-23-stage"></script>
-<script src="js/03-rolls.js?v=2026-11-23-stage"></script>
-<script src="js/04-battle.js?v=2026-11-23-stage"></script>
-<script src="js/04b-battle-helper.js?v=2026-11-23-stage"></script>
-<script src="js/04c-format.js?v=2026-11-23-stage"></script>
-<script src="js/05-pokedex-contests.js?v=2026-11-23-stage"></script>
-<script src="js/05b-stage.js?v=2026-11-23-stage"></script>
-<script src="js/06-world.js?v=2026-11-23-stage"></script>
-<script src="js/07-npc.js?v=2026-11-23-stage"></script>
-<script src="js/07b-quick-npc.js?v=2026-11-23-stage"></script>
-<script src="js/08-battlemap.js?v=2026-11-23-stage"></script>
-<script src="js/09-sheets.js?v=2026-11-23-stage"></script>
-<script src="js/09b-road.js?v=2026-11-23-stage"></script>
-<script src="js/09c-growth.js?v=2026-11-23-stage"></script>
-<script src="js/09d-dash.js?v=2026-11-23-stage"></script>
-<script src="js/09e-badge.js?v=2026-11-23-stage"></script>
-<script src="js/10-calendar-main.js?v=2026-11-23-stage"></script>
+<script src="js/01-core.js?v=2026-11-23-shows"></script>
+<script src="js/02-species.js?v=2026-11-23-shows"></script>
+<script src="js/03-rolls.js?v=2026-11-23-shows"></script>
+<script src="js/04-battle.js?v=2026-11-23-shows"></script>
+<script src="js/04b-battle-helper.js?v=2026-11-23-shows"></script>
+<script src="js/04c-format.js?v=2026-11-23-shows"></script>
+<script src="js/05-pokedex-contests.js?v=2026-11-23-shows"></script>
+<script src="js/05b-stage.js?v=2026-11-23-shows"></script>
+<script src="js/05c-shows.js?v=2026-11-23-shows"></script>
+<script src="js/06-world.js?v=2026-11-23-shows"></script>
+<script src="js/07-npc.js?v=2026-11-23-shows"></script>
+<script src="js/07b-quick-npc.js?v=2026-11-23-shows"></script>
+<script src="js/08-battlemap.js?v=2026-11-23-shows"></script>
+<script src="js/09-sheets.js?v=2026-11-23-shows"></script>
+<script src="js/09b-road.js?v=2026-11-23-shows"></script>
+<script src="js/09c-growth.js?v=2026-11-23-shows"></script>
+<script src="js/09d-dash.js?v=2026-11-23-shows"></script>
+<script src="js/09e-badge.js?v=2026-11-23-shows"></script>
+<script src="js/10-calendar-main.js?v=2026-11-23-shows"></script>
 </body></html>
