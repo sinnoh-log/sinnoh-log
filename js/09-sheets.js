@@ -177,7 +177,13 @@ function vitalsPanel(uid,t,ro){
       <span class="sm"><span>mod ${sgn(m)}</span>${ro?'':h`<button class="rollbtn" data-act="roll" data-label="${full} check" data-bonus="${m}" data-tal="0">d20</button>`}</span></div>`;
   });
   return h`<section class="panel"><div class="ph"><h2>Stats</h2><span class="sub">Modifier is half the stat, rounded down. Stats cap at 10.</span></div>
+    ${ro?'':rdChk()}
     <div class="stats">${hpTile('t',uid,t.hp,ro)}${tiles}</div></section>`;
+}
+/* typed dice for checks (Update 65): one switch and one box, shared by the stat and skill buttons */
+function rdChk(){
+  const on=!!S.ui.rd.chk;
+  return h`<div class="rdchk">${rdSwitch('chk','Checks')}${on?h`<label class="fld"><span class="fl">d20 you rolled (on a 20, roll again and type the sum)</span><input type="number" inputmode="numeric" min="1" max="40" data-u="rd.cv" data-nr value="${S.ui.rd.cv||''}"></label><span class="sub">Type it, then tap the check’s Roll or d20 button. The site adds the modifier and talent.</span>`:''}</div>`;
 }
 function skillsPanel(uid,t,ro){
   const tal=t.talents||{};
@@ -196,6 +202,7 @@ function skillsPanel(uid,t,ro){
   });
   return h`<section class="panel"><div class="ph"><h2>Skills</h2>
     <div class="seg" role="group" aria-label="Roll mode">${[['normal','Normal'],['adv','Advantage'],['dis','Disadvantage']].map(([v,l])=>h`<button data-act="adv" data-v="${v}" aria-pressed="${String(S.ui.adv===v)}">${l}</button>`)}</div></div>
+    ${ro?'':rdChk()}
     ${groups}</section>`;
 }
 /* the Sinnoh League badge medal: eight jigsaw pieces round a crest (pieces lit when the badge is won) */

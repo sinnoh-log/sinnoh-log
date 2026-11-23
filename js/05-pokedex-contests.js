@@ -638,7 +638,7 @@ function dxAct(b){
    database (meta/pta_contest), where only signed-in members can read it. */
 const CT_TYPES=['Cool','Beauty','Cute','Clever','Tough'];   /* the order they sit in around the handbook's wheel */
 const CT_ICON={Cool:'◆',Beauty:'●',Cute:'★',Clever:'■',Tough:'▼',Any:'✦'};
-const CT_VIEWS=[['moves','Contest moves'],['keys','Keywords'],['help','Appeal helper'],['how','How contests work'],['ex','Example (Option B)'],['rib','Ribbons']];
+const CT_VIEWS=[['live','Live stage'],['moves','Contest moves'],['keys','Keywords'],['help','Appeal helper'],['how','How contests work'],['ex','Example (Option B)'],['rib','Ribbons']];
 S.ui.ct=S.ui.ct||{v:'moves',q:'',type:'',kw:'',show:'all',page:1,mv:'',mvt:'',ctype:'',volt:'0',elec:false,first:false,last:false,fin:false,low:false,both:false,maxed:false,before:'0',alone:false,allBig:false,lastHp:'2d4',ready:false,same:false,stat:'0',res:null,mon:'',sfrom:'',spent:{}};
 const CT_PAGE=80;
 
@@ -809,6 +809,9 @@ function ctCalc(o){
   /* what the move does to the judge's Voltage */
   let dv=rel==='m'?1:rel==='x'?-1:0;
   if(kw==='Crowd Pleaser')dv=2;
+  /* the live stage (Update 66): Hold That Thought and Excitement lock a judge's Voltage for the rest of the round */
+  if(o.noRaise&&dv>0)dv=0;
+  if(o.noLower&&dv<0)dv=0;
   const raises=dv>0&&volt<5;
   const reach=volt<5&&volt+dv>=5;
   switch(kw){
@@ -1426,8 +1429,8 @@ function ctTab(){
   ctWarm();
   const o=S.ui.ct;
   if(!CT_VIEWS.some(v=>v[0]===o.v))o.v='moves';
-  const body=o.v==='keys'?ctKeysView():o.v==='help'?ctHelpView():o.v==='how'?ctHowView():o.v==='ex'?ctExView():o.v==='rib'?ribView():ctMovesView();
-  return h`<section class="panel ctp"><div class="ph"><h2>Contests</h2>${CT.list?h`<span class="pill">${CT.list.length} moves</span>`:''}</div>
+  const body=o.v==='live'?csLiveView():o.v==='keys'?ctKeysView():o.v==='help'?ctHelpView():o.v==='how'?ctHowView():o.v==='ex'?ctExView():o.v==='rib'?ribView():ctMovesView();
+  return h`<section class="panel ctp"><div class="ph"><h2>Contests</h2>${csOn()?h`<span class="pill good">Live</span>`:''}${CT.list?h`<span class="pill">${CT.list.length} moves</span>`:''}</div>
     <div class="seg" role="group" aria-label="Contest pages">${CT_VIEWS.map(([k,l])=>h`<button data-act="ct_view" data-v="${k}" aria-pressed="${String(o.v===k)}">${l}</button>`)}</div>
     <div class="ctbody">${body}</div>
   </section>`;

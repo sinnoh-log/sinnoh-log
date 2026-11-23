@@ -1,6 +1,6 @@
 'use strict';
 /* Sinnoh Trainer Log · 01-core. The files in js/ are classic scripts that share one scope: load them in order (see index.html). */
-const BUILD='2026-11-18 · Update 63';
+const BUILD='2026-11-23 · Update 66';
 
 /* ---------- reference data (labels only) ---------- */
 const STATS=[['atk','Attack','Atk'],['def','Defense','Def'],['spa','Sp. Attack','SpAtk'],['spd','Sp. Defense','SpDef'],['spe','Speed','Spd']];
@@ -117,7 +117,7 @@ const S={
   ready:false,noDb:false,db:null,user:null,dl:null,
   me:{id:null,admin:false,canWrite:true},
   tab:'overview',viewUid:null,
-  megaOk:{},battle:{},battleGm:{},trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},gmNt:{},npcPub:{},shopPub:{},shopGm:{},roadGm:{},teamGm:{},dashGm:{},
+  megaOk:{},battle:{},battleGm:{},trainers:{},pokemon:{},people:{},journal:{},leads:{},notes:{},meta:Object.assign({},DEF_META),gmLoy:{},gmNpc:{},gmNt:{},npcPub:{},shopPub:{},shopGm:{},roadGm:{},teamGm:{},dashGm:{},contest:{},contestGm:{},
   awards:{},timeline:{},pins:{},banner:{},cond:{},places:{},gmPl:{},placeId:null,members:{},invite:null,mapChunks:{},mapSrc:'',room:null,peers:[],avatars:{},
   pick:null,names:{},save:{cls:'',text:'Saved'},rolls:[],_tsig:'',
   ui:{open:{},flip:{},sheetTab:'',lbx:null,adv:'normal',q:{},f:{places:'all'},zoom:1,mapSub:'places',sub:'party',confirm:null,writeFail:false,rollHidden:false,toTop:false,pinMode:'',selPin:null,navOpen:false,inv:{code:null},acct:{name:null,msg:''},delT:{uid:null,text:''},pop:null,megaPop:null,
@@ -187,7 +187,7 @@ const PD_BY={};PD.forEach(f=>{PD_BY[f.id]=f;});
 const PLACES=PD.map(f=>f.name).sort();
 
 /* ---------- store: refs, local copies, write queue ---------- */
-const SET_ALWAYS=new Set(['meta','gl','gn','bn','pl','gp','mg','bt','gb','gt','np','bm','bg','sh','sg','gr','gf','gd','cd']);
+const SET_ALWAYS=new Set(['meta','gl','gn','bn','pl','gp','mg','bt','gb','gt','np','bm','bg','sh','sg','gr','gf','gd','cd','cs','cg']);
 function refFor(sc,id){
   const db=S.db;
   switch(sc){
@@ -219,6 +219,8 @@ function refFor(sc,id){
     case 'gf':return db.collection('gm').doc('teams');
     case 'gd':return db.collection('gm').doc('dash');
     case 'cd':return db.collection('meta').doc('conditions');
+    case 'cs':return db.collection('meta').doc('contest');
+    case 'cg':return db.collection('gm').doc('contest');
   }
 }
 function getLocal(sc,id){
@@ -251,6 +253,8 @@ function getLocal(sc,id){
     case 'gf':return S.teamGm;
     case 'gd':return S.dashGm;
     case 'cd':return S.cond;
+    case 'cs':return S.contest;
+    case 'cg':return S.contestGm;
   }
 }
 function putLocal(sc,id,d){
@@ -283,6 +287,8 @@ function putLocal(sc,id,d){
     case 'gf':S.teamGm=d;break;
     case 'gd':S.dashGm=d;break;
     case 'cd':S.cond=d;break;
+    case 'cs':S.contest=d;break;
+    case 'cg':S.contestGm=d;break;
   }
 }
 function dropLocal(sc,id){
@@ -362,7 +368,7 @@ function withPending(sc,id,d){
 function edit(sc,id,path,v){
   let doc=getLocal(sc,id);
   if(!doc){
-    if(sc==='gl'||sc==='gn'||sc==='pl'||sc==='gp'||sc==='mg'||sc==='bt'||sc==='gb'||sc==='np'||sc==='bm'||sc==='sh'||sc==='sg'||sc==='gr'||sc==='gf'||sc==='gd'||sc==='cd'){doc={};putLocal(sc,id,doc);}
+    if(sc==='gl'||sc==='gn'||sc==='pl'||sc==='gp'||sc==='mg'||sc==='bt'||sc==='gb'||sc==='np'||sc==='bm'||sc==='sh'||sc==='sg'||sc==='gr'||sc==='gf'||sc==='gd'||sc==='cd'||sc==='cs'||sc==='cg'){doc={};putLocal(sc,id,doc);}
     else return;
   }
   const parts=path.split('.');
@@ -445,6 +451,11 @@ function startWatches(){
     if(s.exists)S.battle=withPending('bt','battle',s.data());
     else if(!Q.has('bt|battle'))S.battle={};
   },'battle');
+  /* the live contest stage (Update 66): what the table sees */
+  watch(db.collection('meta').doc('contest'),s=>{
+    if(s.exists)S.contest=withPending('cs','contest',s.data());
+    else if(!Q.has('cs|contest'))S.contest={};
+  },'contest');
   watch(db.collection('meta').doc('npcs'),s=>{
     if(s.exists)S.npcPub=withPending('np','npcs',s.data());
     else if(!Q.has('np|npcs'))S.npcPub={};
@@ -474,13 +485,14 @@ function startWatches(){
   if(S.me.admin){
     watch(db.collection('gm'),s=>{
       const loy={},npc={},gpl={},gnt={},bch={};
-      let gbat=null,gbm=null,gsh=null,grd=null,gtm=null,gds=null;
+      let gbat=null,gbm=null,gsh=null,grd=null,gtm=null,gds=null,gct=null;
       s.docs.forEach(d=>{
         if(d.id==='battle')gbat=withPending('gb','battle',d.data());
         else if(d.id==='shops')gsh=withPending('sg','shops',d.data());
         else if(d.id==='road')grd=withPending('gr','road',d.data());
         else if(d.id==='teams')gtm=withPending('gf','teams',d.data());
         else if(d.id==='dash')gds=withPending('gd','dash',d.data());
+        else if(d.id==='contest')gct=withPending('cg','contest',d.data());
         else if(d.id==='bmap')gbm=withPending('bg','bmap',d.data());
         else if(d.id.indexOf('bmi_')===0)bch[+d.id.slice(4)]=d.data();
         else if(d.id.indexOf('loy_')===0)loy[d.id.slice(4)]=withPending('gl',d.id.slice(4),d.data());
@@ -499,6 +511,7 @@ function startWatches(){
       if(grd)S.roadGm=grd;else if(!Q.has('gr|road'))S.roadGm={};
       if(gtm)S.teamGm=gtm;else if(!Q.has('gf|teams'))S.teamGm={};
       if(gds)S.dashGm=gds;else if(!Q.has('gd|dash'))S.dashGm={};
+      if(gct)S.contestGm=gct;else if(!Q.has('cg|contest'))S.contestGm={};
       if(!S.gmIn)setTimeout(()=>{try{grEnsure();}catch(e){}},2500);
       S.gmIn=true;   /* the GM's own documents have arrived at least once */
       shPubSoon();

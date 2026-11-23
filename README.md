@@ -1053,3 +1053,32 @@ A GM-only **GM Dashboard** page (first item under Game Master in the menu, with 
 - **Load these teams** puts the tier's saved teams on both sheets; **Send to the battle** adds the picked Pokémon as foes, hidden until shown.
 - Rankings: a new event, **Won a Gym badge solo** (+30). A badge logged for a circuit trainer or rival now counts toward their badges.
 - `tests/t_badgebat.js` checks it (the pack part runs with `PACKS=folder`).
+
+## Battle formats: the field, the bench and allies (Update 64)
+
+- **Format** (GM, at the top of the Battle page): **Open** (everyone in the turn order at once, as before, and what **End battle** goes back to), **Singles** (one Pokémon on the field per trainer), **Doubles** (two) or **Tag** (one per trainer, partners side by side). `js/04c-format.js`.
+- Pokémon past a trainer's field slots wait on the **bench**: out of the turn order and off the map. The page shows **Your side** and **Opponents** with each trainer's slots, then the turn order, then the bench. Players see the field and their side's bench; a foe's bench is only a count.
+- **Recall** puts a Pokémon on the bench (the turn passes on if it was acting). **Send out** brings one back: with a full field you choose who it replaces. It rolls initiative the way the battle does (its Speed, or d20 + Speed with the d20 typed or rolled), slots in where it lands, and takes the replaced Pokémon's square on the map. Changing the format rebalances everyone. Only the GM recalls and sends out.
+- **Allies:** **Add a foe** and **NPC trainers** have a **Joins as: Foe / Ally** switch. An ally is a foe sheet on the players' side: only the GM changes or rolls for it, the table sees all of it, its row and token are blue, and it is on the table's map as soon as it is placed.
+- A Leader's **Send to the battle** (badge battles) now sets Doubles or Tag and adds an NPC tag partner's first Pokémon as allies.
+- `tests/t_format.js` checks it.
+
+## Typed dice (Update 65)
+
+- Roll forms have a **Dice: The site rolls / I rolled real dice** switch, for players' move rolls (**Roll attack** and **Damage only**), the GM's foe and ally rolls, and the stat and skill checks on the Trainer sheet. The switch is not saved: flip it when you roll for real.
+- On a move, the form says what to roll, worked out the same way as a site roll (for example "Roll 1d20 for accuracy and 3d6 for damage (Bite's 2d6, +1 die super effective)"). Type the d20 face and the damage dice's total; the site adds the stat modifier, same-type bonus, bonuses, passives and field, and checks the total is possible for those dice.
+- A typed natural 20 is still a critical hit: every damage die counts at its top face, so no damage total is needed. With advantage or disadvantage, type the d20 you kept. Technician asks you to count 1s and 2s as 3s yourself.
+- Checks: type the d20 (on a 20, roll again and type the sum, up to 40), then tap the check. The modifier and talent are added.
+- Typed rolls show "typed" in their working and a **real dice** tag in the table's roll log. `tests/t_dice.js` checks it.
+
+## The live contest stage (Update 66)
+
+- **Contests → Live stage** (`js/05b-stage.js`) runs a contest like a battle. The menu shows **LIVE** next to Contests while one runs.
+- **Setting up (GM):** the hall (the ribbon list), the contest type, and the variations **Double Performance**, **Super Contest**, **Festival** and **High Voltage**; three judges, each with three hidden goals (pick from the list, or **Roll goals**: the announced type decides one Star Point, so only the first judge gets that goal); the players with their Pokémon, and NPC coordinators from an NPC sheet or a name and species.
+- **Introductions:** reveal a goal for a successful Insight check (it reaches the table), and give 1d4 Heart Points for an introduction.
+- **Appeals:** five rounds. Round 1 goes in entry order; later rounds go by Heart Points (Speed breaks ties), or at random after a Scrambler. **Goes now** lets a volunteer go first. The appeal form works out the dice from the Appeal helper's sums with the round filled in for you (first or last, the final round, fewest Heart Points, Voltage raised on the last two appeals, a judge at the maximum, appeals before you, nobody else at this judge, the last move's dice, Get Ready!, a repeated move), the contest stat you spend, and the judge's Voltage, Electrified, and the Hold That Thought and Excitement locks. The site rolls, or the appealer types the total of real dice.
+- **Option B judging:** each appeal goes to one judge, and its Heart Points count only toward that judge's goals; moves used, contest stats and the goals you judge count across everyone.
+- **Players appeal from their own screen** when it is their turn: the appeal is saved on their trainer sheet (`ctap`) and the GM's page scores it, so keep it open. The GM picks moves and judges for NPC coordinators and can appeal for anyone. **+1d4 creativity** (up to twice per appeal) and **Undo last** are there for the GM.
+- **Everyone sees** the judges' Voltage, every contestant's Heart Points and the round's appeals. The hidden goals stay in `gm/contest` until revealed.
+- **Awards:** after round 5 the GM sees who has earned each goal (and can overrule a count, or choose the winner of a goal they judge), then **Reveal the awards** for everyone: each judge's goals and winners, Star Points, and the winner (ties share first place). **Record ribbon and rankings** ticks the hall's ribbon in each winning player's case with a Contest Ribbon honor, and logs Won a contest ribbon and Placed second on the contest circuit rankings (for NPCs on the board too).
+- `tests/t_stage.js` checks it.

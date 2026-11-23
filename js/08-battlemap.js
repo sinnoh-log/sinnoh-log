@@ -82,7 +82,7 @@ function bmTokens(cfg){
       const e=gm?(bmG().f||{})[cid]:((S.bmap||{}).f||{})[cid];
       const ok=!!e&&num(e.x)>=0&&num(e.y)>=0;
       const fp=gm?bmFoot((foeOf(cid)||{}).sz):clamp(Math.round(num(e&&e.s))||1,1,4);
-      out.push({cid,side:'f',v,x:ok?num(e.x):-1,y:ok?num(e.y):-1,placed:ok,fp,mine:gm,vis:gm?(ok&&num(e.vis)>0):true});
+      out.push({cid,side:'f',al:!!c.al,v,x:ok?num(e.x):-1,y:ok?num(e.y):-1,placed:ok,fp,mine:gm,vis:gm?(ok&&num(e.vis)>0):true});
     }
   });
   bmTrainerToks(cfg,out);
@@ -131,9 +131,9 @@ function bmTok(cfg,t){
   const b=BT(),sel=S.ui.bm.sel===t.cid;
   const bc=b.on?btC(b.turn):null;
   const turn=!!b.on&&(b.turn===t.cid||(t.side==='t'&&!!bc&&bc.s==='t'&&'tr_'+bc.u===t.cid));
-  const cls=['bmt',t.side==='a'?'ally':t.side==='t'?'ally tr':t.side==='n'?'foe tr':'foe',turn?'turn':'',v.down?'down':'',t.vis?'':'hid',sel?'sel':'',t.mine?'mine':''].filter(Boolean).join(' ');
+  const cls=['bmt',t.side==='a'||t.al?'ally':t.side==='t'?'ally tr':t.side==='n'?'foe tr':'foe',turn?'turn':'',v.down?'down':'',t.vis?'':'hid',sel?'sel':'',t.mine?'mine':''].filter(Boolean).join(' ');
   const pic=t.side==='a'?monPic(v.m):t.side==='t'?pimg((v.tr&&v.tr.img)||'',v.name,'thumb'):t.side==='n'?pimg('',v.name,'thumb'):foePic(v);
-  const label=v.name+(t.side==='a'?', '+v.owner:t.side==='t'?', trainer':t.side==='n'?', NPC trainer':', foe')+(hp&&v.down?', down':'')+(hp?(v.showHp===1?', about '+Math.round(ratio*100)+' percent health':', '+num(hp.cur)+' of '+mx+' HP'):'')+(t.vis?'':', hidden from players')+', column '+(t.x+1)+', row '+(t.y+1)+(t.mine?'. Drag to move it, or use the arrow keys.':'');
+  const label=v.name+(t.side==='a'?', '+v.owner:t.side==='t'?', trainer':t.side==='n'?', NPC trainer':t.al?', ally':', foe')+(hp&&v.down?', down':'')+(hp?(v.showHp===1?', about '+Math.round(ratio*100)+' percent health':', '+num(hp.cur)+' of '+mx+' HP'):'')+(t.vis?'':', hidden from players')+', column '+(t.x+1)+', row '+(t.y+1)+(t.mine?'. Drag to move it, or use the arrow keys.':'');
   return h`<button type="button" class="${cls}" data-bmt="${t.cid}" data-act="bm_sel" data-cid="${t.cid}" aria-pressed="${String(sel)}" aria-label="${label}" title="${v.name}" style="left:${bmPct(cfg.ox+t.x*cfg.gx,cfg.w)};top:${bmPct(cfg.oy+t.y*cfg.gx,cfg.h)};width:${bmPct(t.fp*cfg.gx,cfg.w)};height:${bmPct(t.fp*cfg.gx,cfg.h)};--c:${(cfg.gx/cfg.w*100).toFixed(4)}cqw">
     <span class="bmt-pic">${pic}</span>${ratio!=null?h`<span class="bmt-hp ${hpCls({cur:ratio,max:1})}"><i style="width:${Math.round(ratio*100)}%"></i></span>`:''}${v.status?h`<span class="bmt-st">${String(v.status).slice(0,3).toUpperCase()}</span>`:''}${t.vis?'':h`<span class="bmt-eye" aria-hidden="true">hidden</span>`}<span class="bmt-nm">${bmShort(v.name)}</span></button>`;
 }
@@ -170,8 +170,9 @@ function bmSetPos(cid,x,y,o){
   }else if(t.side==='a'){
     edit('p',btC(cid).r,'bpos',{x:p.x,y:p.y,v:cfg.v});
   }else{
-    const old=(bmG().f||{})[cid]||{};
-    edit('bg','bmap','f.'+cid,{x:p.x,y:p.y,vis:num(old.vis)>0?1:0});
+    const old=(bmG().f||{})[cid];
+    /* an ally (Update 64) is on the table's map as soon as it is placed */
+    edit('bg','bmap','f.'+cid,{x:p.x,y:p.y,vis:old?(num(old.vis)>0?1:0):(t.al?1:0)});
     bmSync();
   }
   /* said after the save has started, or "Saving…" would replace it */
@@ -224,6 +225,7 @@ function bmSync(){
   const pubF={};
   Object.keys(keep).forEach(cid=>{
     const e=keep[cid];
+    if(c[cid].bn)return;   /* on the bench (Update 64): off the table's map */
     if(num(e.vis)>0&&num(e.x)>=0){
       const fp=bmFoot((foeOf(cid)||{}).sz);
       if(fe&&!bmRowsSeen(fe,num(e.x),num(e.y),fp))return;

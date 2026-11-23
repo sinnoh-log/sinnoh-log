@@ -84,12 +84,12 @@ function btInfo(cid,full){
   }
   const f=full&&S.me.admin?foeOf(cid):null;
   if(f){
-    return {cid,side:'f',f,name:foeLabel(f),pubName:foePub(f).n,types:foeTypes(f),mega:megaOn(f),ms:megaOn(f)?num(f.mega.sid):0,itemTxt:String(f.item||'').trim(),
+    return {cid,side:'f',al:!!c.al,f,name:foeLabel(f),pubName:foePub(f).n,types:foeTypes(f),mega:megaOn(f),ms:megaOn(f)?num(f.mega.sid):0,itemTxt:String(f.item||'').trim(),
       stat:{def:fStat(f,'def'),spd:fStat(f,'spd'),spe:fSpd(f)},stage:{def:stg(f,'def'),spd:stg(f,'spd')},
       hp:f.hp||{cur:0,max:0},down:num(f.hp&&f.hp.cur)<=0,status:f.st||'',stages:stgObj(f),showHp:2,pic:true,sy:f.shiny===true?1:0};
   }
   const p=c.pub||{};
-  return {cid,side:'f',name:p.n||'Unknown foe',types:p.ty&&p.ty.length?p.ty:null,stat:null,
+  return {cid,side:'f',al:!!c.al,name:p.n||(c.al?'Ally':'Unknown foe'),types:p.ty&&p.ty.length?p.ty:null,stat:null,
     stage:p.sg?{def:num(p.sg.def),spd:num(p.sg.spd)}:null,
     hp:p.hp?{cur:num(p.hp.c!=null?p.hp.c:Math.round(num(p.hp.p)*100)),max:p.hp.m!=null?num(p.hp.m):100,p:num(p.hp.p),exact:p.hp.c!=null}:null,
     down:!!p.down,status:p.st||'',stages:p.sg||null,showHp:p.hp?(p.hp.c!=null?2:1):0,pub:p,pic:!!p.sp,sp:p.sp||'',mg:p.mg||null,ms:num(p.ms),sy:num(p.sy),itemTxt:p.it||''};
@@ -142,7 +142,7 @@ const btCmp=(a,z)=>z.ini-a.ini||z.sp-a.sp||z.tb-a.tb;
 function btRollInit(){
   if(!S.me.admin)return;
   const b=BT();
-  const ids=Object.keys(b.c||{}).filter(cid=>btInfo(cid,true));
+  const ids=Object.keys(b.c||{}).filter(cid=>!b.c[cid].bn&&btInfo(cid,true));
   if(!ids.length){toast('Add some Pokémon or foes first.');return;}
   const d20m=b.mode==='d20';
   const rows=ids.map(cid=>{const sp=btSpeed(cid);return {cid,sp,ini:sp+(d20m?rnd(20):0),tb:rnd(20)};});
@@ -209,7 +209,11 @@ function btSetMode(v){
 /* ----- adding and removing combatants ----- */
 function btInsert(cid,obj,ini,tb){
   const b=BT();
+  /* Update 64: a foe or ally knows whose side and trainer it is (public), and a full field puts it on the bench */
+  if(obj.s==='f'&&!obj.g){const f=foeOf(cid);obj.g=btFoeG(f);if(f&&f.al){obj.al=1;if(f.own)obj.gn=String(f.own);}}
+  if(obj.s!=='t'&&btSlots()&&btFieldOf(btGKey(obj)).filter(k=>k!==cid).length>=btSlots())obj.bn=true;
   edit('bt','battle','c.'+cid,obj);
+  if(obj.bn){btSetIni(cid,ini,tb);return;}
   const ord=(b.order||[]).filter(x=>b.c&&b.c[x]&&x!==cid);
   let at=ord.length;
   const me={ini,sp:btSpeed(cid),tb};
@@ -270,7 +274,7 @@ async function btAddFoe(){
   const sw=!!u.foeSw;
   const n=clamp(Math.round(num(u.foeN))||1,1,sw?40:8);
   if(sw&&n<2){toast('A Swarm needs at least two Pokémon.');return;}
-  await btAddFoeSp(sp,n,n===1?String(u.foeNick||'').trim():'','',sw?{swarm:{n,g:'w'+Date.now().toString(36)}}:null);
+  await btAddFoeSp(sp,n,n===1?String(u.foeNick||'').trim():'','',Object.assign(sw?{swarm:{n,g:'w'+Date.now().toString(36)}}:{},u.foeAl?{ally:true,own:'Allies',ag:'sp'}:{}));
   u.foeSp='';u.foeNick='';u.foeN=1;u.foeSw=false;
   render();
 }
@@ -399,10 +403,11 @@ async function btAddFoeSp(sp,n,nick,note,opts){
     const f=Object.assign({nick:nick||'',bonus:zeroStats(),stages:zeroStats(),st:'',notes:note||'',sh:Object.assign({},SHOW_NONE),pn:foeLetter()},base);
     if(opts&&opts.alpha)foeKindApply(f,'alpha');else if(opts&&opts.kind)foeKindApply(f,opts.kind);
     else if(opts&&opts.swarm){qwApply(f,'swarm');f.sw=opts.swarm;}
+    if(opts&&opts.ally)btMakeAlly(f,opts.own,opts.ag);
     edit('gb','battle','foes.'+cid,f);
     btInsert(cid,{s:'f',pub:foePub(f)},fSpd(f)+(b.mode==='d20'?rnd(20):0),rnd(20));
   }
-  toast(n+(n===1?' foe':' foes')+' added'+(note?' ('+((opts&&opts.alpha)?'alpha ':'')+sp+')':'')+(rec||si?'':'. That species is not in the data, so fill in its numbers by hand')+'.',true);
+  toast(n+(opts&&opts.ally?(n===1?' ally':' allies'):(n===1?' foe':' foes'))+' added'+(note?' ('+((opts&&opts.alpha)?'alpha ':'')+sp+')':'')+(rec||si?'':'. That species is not in the data, so fill in its numbers by hand')+'.',true);
 }
 function btRemove(cid){
   if(!S.me.admin)return;
@@ -436,6 +441,7 @@ function btEnd(){
   edit('bt','battle','round',0);
   edit('bt','battle','bid',0);
   edit('bt','battle','fc',[]);
+  edit('bt','battle','fmt','open');
   edit('gb','battle','foes',{});
   S.ui.bt.open={};
   endBattleAll();
@@ -515,29 +521,45 @@ function applyRoll(src,id){
 }
 
 /* ----- the GM rolls for a foe ----- */
+/* the numbers a foe's roll uses, without the dice: shared by the roll and the typed-dice hint (Update 65) */
+function foeOpts(cid,f,mv,onlyDmg){
+  const k=KINDS.indexOf(mv.kind)>=0?mv.kind:'Physical',ks=kindStat(k),u=S.ui.bt;
+  const info=u.tgt&&btC(u.tgt)?btInfo(u.tgt,true):null;
+  return {
+    mv,die:monDie(f),aTypes:foeTypes(f),aAcc:isEff(k)?fSpd(f):fStat(f,ks.acc),aDmg:ks.dmg?fStat(f,ks.dmg):0,aStage:ks.dmg?stg(f,ks.dmg):0,
+    tTypes:info?info.types:null,tDef:info&&info.stat?(isEff(k)?info.stat.spe:info.stat[fcSwapDef(u.tgt,ks.def)]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
+    eff:u.eff||'auto',adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:false,dmgBonus:num(f.qn&&f.qn.dmg),
+    aPs:f.ps,aHp:f.hp,tPs:info?(info.side==='a'?(info.m.passives||[]):((info.f&&info.f.ps)||[])):null,tHp:info?(info.side==='a'?info.hp:(info.f&&info.f.hp)):null,tog:psTog(u),
+    fcA:fcAt(cid),fcT:u.tgt?fcAt(u.tgt):[]
+  };
+}
+function foeHint(cid,i){
+  const f=foeOf(cid),x=f&&(f.mv||[])[i];
+  if(!x||x.kind==='Style')return '';
+  return rdHint(atkCalc(Object.assign(foeOpts(cid,f,effMove(x,f),false),{typed:{d20:10,dmg:0}})),false,x.name);
+}
 function foeRoll(cid,i,onlyDmg){
   if(!S.me.admin)return;
   const f=foeOf(cid);
   const x=f&&(f.mv||[])[i];
   if(!x)return;
-  const k=KINDS.indexOf(x.kind)>=0?x.kind:'Physical';
-  const ks=kindStat(k);
   const u=S.ui.bt;
   if(needDie(x,monDie(f),foeLabel(f)+(megaOn(f)?' (Mega)':'')))return;
   const info=u.tgt&&btC(u.tgt)?btInfo(u.tgt,true):null;
   const prep=auRollPrep('gb','battle','foes.'+cid+'.mv.'+i,effMove(x,f),cid,!!onlyDmg);
   if(!prep)return;
-  const c=atkCalc({
-    mv:prep.x,die:monDie(f),aTypes:foeTypes(f),aAcc:isEff(k)?fSpd(f):fStat(f,ks.acc),aDmg:ks.dmg?fStat(f,ks.dmg):0,aStage:ks.dmg?stg(f,ks.dmg):0,
-    tTypes:info?info.types:null,tDef:info&&info.stat?(isEff(k)?info.stat.spe:info.stat[fcSwapDef(u.tgt,ks.def)]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
-    eff:u.eff||'auto',adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:false,dmgBonus:num(f.qn&&f.qn.dmg),
-    aPs:f.ps,aHp:f.hp,tPs:info?(info.side==='a'?(info.m.passives||[]):((info.f&&info.f.ps)||[])):null,tHp:info?(info.side==='a'?info.hp:(info.f&&info.f.hp)):null,tog:psTog(u),
-    fcA:fcAt(cid),fcT:u.tgt?fcAt(u.tgt):[]
-  });
+  const o=foeOpts(cid,f,prep.x,onlyDmg);
+  if(S.ui.rd.foe){
+    const t=rdTyped('bt',atkCalc(Object.assign({},o,{typed:{d20:10,dmg:0}})),onlyDmg);
+    if(!t)return;
+    o.typed=t;
+  }
+  const c=atkCalc(o);
   if(!c.ac&&!c.dm){toast('That move has no damage listed. Use Roll attack for the accuracy check.');return;}
   const {e,local}=atkEntry(c,foePub(f).n,info?{cid:u.tgt,name:info.name}:null,true);
   logRoll(e,local);
   prep.done();
+  if(S.ui.rd.foe){u.td20='';u.tdmg='';}
   renderRoll();
   render();
 }
@@ -651,10 +673,10 @@ function btRow(cid,idx,gm,turn){
   const secret=v.side==='f'&&gm&&v.f;
   const ini=v.side==='a'||v.side==='t'?num(btC(cid).ini):(gm?btIni(cid):null);
   const own=secret?ntFoeOwner(v.f):(v.pub&&v.pub.o)||'';
-  const sub=v.side==='a'?v.owner:v.side==='t'?'Trainer':'Foe'+(own?' · '+own:'')+(secret?' · players see “'+v.pubName+'”':'');
+  const sub=v.side==='a'?v.owner:v.side==='t'?'Trainer':(v.al?'Ally':'Foe')+(v.al&&btC(cid).gn?' · '+btC(cid).gn:own?' · '+own:'')+(secret&&!v.al?' · players see “'+v.pubName+'”':'');
   const types=v.types&&v.types.length?chipsOf(v.types):'';
   const hidden=v.side==='f'&&!secret&&!v.types;
-  return h`<li class="brow ${v.side==='a'||v.side==='t'?'ally':'foe'} ${turn?'turn':''} ${v.down?'down':''}" data-cid="${cid}">
+  return h`<li class="brow ${v.side==='a'||v.side==='t'||v.al?'ally':'foe'} ${turn?'turn':''} ${v.down?'down':''}" data-cid="${cid}">
     <div class="bmain">
       <span class="bn" aria-label="Position ${idx+1}">${idx+1}</span>
       <span class="bpic"><span class="spr bs ${v.side==='f'&&!v.pic?'unk':''}" ${v.side==='a'?typeVars(v.m):typeVars({types:v.types||[]})}>${v.side==='a'?monPic(v.m):v.side==='t'?pimg((v.tr&&v.tr.img)||'',v.name,'thumb'):foePic(v)}</span></span>
@@ -759,7 +781,8 @@ function btFoeBody(cid,v,idx){
       ${mrPsLine('bt',f,S.ui.bt.tgt&&btC(S.ui.bt.tgt)?((x=>x?(x.side==='a'?x.m:x.f):null)(btInfo(S.ui.bt.tgt,true))):null,null)}
       <div class="row"><div class="seg" role="group" aria-label="Roll mode">${[['normal','Normal'],['adv','Advantage'],['dis','Disadvantage']].map(([k,l])=>h`<button data-act="adv" data-v="${k}" aria-pressed="${String(S.ui.adv===k)}">${l}</button>`)}</div>
         <label class="row"><input type="checkbox" data-act="b_secret" ${S.ui.secret?raw('checked'):''}><span>Roll in secret (not shared)</span></label></div>
-      ${!mvs.length?h`<p class="sub">No moves yet. ${ed?'Add one, or type a move name to fill it in from the handbook.':'Use Edit details to add them.'}</p>`:!ed?mvs.map((x,i)=>mvRead('gb','battle',P+'mv.'+i,effMove(x,f),false,'fmx'+cid+'#'+i,x.kind==='Style'?'':h`<div class="row"><button class="btn primary sm" data-act="b_fmroll" data-cid="${cid}" data-i="${i}">Roll attack</button><button class="btn sm" data-act="b_fmdmg" data-cid="${cid}" data-i="${i}">Damage only</button></div>`)):mvs.map((x,i)=>h`<div class="move ${x.kind==='Style'?'mvstyle':''}"><div class="mv1">${fText('Move','gb','battle',P+'mv.'+i+'.name',S.battleGm,{list:'dl-moves'})}${fText('Uses','gb','battle',P+'mv.'+i+'.freq',S.battleGm,{})}<span></span>${rowBtns('gb','battle',P+'mv',i,mvs.length,false)}</div>
+      ${rdBoxes('foe','',true,true,'bt')}
+      ${!mvs.length?h`<p class="sub">No moves yet. ${ed?'Add one, or type a move name to fill it in from the handbook.':'Use Edit details to add them.'}</p>`:!ed?mvs.map((x,i)=>mvRead('gb','battle',P+'mv.'+i,effMove(x,f),false,'fmx'+cid+'#'+i,x.kind==='Style'?'':h`<div class="row"><button class="btn primary sm" data-act="b_fmroll" data-cid="${cid}" data-i="${i}">${S.ui.rd.foe?'Log attack':'Roll attack'}</button><button class="btn sm" data-act="b_fmdmg" data-cid="${cid}" data-i="${i}">Damage only</button>${S.ui.rd.foe?h`<span class="dhint">${raw(foeHint(cid,i))}</span>`:''}</div>`)):mvs.map((x,i)=>h`<div class="move ${x.kind==='Style'?'mvstyle':''}"><div class="mv1">${fText('Move','gb','battle',P+'mv.'+i+'.name',S.battleGm,{list:'dl-moves'})}${fText('Uses','gb','battle',P+'mv.'+i+'.freq',S.battleGm,{})}<span></span>${rowBtns('gb','battle',P+'mv',i,mvs.length,false)}</div>
         <div class="mv2">${fSel('Kind','gb','battle',P+'mv.'+i+'.kind',S.battleGm,KINDS,{})}${fSel('Type','gb','battle',P+'mv.'+i+'.type',S.battleGm,TYPES,{})}${fText('Range','gb','battle',P+'mv.'+i+'.range',S.battleGm,{})}${fText('Damage','gb','battle',P+'mv.'+i+'.dice',S.battleGm,{ph:'e.g. 3d8'})}</div>
         ${fArea('Effect','gb','battle',P+'mv.'+i+'.text',S.battleGm,{rows:2})}
         ${x.kind==='Style'?h`<p class="sub stynote"><span class="pill sty">Style</span> No attack roll and no damage.</p>`:h`<div class="row"><button class="btn primary sm" data-act="b_fmroll" data-cid="${cid}" data-i="${i}">Roll attack</button><button class="btn sm" data-act="b_fmdmg" data-cid="${cid}" data-i="${i}">Damage only</button></div>`}</div>`)}
@@ -790,7 +813,8 @@ function btAddPanel(){
         <label class="fld"><span class="fl">Name (optional)</span><input type="text" data-u="bt.foeNick" data-nr value="${u.foeNick}"></label>
         <label class="fld"><span class="fl">How many</span><input type="number" inputmode="numeric" min="1" max="${u.foeSw?40:8}" data-u="bt.foeN" data-nr value="${u.foeN}"></label>
       </div>
-      <div class="row"><button class="btn primary sm" data-act="b_addfoe">${u.foeSw?'Add swarm':'Add foe'}</button><button class="btn sm chk" data-act="b_swarm" aria-pressed="${String(!!u.foeSw)}" title="Quick NPC rules: halved HP, and a quarter of the swarm acts each round">As a Swarm</button></div>
+      <div class="row"><span class="fl">Joins as</span><span class="seg" role="group" aria-label="Which side it joins"><button data-act="b_foeal" data-v="0" aria-pressed="${String(!u.foeAl)}">Foe</button><button data-act="b_foeal" data-v="1" aria-pressed="${String(!!u.foeAl)}">Ally</button></span>${u.foeAl?h`<span class="sub">An ally fights on the players’ side. Only you change or roll for it; the table sees all of it.</span>`:''}</div>
+      <div class="row"><button class="btn primary sm" data-act="b_addfoe">${u.foeSw?'Add swarm':u.foeAl?'Add ally':'Add foe'}</button><button class="btn sm chk" data-act="b_swarm" aria-pressed="${String(!!u.foeSw)}" title="Quick NPC rules: halved HP, and a quarter of the swarm acts each round">As a Swarm</button></div>
       ${u.foeSw?h`<p class="sub">Swarm: each member's max HP is halved, 3/day moves are 2 per combat, and only a quarter of the swarm (rounded up) takes turns each round. Up to 40 members.</p>`:''}</div>
     ${encBattlePanel()}
     ${ccPanel('bat')}
@@ -803,7 +827,7 @@ function btAddPanel(){
    battle it keeps the number it has. Applying sorts the order (ties: higher Speed, then a roll), starts the battle if it
    has not started, and otherwise keeps whose turn it is. Only the GM sees the form. */
 S.ui.ini=S.ui.ini||{open:false,v:{}};
-const iniIds=()=>{const b=BT(),o=btOrder(),rest=Object.keys(b.c||{}).filter(cid=>o.indexOf(cid)<0);return o.concat(rest).filter(cid=>btInfo(cid,true));};
+const iniIds=()=>{const b=BT(),o=btOrder(),rest=Object.keys(b.c||{}).filter(cid=>o.indexOf(cid)<0&&!b.c[cid].bn);return o.concat(rest).filter(cid=>btInfo(cid,true));};
 const iniRow=cid=>S.ui.ini.v[cid]||(S.ui.ini.v[cid]={n:'',t:'d20'});
 /* what a row adds up to: {ini, ok, txt}; ini is null when the box is empty */
 function iniCalc(cid){
@@ -885,10 +909,13 @@ function battleOrderTab(){
   const mineNow=cv&&(cv.side==='a'||cv.side==='t')&&canEditT(cv.uid);
   return h`<section class="panel btl"><div class="ph"><h2>Battle</h2>${b.on?h`<span class="pill good">Round ${num(b.round)||1}</span>`:h`<span class="pill">${ord.length?'Setting up':'No battle'}</span>`}
       ${gm?h`<div class="acts"><button class="btn primary sm" data-act="b_init" ${ord.length?'':raw('disabled')}>${b.on?'Roll initiative again':'Roll initiative'}</button>${iniBtn()}<button class="btn sm" data-act="b_next" ${b.on?'':raw('disabled')}>Next turn</button>${b.on&&b.mode!=='d20'?h`<button class="btn sm" data-act="b_resort">Re-sort by Speed</button>`:''}<button class="btn sm danger ${ask?'armed':''}" data-act="b_end">${ask?'Tap again to end it for everyone':'End battle'}</button></div>`:''}</div>
+    ${btFmtRow(gm)}
     ${gm?h`<div class="row"><div class="seg" role="group" aria-label="How turn order is decided"><button data-act="b_mode" data-v="speed" aria-pressed="${String(b.mode!=='d20')}">Highest Speed first</button><button data-act="b_mode" data-v="d20" aria-pressed="${String(b.mode==='d20')}">d20 + Speed</button></div></div>`:''}
     ${b.on&&cv?h`<p class="bnow ${mineNow?'mine':''}">${mineNow?'Your turn: ':''}<b>${cv.name}</b> is acting${cv.side==='a'?' · '+cv.owner:''}.</p>`:(ord.length?h`<p class="sub">${b.on?'':(gm?'Add everyone, then roll initiative.':'The GM is setting up the battle.')}</p>`:h`<p class="sub">${gm?'Nothing here yet. Add your players’ Pokémon and any foes below.':'No battle is running. When the GM starts one, the turn order shows up here.'}</p>`)}
     ${auPanel()}
-    ${ord.length?h`<ol class="bord">${ord.map((cid,i)=>btRow(cid,i,gm,cur===cid))}</ol>`:''}
+    ${btFieldPanel(gm)}
+    ${ord.length?h`${btSlots()?h`<h3 class="refg">Turn order</h3>`:''}<ol class="bord">${ord.map((cid,i)=>btRow(cid,i,gm,cur===cid))}</ol>`:''}
+    ${btBenchPanel(gm)}
   </section>
   ${gm?btAddPanel():''}
   <section class="panel"><div class="ph"><h2>Table rolls</h2>${gm?h`<div class="acts"><label class="row"><input type="checkbox" data-act="b_secret" ${S.ui.secret?raw('checked'):''}><span>Roll in secret</span></label><button class="btn sm danger ${S.ui.confirm==='bt|clr'?'armed':''}" data-act="b_clear">${S.ui.confirm==='bt|clr'?'Tap again to clear':'Clear the log'}</button></div>`:''}</div>
@@ -932,6 +959,9 @@ function evoLogDesk(){
 function batAct(b,e){
   const d=b.dataset;
   if(qnBattleAct(d))return;
+  if(['b_fmt','b_recall','b_so','b_sogo','b_socx'].indexOf(d.act)>=0){btFmtAct(d);return;}
+  if(d.act==='b_foeal'){S.ui.bt.foeAl=d.v==='1';render();return;}
+  if(d.act==='b_ntal'){S.ui.bt.ntAl=d.v==='1';render();return;}
   switch(d.act){
     case 'b_open':S.ui.bt.open[d.cid]=!S.ui.bt.open[d.cid];render();break;
     case 'b_hp':btHp(d.cid,num(d.d));break;

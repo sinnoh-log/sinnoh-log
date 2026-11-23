@@ -1642,6 +1642,7 @@ const navGroups=()=>{const g=S.me.admin?NAV.concat([GM_NAV]):NAV;return CFG?g.co
 function tabCount(k){
   if(k==='people')return Object.keys(S.people).length;
   if(k==='battle')return S.battle&&S.battle.on?'LIVE':0;
+  if(k==='contest')return S.contest&&S.contest.on?'LIVE':0;
   if(k==='dash')return S.me.admin?dashReminders().length:0;
   if(k==='leads')return entriesOf(S.leads).filter(l=>!l.status||l.status==='open'||l.status==='chasing').length;
   return 0;
@@ -1751,6 +1752,7 @@ function render(){
   if(S.tab!=='map')hideTip(true);else syncHl();
   if(S.ui.toTop){S.ui.toTop=false;window.scrollTo(0,0);}else window.scrollTo(0,y);
   ensureNames();
+  try{csPoll();}catch(e){}   /* a player's contest appeal, scored on the GM's page (Update 66) */
 }
 async function ensureNames(){
   if(!S.user)return;
@@ -1900,6 +1902,8 @@ function act(b,e){
   if(d.act&&d.act.indexOf('gr_')===0){grAct(b);return;}
   if(d.act&&d.act.indexOf('gd_')===0){dashAct(b);return;}
   if(d.act&&d.act.indexOf('bdb_')===0){bdbAct(b);return;}
+  if(d.act==='rd_sw'){S.ui.rd[d.k]=d.v==='1';render();return;}
+  if(d.act&&d.act.indexOf('cs_')===0){csAct(b);return;}
   if(d.act&&d.act.indexOf('tm_')===0){tmAct(b);return;}
   if(d.act&&d.act.indexOf('br_')===0){brAct(b);return;}
   if(d.act==='zn_load'){znLoad();return;}
@@ -2235,6 +2239,7 @@ document.addEventListener('input',e=>{
   if(t.dataset.b!=null){onBound(t);if(e.inputType==='insertReplacementText')onSpeciesChange(t);return;}
   if(t.dataset.rdb!=null){rdbInput(t);return;}
   if(t.dataset.inib!=null){iniInput(t);return;}
+  if(t.dataset.csx!=null){csInput(t);return;}
   if(t.dataset.u!=null){
     const k=t.dataset.u.split('.');
     S.ui[k[0]][k[1]]=t.type==='checkbox'?t.checked:t.value;

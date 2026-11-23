@@ -720,6 +720,64 @@ input[type=search]{appearance:none}
 .rdbko{color:var(--bad);font-weight:700}
 .rdbwarn{color:var(--warn)}
 .rdbgym{border:2px dashed var(--line);border-radius:12px;padding:8px 12px;margin-top:10px;display:flex;flex-direction:column;gap:6px}
+/* battle formats (Update 64) */
+.fmtrow{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.field2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:10px}
+.fside{border:2px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:8px;background:var(--raised)}
+.fside.foe{border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.fside h3{margin:0;font:800 12px var(--f-body);letter-spacing:.08em;text-transform:uppercase}
+.fgrp{display:flex;flex-direction:column;gap:6px}
+.fwho{font:700 11px var(--f-body);text-transform:uppercase;letter-spacing:.05em;opacity:.75}
+.fslot{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 10px;align-items:center;border:2px solid var(--line-soft);border-radius:10px;padding:6px 8px}
+.fslot.turn{border-color:var(--gold);box-shadow:0 0 0 2px rgba(212,160,23,.25)}
+.fslot.down{opacity:.6}
+.fslot.empty{grid-template-columns:1fr;border-style:dashed;min-height:44px}
+.fsx{min-width:0}
+.bench{display:flex;flex-direction:column;gap:6px}
+.brl{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.brl b{min-width:120px}
+.bchip{display:inline-flex;gap:6px;align-items:center;border:2px solid var(--line);border-radius:999px;padding:3px 4px 3px 10px;font:600 13px var(--f-body)}
+.bchip.on{border-color:var(--accent)}
+.bchip.out{opacity:.55;text-decoration:line-through;padding-right:10px}
+.bchip button{font:700 12px var(--f-body);border-radius:999px;border:2px solid var(--line);background:var(--bg);color:inherit;padding:2px 8px;cursor:pointer}
+.bchip button[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.sendout{border-left:4px solid var(--accent);padding:6px 10px;display:flex;flex-direction:column;gap:6px}
+.soin{max-width:240px}
+/* typed dice (Update 65) */
+.dicesw{display:flex;gap:8px 10px;align-items:center;flex-wrap:wrap}
+.dicein{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:8px}
+.dicein input{font:800 20px var(--f-body);text-align:center}
+.dhint{font:600 12.5px var(--f-body);margin:0}
+.rdchk{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:flex-end;margin:0 0 10px}
+.rdchk .fld{max-width:300px}
+.pill.rdp{border-style:dashed}
+/* the live contest stage (Update 66) */
+.ctstage{display:flex;flex-direction:column;gap:12px}
+.judges{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px}
+.judge{border:2px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;background:var(--raised)}
+.judge.elec{border-color:var(--gold);box-shadow:0 0 0 3px rgba(224,176,0,.25)}
+.volt{display:inline-flex;gap:4px;vertical-align:middle}
+.volt i{width:20px;height:10px;border-radius:3px;background:var(--line-soft);display:block}
+.volt i.on{background:var(--gold)}
+.goals{display:flex;flex-direction:column;gap:3px;font:600 12.5px var(--f-body)}
+.cgoal{display:flex;flex-wrap:wrap;gap:6px}
+.cgoal select,.cgoal input{max-width:100%}
+.score{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.score li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:center;border:2px solid var(--line-soft);border-radius:10px;padding:6px 8px}
+.score li.now{border-color:var(--gold)}
+.hearts{font:800 17px var(--f-body);color:#d64575;white-space:nowrap}
+.heartbar{height:7px;border-radius:4px;background:#d64575;display:block;margin-top:3px;max-width:100%}
+.star{color:var(--gold)}
+.rounds{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.rounds i{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:800 13px var(--f-body);font-style:normal;border:2px solid var(--line)}
+.rounds i.done{background:var(--line-soft)}
+.rounds i.now{border-color:var(--gold);background:#fff3c4;color:#5a4300}
+.applog{list-style:none;margin:0;padding:0;font:13px var(--f-body);display:flex;flex-direction:column;gap:4px}
+.applog li{border-bottom:1px solid var(--line-soft);padding:4px 0}
+.appeal{display:flex;flex-direction:column;gap:8px}
+.csaward{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px}
+.csum{max-width:200px}
+.csgm{flex-wrap:wrap;gap:8px}
 /* badge battles (Update 63) */
 .bdb{display:flex;flex-direction:column;gap:8px;border:2px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0;background:var(--raised)}
 .bdb > .row{flex-wrap:wrap}
@@ -1623,20 +1681,22 @@ input,select,textarea{border-radius:9px}
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
 <!-- The app, in load order. These files share one scope; keep the order. -->
-<script src="js/01-core.js?v=2026-11-18-badge"></script>
-<script src="js/02-species.js?v=2026-11-18-badge"></script>
-<script src="js/03-rolls.js?v=2026-11-18-badge"></script>
-<script src="js/04-battle.js?v=2026-11-18-badge"></script>
-<script src="js/04b-battle-helper.js?v=2026-11-18-badge"></script>
-<script src="js/05-pokedex-contests.js?v=2026-11-18-badge"></script>
-<script src="js/06-world.js?v=2026-11-18-badge"></script>
-<script src="js/07-npc.js?v=2026-11-18-badge"></script>
-<script src="js/07b-quick-npc.js?v=2026-11-18-badge"></script>
-<script src="js/08-battlemap.js?v=2026-11-18-badge"></script>
-<script src="js/09-sheets.js?v=2026-11-18-badge"></script>
-<script src="js/09b-road.js?v=2026-11-18-badge"></script>
-<script src="js/09c-growth.js?v=2026-11-18-badge"></script>
-<script src="js/09d-dash.js?v=2026-11-18-badge"></script>
-<script src="js/09e-badge.js?v=2026-11-18-badge"></script>
-<script src="js/10-calendar-main.js?v=2026-11-18-badge"></script>
+<script src="js/01-core.js?v=2026-11-23-stage"></script>
+<script src="js/02-species.js?v=2026-11-23-stage"></script>
+<script src="js/03-rolls.js?v=2026-11-23-stage"></script>
+<script src="js/04-battle.js?v=2026-11-23-stage"></script>
+<script src="js/04b-battle-helper.js?v=2026-11-23-stage"></script>
+<script src="js/04c-format.js?v=2026-11-23-stage"></script>
+<script src="js/05-pokedex-contests.js?v=2026-11-23-stage"></script>
+<script src="js/05b-stage.js?v=2026-11-23-stage"></script>
+<script src="js/06-world.js?v=2026-11-23-stage"></script>
+<script src="js/07-npc.js?v=2026-11-23-stage"></script>
+<script src="js/07b-quick-npc.js?v=2026-11-23-stage"></script>
+<script src="js/08-battlemap.js?v=2026-11-23-stage"></script>
+<script src="js/09-sheets.js?v=2026-11-23-stage"></script>
+<script src="js/09b-road.js?v=2026-11-23-stage"></script>
+<script src="js/09c-growth.js?v=2026-11-23-stage"></script>
+<script src="js/09d-dash.js?v=2026-11-23-stage"></script>
+<script src="js/09e-badge.js?v=2026-11-23-stage"></script>
+<script src="js/10-calendar-main.js?v=2026-11-23-stage"></script>
 </body></html>

@@ -93,6 +93,29 @@ function parseDice(s){
   const mon=/m/i.test(m[2]);
   return {n:+m[1],s:mon?0:+m[2],mon,f:m[3]?(m[3]==='+'?1:-1)*(+m[4]):0};
 }
+/* ----- typed dice (Update 65): the table rolls real dice and types the faces; the site adds the rest ----------
+   S.ui.rd holds the switch for each kind of roll (mr: a player's move, chk: checks, foe: the GM's foe and ally rolls) and the
+   typed check die (cv). It is not saved: each person flips it when they roll for real. */
+S.ui.rd=S.ui.rd||{mr:false,chk:false,foe:false,cv:''};
+const rdNum=(v,lo,hi)=>{const t=String(v==null?'':v).trim();if(!/^\d+$/.test(t))return null;const n=+t;return n>=lo&&n<=hi?n:null;};
+function rdSwitch(k,label){
+  const on=!!S.ui.rd[k];
+  return h`<div class="dicesw"><span class="fl">${label||'Dice'}</span><div class="seg" role="group" aria-label="Who rolls the dice"><button data-act="rd_sw" data-k="${k}" data-v="0" aria-pressed="${String(!on)}">The site rolls</button><button data-act="rd_sw" data-k="${k}" data-v="1" aria-pressed="${String(on)}">I rolled real dice</button></div></div>`;
+}
+/* what to roll for a move, worked out from a dry run of the same sums */
+function rdHint(c,onlyDmg,name){
+  const bits=[];
+  if(!onlyDmg&&c.ac)bits.push('<b>1d20</b> for accuracy');
+  const m=c.dm;
+  if(m&&!m.imm&&m.n>0){
+    const why=[];
+    if(m.mon)why.push('Monster die d'+m.s);
+    if(m.eff)why.push((m.eff>0?'+':'−')+dieWord(m.eff)+' '+EFF_LBL[m.ef].toLowerCase());
+    if(m.stageD)why.push((m.stageD>0?'+':'−')+dieWord(m.stageD)+' from stages');
+    bits.push('<b>'+m.n+'d'+m.s+'</b> for damage'+(why.length||m.n!==m.base?' ('+(name?esc(name):'the move')+'’s '+m.base+'d'+m.s+(why.length?', '+why.join(', '):'')+')':''));
+  }else if(m&&m.imm)bits.push('no damage dice (no effect)');
+  return bits.length?'Roll '+bits.join(' and ')+'.':'';
+}
 function d20adv(mode){
   const a=rnd(20);
   if(mode!=='adv'&&mode!=='dis')return {v:a,all:[a]};
@@ -434,14 +457,16 @@ function atkCalc(o){
   const out={k,mv:mv.name||'Move',type:P.type||mv.type||'',ps:P.notes.slice(),pd:!!o.tPs||P.ignoreT,mb:P.ignoreT,rng:mv.range||''};
   if(P.ignoreT&&o.tPs&&psKeys(o.tPs).size)out.ps.push('Mold Breaker (ignores the target’s passives)');
   let crit=!!o.crit;
+  const T=o.typed||null,tA=T&&T.d20!=null,tD=T&&T.dmg!=null;
+  out.typed=!!(tA||tD);
   if(!o.onlyDmg){
-    const r=d20adv(o.adv);
+    const r=tA?{v:T.d20,all:[T.d20]}:d20adv(o.adv);
     const mm=mod(o.aAcc);
     let bonus=num(o.accBonus)+P.acc+FM.acc;
     if(FM.acc)out.ps.push('Gravitized Zone +1 Acc');
     if(FM.hazy&&bonus>0){bonus=0;out.ps.push('Hazy Weather (no Accuracy bonuses)');}
     const tot=r.v+mm+bonus;
-    out.ac={tot,d:r.v,all:r.all,mod:mm,bonus,adv:o.adv==='adv'||o.adv==='dis'?o.adv:'normal',ab:ks.ab};
+    out.ac={tot,d:r.v,all:r.all,mod:mm,bonus,adv:!tA&&(o.adv==='adv'||o.adv==='dis')?o.adv:'normal',ab:ks.ab,typed:!!tA};
     crit=r.v===20;
     if(o.tDef!=null){out.vs=num(o.tDef);out.vsAb=ks.dab;out.hit=tot>=num(o.tDef);}
   }
@@ -475,8 +500,11 @@ function atkCalc(o){
   const stageD=plain?0:num(o.aStage)-num(o.tStage);
   const n=Math.max(0,dc.n+(plain?0:eff.d+D.step)+stageD);
   const rolled=[];
-  for(let i=0;i<n;i++){let v=crit?dc.s:rnd(dc.s);if(P.tech&&v<3)v=3;rolled.push(v);}
-  const sum=rolled.reduce((a,b)=>a+b,0);
+  /* typed: the damage dice's total as rolled at the table; a critical hit still counts every die at its top face */
+  const useT=tD&&!crit;
+  if(!useT)for(let i=0;i<n;i++){let v=crit?dc.s:rnd(dc.s);if(P.tech&&v<3)v=3;rolled.push(v);}
+  const sum=useT?Math.max(0,Math.round(num(T.dmg))):rolled.reduce((a,b)=>a+b,0);
+  if(useT&&P.tech)out.ps.push('Technician: count any 1s and 2s as 3s in the total you typed');
   const stab=!plain&&ty&&(o.aTypes||[]).indexOf(ty)>=0?4:0;
   const stat=plain||!ks.dmg?0:mod(o.aDmg);
   let psd=plain?0:P.dmg;
@@ -489,7 +517,7 @@ function atkCalc(o){
   if(!plain){D.dbl.forEach(n=>{tot*=2;out.ps.push(n+' ×2');});D.half.forEach(n=>{tot=Math.floor(tot/2);out.ps.push(n+' ½');});}
   let heal=0;
   if(!plain&&D.absorb){heal=Math.floor(tot/2);out.ps.push(D.absorb+': heals '+heal+' instead');tot=0;}
-  out.dm={tot,base:dc.n,n,s:dc.s,mon:!!dc.mon,rolled,eff:eff.d,stageD,fixed:dc.f,stat,stab,extra,psd,heal,absorb:D.absorb,ef:eff.c,ab:ks.ab};
+  out.dm={tot,base:dc.n,n,s:dc.s,mon:!!dc.mon,rolled,sum,typed:useT,eff:eff.d,stageD,fixed:dc.f,stat,stab,extra,psd,heal,absorb:D.absorb,ef:eff.c,ab:ks.ab};
   return out;
 }
 const dieWord=n=>Math.abs(n)+(Math.abs(n)===1?' die':' dice');
@@ -497,7 +525,7 @@ function acText(c){
   const a=c.ac;
   if(!a)return '';
   const d=a.adv==='adv'?'advantage '+a.all.join(' / ')+' → '+a.d:a.adv==='dis'?'disadvantage '+a.all.join(' / ')+' → '+a.d:String(a.d);
-  let s='d20 '+d+(a.mod?' + '+a.ab+' '+a.mod:'')+(a.bonus?' '+sgn(a.bonus):'')+' = '+a.tot;
+  let s='d20 '+d+(a.typed?' typed':'')+(a.mod?' + '+a.ab+' '+a.mod:'')+(a.bonus?' '+sgn(a.bonus):'')+' = '+a.tot;
   if(c.crit)s+=' · natural 20!';
   if(c.vs!=null)s+=' vs '+c.vsAb+' '+c.vs+(c.hit?' · hit':' · miss');
   return s;
@@ -510,7 +538,7 @@ function dmText(c){
   if(m.eff)bits.push((m.eff>0?'+':'−')+dieWord(m.eff)+' '+EFF_LBL[m.ef].toLowerCase());
   if(m.stageD)bits.push((m.stageD>0?'+':'−')+dieWord(m.stageD)+' from stages');
   const dice=(m.mon?m.base+'dM → ':'')+m.base+'d'+m.s+(bits.length?' ('+bits.join(', ')+') = '+m.n+'d'+m.s:'')+(m.mon?' (Monster die d'+m.s+')':'');
-  let s=dice+(c.crit?' · critical, every die at its top face':'')+': ['+m.rolled.join(', ')+']';
+  let s=dice+(c.crit?' · critical, every die at its top face':'')+(m.typed?': typed '+m.sum:': ['+m.rolled.join(', ')+']');
   const add=[];
   if(m.fixed)add.push(sgn(m.fixed));
   if(m.stat)add.push('+'+m.stat+' '+m.ab);
@@ -553,6 +581,7 @@ function atkEntry(c,who,tgt,foe){
   if(c.crit)e.crit=true;
   if(c.hit!=null)e.hit=!!c.hit;
   if(c.dm){e.dm=c.dm.tot;e.ef=c.dm.ef;}
+  if(c.typed)e.rd=1;
   const local=Object.assign({},e,{acd:acText(c),dmd:dmText(c)});
   if(!foe){e.acd=local.acd;e.dmd=local.dmd;}
   if(foe)e.gm=true;
@@ -585,7 +614,7 @@ function rollLogView(limit,gm){
     const ap=auCanHit(r),seen=ap?auRollSeen(r):'';
     return h`<li class="${r.kind==='atk'?'atk':''}"><span class="rt">${hhmm(r.at)}</span>
       <span class="rb"><b>${r.who||'Someone'}</b>${r.pk?h` · ${r.pk}`:''} · ${r.label}${r.tn?h` <span class="sub">→ ${r.tn}</span>`:''}
-        <span class="rv">${rollRowText(r)}${r.hit===true?h` <span class="pill good">Hit</span>`:r.hit===false?h` <span class="pill">Miss</span>`:''}${r.crit?h` <span class="pill gm">Crit</span>`:''}${r.ef&&r.ef!=='n'?h` <span class="pill">${EFF_LBL[r.ef]}</span>`:''}</span>
+        <span class="rv">${rollRowText(r)}${r.hit===true?h` <span class="pill good">Hit</span>`:r.hit===false?h` <span class="pill">Miss</span>`:''}${r.crit?h` <span class="pill gm">Crit</span>`:''}${r.ef&&r.ef!=='n'?h` <span class="pill">${EFF_LBL[r.ef]}</span>`:''}${r.rd?h` <span class="pill rdp">real dice</span>`:''}</span>
         ${r.acd||r.dmd?h`<span class="sub rd">${[r.acd,r.dmd].filter(Boolean).join(' · ')}</span>`:(r.detail?h`<span class="sub rd">${r.detail}</span>`:'')}</span>
       ${ap?(seen?h`<span class="pill">${seen==='skip'?'Skipped':'Applied'}</span>`:h`<button class="btn sm" data-act="b_apply" data-src="${r.src}" data-id="${r.id}">Apply ${r.dm} to ${r.tn||'target'}</button>`):''}</li>`;
   })}</ol>`;
@@ -613,10 +642,42 @@ function mrPsLine(scope,att,tgt,x){
   return h`<div class="psline">${on.length?h`<p class="sub">Passives counted when they apply: <b>${on.join(', ')}</b>.${tPs?' The target’s passives count too.':' A hidden foe’s passives are applied when the GM presses Apply.'}</p>`:''}
     ${sit.length?h`<div class="row evchips">${sit.map(([k,,,l])=>h`<label class="chip chkc"><input type="checkbox" data-u="${scope}.ps_${k}" data-nr ${tog[k]?raw('checked'):''}><span>${l}</span></label>`)}</div>`:''}</div>`;
 }
+/* the numbers a player's move roll uses, without the dice: shared by the roll and the typed-dice hint */
+function mrOpts(m,x,onlyDmg,uid,pid){
+  const f=S.ui.mr,k=KINDS.indexOf(x.kind)>=0?x.kind:'Physical',ks=kindStat(k);
+  const info=f.tgt?btInfo(f.tgt,false):null;
+  return {
+    mv:x,die:monDie(m),aTypes:effTypes(m),aAcc:isEff(k)?spdOf(m):effStat(m,ks.acc),aDmg:ks.dmg?effStat(m,ks.dmg):0,aStage:ks.dmg?stg(m,ks.dmg):0,
+    tTypes:info?info.types:null,tDef:info&&info.stat?(isEff(k)?info.stat.spe:info.stat[fcSwapDef(f.tgt,ks.def)]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
+    eff:f.eff||'auto',accBonus:num(f.acc),dmgBonus:num(f.dmg),adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:!!onlyDmg&&!!f.crit,
+    aPs:m.passives,aHp:m.hp,tPs:info&&info.side==='a'?(info.m.passives||[]):null,tHp:info&&info.side==='a'?info.hp:null,tog:psTog(f),
+    fcA:fcAt(btCidOf(uid+'/'+pid)),fcT:f.tgt?fcAt(f.tgt):[]
+  };
+}
+/* the typed-dice part of a roll form: the switch, what to roll, and the boxes */
+function rdBoxes(k,hint,acc,dmg,sc){
+  if(!S.ui.rd[k])return rdSwitch(k);
+  return h`${rdSwitch(k)}${hint?h`<p class="dhint">${raw(hint)}</p>`:''}
+    <div class="dicein">${acc?h`<label class="fld"><span class="fl">d20 (the face you rolled)</span><input type="number" inputmode="numeric" min="1" max="20" data-u="${sc}.td20" data-nr value="${S.ui[sc].td20||''}"></label>`:''}
+      ${dmg?h`<label class="fld"><span class="fl">Damage dice total${dmg===true?'':' ('+dmg+')'}</span><input type="number" inputmode="numeric" min="0" data-u="${sc}.tdmg" data-nr value="${S.ui[sc].tdmg||''}"></label>`:''}</div>
+    <p class="sub">With advantage or disadvantage, type the d20 you kept. A natural 20 is a critical hit: the damage dice then count at their top faces, whatever you typed.</p>`;
+}
+/* the typed dice, checked: null (with a message) when something is missing */
+function rdTyped(sc,c0,onlyDmg){
+  const f=S.ui[sc],t={d20:null,dmg:null};
+  if(!onlyDmg&&c0.ac){t.d20=rdNum(f.td20,1,20);if(t.d20==null){toast('Type the d20 you rolled (1 to 20) first.');return null;}}
+  const needDmg=c0.dm&&!c0.dm.imm&&c0.dm.n>0&&!(t.d20===20)&&!(onlyDmg&&c0.crit);
+  if(needDmg){const mx=c0.dm.n*c0.dm.s;t.dmg=rdNum(f.tdmg,c0.dm.n,mx);if(t.dmg==null){toast('Type the total of your '+c0.dm.n+'d'+c0.dm.s+' ('+c0.dm.n+' to '+mx+') first.');return null;}}
+  return t;
+}
 function moveForm(uid,pid,i,x){
   const key=mrKey(uid,pid,i);
   const f=S.ui.mr;
   if(f.key!==key)return '';
+  const m0=getLocal('p',uid+'/'+pid),mm=m0?Object.assign({id:pid},m0):null;
+  const real=!!S.ui.rd.mr;
+  const dry=real&&mm?atkCalc(Object.assign(mrOpts(mm,hbMove(x,monDie(mm)),false,uid,pid),{typed:{d20:10,dmg:0}})):null;
+  const dmgLbl=dry&&dry.dm&&!dry.dm.imm&&dry.dm.n>0?dry.dm.n+'d'+dry.dm.s:'';
   const tg=btTargets(uid+'/'+pid);
   const info=f.tgt?btInfo(f.tgt,false):null;
   const known=info&&info.types;
@@ -630,9 +691,10 @@ function moveForm(uid,pid,i,x){
     </div>
     ${mrPsLine('mr',getLocal('p',uid+'/'+pid),info&&info.side==='a'?info.m:null,x)}
     ${plain?'':h`<p class="sub">${known?'Automatic uses '+info.name+'’s types, which the GM has shown.':(f.tgt?'This target’s types are hidden, so pick the advantage yourself once the GM tells you.':'Automatic treats it as neutral unless you pick a target whose types are shown.')}</p>`}
+    ${rdBoxes('mr',dry?rdHint(dry,false,x.name):'',!!(dry&&dry.ac),dmgLbl||false,'mr')}
     <div class="row"><div class="seg" role="group" aria-label="Roll mode">${[['normal','Normal'],['adv','Advantage'],['dis','Disadvantage']].map(([v,l])=>h`<button data-act="adv" data-v="${v}" aria-pressed="${String(S.ui.adv===v)}">${l}</button>`)}</div>
       <label class="row"><input type="checkbox" data-u="mr.crit" data-nr ${f.crit?raw('checked'):''}><span>Critical hit (damage only)</span></label></div>
-    <div class="row"><button class="btn primary sm" data-act="b_mroll" data-uid="${uid}" data-pid="${pid}" data-i="${i}">Roll attack</button>
+    <div class="row"><button class="btn primary sm" data-act="b_mroll" data-uid="${uid}" data-pid="${pid}" data-i="${i}">${real?'Log attack':'Roll attack'}</button>
       <button class="btn sm" data-act="b_mdmg" data-uid="${uid}" data-pid="${pid}" data-i="${i}">Damage only</button>
       <button class="btn sm ghost" data-act="b_mclose">Close</button></div>
   </div>`;
@@ -644,26 +706,25 @@ function moveRoll(uid,pid,i,onlyDmg){
   const x=(m.moves||[])[i];
   if(!x)return;
   const f=S.ui.mr;
-  const k=KINDS.indexOf(x.kind)>=0?x.kind:'Physical';
-  const ks=kindStat(k);
   if(needDie(x,monDie(m),mName(m)+(megaOn(m)?' (Mega)':'')))return;
   const info=f.tgt?btInfo(f.tgt,false):null;
   const tgtBit=info?{cid:f.tgt,name:info.name}:null;
   const prep=auRollPrep('p',uid+'/'+pid,'moves.'+i,hbMove(x,monDie(m)),btCidOf(uid+'/'+pid),!!onlyDmg);
   if(!prep)return;
   /* a target's Defense and stages are used only when everyone can see them (a player's Pokémon always can) */
-  const c=atkCalc({
-    mv:prep.x,die:monDie(m),aTypes:effTypes(m),aAcc:isEff(k)?spdOf(m):effStat(m,ks.acc),aDmg:ks.dmg?effStat(m,ks.dmg):0,aStage:ks.dmg?stg(m,ks.dmg):0,
-    tTypes:info?info.types:null,tDef:info&&info.stat?(isEff(k)?info.stat.spe:info.stat[fcSwapDef(f.tgt,ks.def)]):null,tStage:info&&info.stage&&ks.dmg?num(info.stage[ks.def]):0,
-    eff:f.eff||'auto',accBonus:num(f.acc),dmgBonus:num(f.dmg),adv:S.ui.adv,onlyDmg:!!onlyDmg,crit:!!onlyDmg&&!!f.crit,
-    aPs:m.passives,aHp:m.hp,tPs:info&&info.side==='a'?(info.m.passives||[]):null,tHp:info&&info.side==='a'?info.hp:null,tog:psTog(f),
-    fcA:fcAt(btCidOf(uid+'/'+pid)),fcT:f.tgt?fcAt(f.tgt):[]
-  });
+  const o=mrOpts(m,prep.x,onlyDmg,uid,pid);
+  if(S.ui.rd.mr){
+    const t=rdTyped('mr',atkCalc(Object.assign({},o,{typed:{d20:10,dmg:0}})),onlyDmg);
+    if(!t)return;
+    o.typed=t;
+  }
+  const c=atkCalc(o);
   if(!c.ac&&!c.dm){toast('That move has no damage listed, so there is nothing to roll. Use Roll attack for the accuracy check.');return;}
   const who=mName(m);
   const {e,local}=atkEntry(c,who,tgtBit,false);
   logRoll(e,local);
   prep.done();
+  if(S.ui.rd.mr){f.td20='';f.tdmg='';}
   renderRoll();
   render();
 }
@@ -688,6 +749,17 @@ function renderRoll(){
 
 /* skill and stat checks from the Trainer sheet: same roll as before, and now shared */
 function doRoll(label,m,tal){
+  if(S.ui.rd.chk){
+    /* typed: the d20 as rolled at the table; a 20 rolls again and adds, so up to 40 */
+    const v=rdNum(S.ui.rd.cv,1,40);
+    if(v==null){toast('Type the d20 you rolled first (1 to 20; on a 20, roll again and type the sum).');return;}
+    const e=chkEntry(label,v+m+tal,'d20 '+v+' typed + mod '+m+(tal?' + talent '+tal:''));
+    e.rd=1;
+    logRoll(e);
+    S.ui.rd.cv='';
+    render();
+    return;
+  }
   const r1=rollOnce();
   let pick=r1,note='';
   if(S.ui.adv!=='normal'){

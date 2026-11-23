@@ -58,7 +58,7 @@ const seedFn=S=>{
   s=await p.evaluate(()=>{const s=bdbState('f1');return {P:s.P&&s.P.name,pbd:s.P&&s.P.bd,tier:s.tier,n:s.n,lk:s.lk,hk:s.hk,saved:!!(S.teamGm&&S.teamGm.f&&S.teamGm.f[s.P.r.id])};});
   ok(s.P&&s.tier===String(s.pbd>=7?4:s.pbd>=5?3:s.pbd>=2?2:1)&&s.saved,'choosing '+s.P+' ('+s.pbd+' badges) sets the tier from the partner with more ('+s.tier+'), and saves their circuit team');
   t=await card('f1');
-  ok(/partner ·/.test(t)&&/battle page tracks player Pokémon only/.test(t),'the partner’s team shows, with a note on running them');
+  ok(/partner ·/.test(t)&&/as allies on the players’ side/.test(t),'the partner’s team shows, and Send to the battle will add them as allies');
 
   // picking and sending
   await click(p,{act:'bdb_p',id:'f1',v:'pc:u3'});await W(p);

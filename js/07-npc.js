@@ -600,7 +600,7 @@ function ntFoeFrom(id,nt,m){
 }
 /* a Quick NPC's Pokémon get the applied numbers of its features (Update 52) */
 const ntFoeFromQ=(id,nt,m)=>qnFoe(ntFoeFrom(id,nt,m),nt,id);
-function ntToBattle(id,mid,quiet){
+function ntToBattle(id,mid,quiet,ally){
   if(!S.me.admin)return;
   const nt=NTS()[id];
   const m=nt&&ntTeam(nt).find(x=>x.id===mid);
@@ -608,16 +608,18 @@ function ntToBattle(id,mid,quiet){
   const b=BT();
   const cid=newCid();
   const f=ntFoeFromQ(id,nt,m);
+  /* Update 64: an NPC's Pokémon can fight on the players' side */
+  if(ally)btMakeAlly(f,ntName(nt));
   edit('gb','battle','foes.'+cid,f);
   btInsert(cid,{s:'f',pub:foePub(f)},fSpd(f)+(b.mode==='d20'?rnd(20):0),rnd(20));
   if(!quiet)render();
 }
 function ntTeamToBattle(id){
   if(!S.me.admin)return;
-  const nt=NTS()[id];
+  const nt=NTS()[id],al=!!S.ui.bt.ntAl;
   const left=ntTeam(nt).filter(m=>!ntInBattle(id,m.id));
-  left.forEach(m=>ntToBattle(id,m.id,true));
-  if(left.length)toast(left.length+(left.length===1?' Pokémon':' Pokémon')+' from '+ntName(nt)+' added to the battle, hidden from the players until you show them.',true);
+  left.forEach(m=>ntToBattle(id,m.id,true,al));
+  if(left.length)toast(left.length+' Pokémon from '+ntName(nt)+' added to the battle'+(al?' as allies, shown to the table.':', hidden from the players until you show them.'),true);
   render();
 }
 function ntDelete(id){
@@ -1042,8 +1044,10 @@ function ntPublicPanel(o){
 function ntBattlePanel(){
   const ids=ntIds().filter(id=>ntTeam(NTS()[id]).length);
   if(!ids.length)return '';
+  const al=!!S.ui.bt.ntAl;
   return h`<div class="mgd"><b>NPC trainers</b>
-    <p class="sub">Their Pokémon join as foes with their own sheets, hidden from the players until you show them.</p>
+    <div class="row"><span class="fl">Join as</span><span class="seg" role="group" aria-label="Which side NPC Pokémon join"><button data-act="b_ntal" data-v="0" aria-pressed="${String(!al)}">Foes</button><button data-act="b_ntal" data-v="1" aria-pressed="${String(al)}">Allies</button></span></div>
+    <p class="sub">${al?'Their Pokémon join the players’ side as allies: only you change or roll for them, and the table sees all of them.':'Their Pokémon join as foes with their own sheets, hidden from the players until you show them.'}</p>
     ${ids.map(id=>{const nt=NTS()[id],team=ntTeam(nt),left=team.filter(m=>!ntInBattle(id,m.id)).length;
       return h`<div class="row sp"><b>${ntName(nt)}${ntCat(nt)?h` <span class="pill cat ${ntCat(nt)==='villain'?'ves':''}">${npcCatName(ntCat(nt))}</span>`:''}</b><button class="btn sm" data-act="nt_team" data-id="${id}" ${left?'':raw('disabled')}>Add whole team</button></div>
         <div class="row evchips">${team.map(m=>h`<button class="btn sm chk" data-act="nt_foe" data-id="${id}" data-mid="${m.id}" aria-pressed="${String(ntInBattle(id,m.id))}" ${ntInBattle(id,m.id)?raw('disabled'):''}>${monIcon({species:m.sp})}${ntMonName(m)}</button>`)}</div>`;})}
@@ -1075,7 +1079,7 @@ function ntAct(b){
     case 'nt_mgadd':case 'nt_mgform':case 'nt_mgreset':case 'nt_mgdrop':case 'nt_mgready':mgAct('nt',d.act.slice(3),d);break;
     case 'nt_mon':S.ui.nt.mon[d.mid]=!S.ui.nt.mon[d.mid];render();break;
     case 'nt_add':ntAddMon(d.id);break;
-    case 'nt_foe':ntToBattle(d.id,d.mid);break;
+    case 'nt_foe':ntToBattle(d.id,d.mid,false,!!S.ui.bt.ntAl);break;
     case 'nt_team':ntTeamToBattle(d.id);break;
     case 'nt_see':{
       const nt=NTS()[d.id];

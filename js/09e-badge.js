@@ -106,17 +106,32 @@ function bdbLoad(id){
   }
   return ok;
 }
-function bdbSend(id){
+async function bdbSend(id){
   const s=bdbState(id);
   if(!s)return;
   if(!s.A){toast('Choose the challenger first.');return;}
   if(!bdbLoad(id)){render();return;}
-  const add=(nid,picks)=>{const team=ntTeam(NTS()[nid]);let k=0;picks.forEach(i=>{const m=team[i];if(m&&!ntInBattle(nid,m.id)){ntToBattle(nid,m.id,true);k++;}});return k;};
+  /* Update 64: the battle takes the badge battle's format, and an NPC partner's Pokémon join as allies */
+  const fmt=s.tag?'tag':'double';
+  if(btFmt()!==fmt)btSetFmt(fmt);
+  const add=(nid,picks,al)=>{const team=ntTeam(NTS()[nid]);let k=0;picks.forEach(i=>{const m=team[i];if(m&&!ntInBattle(nid,m.id)){ntToBattle(nid,m.id,true,al);k++;}});return k;};
   const a=add(id,s.lp),b=s.tag&&s.hid?add(s.hid,s.hp):0;
+  let c=0;
+  const P=s.P;
+  if(s.tag&&P&&P.kind==='rk'){
+    const pn=P.r.npc&&P.r.npc.nt&&NTS()[P.r.npc.nt]?P.r.npc.nt:'';
+    if(pn)c=add(pn,Array.from({length:s.n},(_,i)=>i),true);
+    else{
+      const fo=foesOf(),inB=Object.keys(fo).some(k=>fo[k].al&&fo[k].ag===P.r.id&&btC(k));
+      const tm=(grTeamOf(P.r,s.F.W)||{}).sp||[];
+      if(!inB)for(const sp of tm.slice(0,s.n)){await btAddFoeSp(sp,1,'','',{ally:true,own:P.name,ag:P.r.id});c++;}
+    }
+  }
   const parts=[];
   if(a)parts.push(a+' Pokémon from '+ntName(s.nt));
   if(b)parts.push(b+' from '+ntName(NTS()[s.hid]));
-  toast(parts.length?'Added '+parts.join(' and ')+' to the battle, hidden from the players until you show them. Add the players’ Pokémon on the Battle page.':'Nothing new to add: those Pokémon are already in the battle.',true);
+  if(c)parts.push(c+' of '+P.name+'’s as allies');
+  toast(parts.length?'A '+(s.tag?'tag':'double')+' battle: added '+parts.join(', ')+'. Foes stay hidden until you show them. Add the players’ Pokémon on the Battle page.':'Nothing new to add: those Pokémon are already in the battle.',true);
   render();
 }
 function bdbAct(b){
@@ -199,7 +214,7 @@ function bdbPanel(id,nt){
     ${tag?(s.hn?bdbTeamHtml(id,'h',s.hn,s.ht,s.hp,s.n,BDB_DOWN[s.tier],hsrc+' · one rank below the Leader'):h`<div class="bdbside"><p class="sub bdbwarn">This Gym has no Head Gym Trainer yet. Import the Head Gym Trainers pack, or set “Head Gym Trainer at” in any NPC’s Edit details.</p></div>`):''}
     ${tag&&P?h`<div class="bdbside ally"><div class="row sp"><span><b>${P.name}</b> <span class="sub">partner · ${rkPl(P.bd,'badge')}${P.kind==='rk'?' · '+P.tn:''}</span></span><span class="sub">brings ${s.n}</span></div>
       <p>${bdbPartnerTeam(P).join(', ')||'No team saved yet.'}</p>
-      ${P.kind==='rk'?h`<p class="sub">The battle page tracks player Pokémon only, so run this partner from here, or hand them to a player who is sitting out.</p>`:''}</div>`:''}
+      ${P.kind==='rk'?h`<p class="sub">Send to the battle adds the first ${s.n} as allies on the players’ side. Only you run them.</p>`:''}</div>`:''}
     <p class="sub bdbstake">${tag?h`<b>A win:</b> both partners take the ${g.badge} Badge and ${gift}; +25 RP each (Won a Gym badge). The Leader’s personal gift goes to whoever impressed them. <b>A loss:</b> −10 RP each. Log an NPC partner on the rankings too: a logged badge counts toward their badges.`
       :h`<b>A win:</b> the ${g.badge} Badge and ${gift}; +30 RP (log Won a Gym badge solo: the +25 for the badge and +5 for winning alone). <b>A loss:</b> −10 RP.`}</p>
     <div class="row"><button class="btn sm" data-act="bdb_load" data-id="${id}">Load these teams</button><button class="btn sm primary" data-act="bdb_send" data-id="${id}">Send to the battle</button><span class="sub">Loading swaps in the saved team, so save any damage or changes to the current one first.</span></div>`}
