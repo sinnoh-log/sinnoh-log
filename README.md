@@ -1096,3 +1096,14 @@ A GM-only **GM Dashboard** page (first item under Game Master in the menu, with 
   - **Extra stages** (Fashion Show, Pokéathlon, PokéStar Heroes, Talent Show, Dummy round, Tasting round): one roll each, and the top contestant earns a Star Point. The Dummy round is one damaging move each at a stage dummy.
 - **Hall twists:** Celestic (composure: a move whose contest type clashes with the judge's favourite loses 1d4), Chocovine (the Cook-Off the night before), Daybreak (final-round appeals get +1d4).
 - `tests/t_shows.js` checks it.
+
+## NPC coordinators in contests (Update 68)
+
+- **Contest stats on NPC Pokémon.** Every Pokémon on an NPC sheet has a **Contest stats** box (Cool, Beauty, Cute, Clever, Tough, "N of 10") under Edit, and the closed row shows them (for example ●6 ★2). NPC packs can carry them: `cs: {cool, beauty, cute, clever, tough}` on a team or stage Pokémon, or five numbers in that order. Importing a pack again fills in stats for any of an NPC's Pokémon that have none yet.
+- **Picking an NPC's Pokémon for a contest.** In the Live stage setup, choosing an NPC sheet shows **Pokémon** (and **Second Pokémon** for Double Performance) from their team, with each one's stats. After adding them, the row lets you swap Pokémon and change each one's five stats. Changed stats are saved on the NPC's sheet when the contest opens.
+- **Check bonus from the Quick NPC rank:** Novice +2, Skilled or Specialist +3, Experienced +4, Ace +5 (+3 for an NPC who isn't a Quick NPC). You can still change it.
+- **In the contest:** an NPC's appeal form offers **Spend <type> stat**, the Visual stage adds their stat, and "Highest <type> contest stat" counts them. Their stats are kept in the GM's own copy (`gm/contest.ncs`), not the table's.
+- **Saved teams in ribbons.** A coordinator on the Contest rankings only (or in the Coordinator category and on neither board) has their saved teams marked in ribbons under Team growth ("At ribbons"). Pack stages count `gain` in ribbons for them.
+- **Packs and the rankings.** An NPC already on the site whose pack row has a board is now linked to a rankings entry of the same name. No new entry is added for them, so a rival you took off the board stays off.
+- **The contest coordinators pack** (`sinnoh-contest-rivals.json`, kept out of this repo): 30 coordinators, a headliner, a ranked rival, a low-ranked rival and two rookies for each Specialty (Cool, Beauty, Cute, Clever, Tough, All-rounder). It includes the five sample rivals already on the board (Celeste Arnaud, Rory Pendleton, Lena Okabe, Mai Takeda, Jules Ferro), who link to their entries and keep their points. All are Quick NPC Performers, with contest moves checked against the handbook's Contest Moves table and what each species can learn, contest stats, and a later team "After N more ribbons" for all but the headliners.
+- `tests/t_ncs.js` checks it (the pack part runs with `PACKS=<folder with the pack>`).

@@ -88,11 +88,9 @@ function csChkBonus(C,eid,skill){
   if(!t||!sk)return 0;
   return mod(num(t.stats&&t.stats[sk[2]]))+[0,2,5][clamp(num((t.talents||{})[skill]),0,2)];
 }
-function csBestStat(E,type){
-  if(E.k!=='pc')return 0;
-  let best=0;
-  (E.mons||[]).forEach(mo=>{const m=getLocal('p',E.u+'/'+mo.pid);if(!m)return;const cs=ctStatsOf(m);best=Math.max(best,type?num(cs[type]):Math.max(...CT_TYPES.map(t=>num(cs[t]))));});
-  return best;
+function csBestStat(E,type,eid){
+  /* Update 68: NPCs' contest stats count too (the GM's own copy) */
+  return Math.max(0,...csMonStats(E,eid).map(cs=>type?num(cs[type]):Math.max(...CT_TYPES.map(t=>num(cs[t])))));
 }
 const csRollD4=n=>{const r=[];for(let i=0;i<n;i++)r.push(rnd(4));return r;};
 const csSum=a=>a.reduce((x,y)=>x+y,0);
@@ -172,7 +170,7 @@ function csPreScore(){
     if(k==='x:dummy'){const r=csDummyRoll(E,U.mv[e],U.dm[e]);res[e]={t:r.t,txt:r.txt,rd:r.typed};return;}
     const td=rdNum(U.d[e],1,20),d=td!=null?td:rnd(20),b=csChkBonus(C,e,sk);
     let tot=d+b,extra='';
-    if(k==='vis'){const st=csBestStat(E,C.type||'');const th=U.th[e]?2:0;tot+=st+th;extra=(st?' + '+st+' contest stat':'')+(th?' + 2 theme':'');}
+    if(k==='vis'){const st=csBestStat(E,C.type||'',e);const th=U.th[e]?2:0;tot+=st+th;extra=(st?' + '+st+' contest stat':'')+(th?' + 2 theme':'');}
     const r={d,b,t:tot,rd:td!=null?1:0,txt:'d20 '+d+(td!=null?' typed':'')+' '+sgn(b)+' '+csSkName(sk)+extra+' = '+tot};
     if(k==='cook'||k==='vis'){r.dice=Math.floor(tot/5);r.rolled=csRollD4(r.dice);r.hp=csSum(r.rolled);E2[e]=Object.assign({},E,{hp:num(E.hp)+r.hp,sh:num(E.sh)+r.hp});}
     res[e]=r;
@@ -244,7 +242,7 @@ function csPreHtml(C,gm){
   }else if(gm){
     body=h`<div class="cspre">${ents.map(e=>{const E=C.ents[e];
       if(k==='x:dummy'){const L=csDummyMoves(E);return h`<div class="brl"><b>${nm(e)}</b>${L.length?h`<select data-csx="pmv" data-e="${e}" aria-label="${nm(e)}’s move">${L.map(m=>h`<option ${U.mv[e]===m.n?raw('selected'):''}>${m.n}</option>`)}</select><input type="number" inputmode="numeric" class="csd" data-csx="pdm" data-e="${e}" value="${U.dm[e]||''}" placeholder="damage dice" aria-label="${nm(e)}’s damage dice total">`:h`<span class="sub">no damaging move</span>`}</div>`;}
-      return h`<div class="brl"><b>${nm(e)}</b><span class="sub">${sgn(csChkBonus(C,e,sk))} ${csSkName(sk)}${k==='vis'&&csBestStat(E,C.type||'')?' + '+csBestStat(E,C.type||'')+' stat':''}</span>
+      return h`<div class="brl"><b>${nm(e)}</b><span class="sub">${sgn(csChkBonus(C,e,sk))} ${csSkName(sk)}${k==='vis'&&csBestStat(E,C.type||'',e)?' + '+csBestStat(E,C.type||'',e)+' stat':''}</span>
         <input type="number" inputmode="numeric" min="1" max="20" class="csd" data-csx="pd" data-e="${e}" value="${U.d[e]||''}" placeholder="d20" aria-label="${nm(e)}’s d20">
         ${k==='vis'?h`<label class="chip chkc"><input type="checkbox" data-act="cs_pth" data-e="${e}" ${U.th[e]?raw('checked'):''}><span>Fits the theme</span></label>`:''}</div>`;})}
       <p class="sub">Type a player’s d20 if they rolled real dice; a blank box is rolled by the site.</p>

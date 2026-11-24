@@ -802,6 +802,17 @@ input[type=search]{appearance:none}
 .ctstage .brl select{width:auto;min-width:170px;max-width:100%}
 .ctstage .brl .fld{margin:0}
 .ctstage .csnpc b{min-width:130px}.ctstage .csnpc .sub{min-width:150px}
+/* Update 68: an NPC coordinator's Pokémon and contest stats at setup */
+.csnpcb{border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin:6px 0;display:flex;flex-direction:column;gap:6px}
+.csnpcb .brl{margin:0}
+.csnm{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding-left:4px}
+.csnm select{width:auto;min-width:170px;max-width:100%}
+.csnmn{min-width:170px}
+.csmini{display:grid;grid-template-columns:repeat(5,74px);gap:6px}
+.csmini .ct{font-size:11px;padding:1px 7px;gap:3px}
+.csmini .fld{margin:0}.csmini .fl{display:flex;justify-content:center}
+.csmini input{width:100%;text-align:center;padding-left:4px;padding-right:4px}
+@media (max-width:620px){.csmini{grid-template-columns:repeat(5,minmax(0,1fr));width:100%}.csmini .cts{display:none}.csmini .ct{padding:1px 9px}}
 /* badge battles (Update 63) */
 .bdb{display:flex;flex-direction:column;gap:8px;border:2px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0;background:var(--raised)}
 .bdb > .row{flex-wrap:wrap}
@@ -1705,23 +1716,23 @@ input,select,textarea{border-radius:9px}
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
 <!-- The app, in load order. These files share one scope; keep the order. -->
-<script src="js/01-core.js?v=2026-11-23-shows"></script>
-<script src="js/02-species.js?v=2026-11-23-shows"></script>
-<script src="js/03-rolls.js?v=2026-11-23-shows"></script>
-<script src="js/04-battle.js?v=2026-11-23-shows"></script>
-<script src="js/04b-battle-helper.js?v=2026-11-23-shows"></script>
-<script src="js/04c-format.js?v=2026-11-23-shows"></script>
-<script src="js/05-pokedex-contests.js?v=2026-11-23-shows"></script>
-<script src="js/05b-stage.js?v=2026-11-23-shows"></script>
-<script src="js/05c-shows.js?v=2026-11-23-shows"></script>
-<script src="js/06-world.js?v=2026-11-23-shows"></script>
-<script src="js/07-npc.js?v=2026-11-23-shows"></script>
-<script src="js/07b-quick-npc.js?v=2026-11-23-shows"></script>
-<script src="js/08-battlemap.js?v=2026-11-23-shows"></script>
-<script src="js/09-sheets.js?v=2026-11-23-shows"></script>
-<script src="js/09b-road.js?v=2026-11-23-shows"></script>
-<script src="js/09c-growth.js?v=2026-11-23-shows"></script>
-<script src="js/09d-dash.js?v=2026-11-23-shows"></script>
-<script src="js/09e-badge.js?v=2026-11-23-shows"></script>
-<script src="js/10-calendar-main.js?v=2026-11-23-shows"></script>
+<script src="js/01-core.js?v=2026-11-23-coord"></script>
+<script src="js/02-species.js?v=2026-11-23-coord"></script>
+<script src="js/03-rolls.js?v=2026-11-23-coord"></script>
+<script src="js/04-battle.js?v=2026-11-23-coord"></script>
+<script src="js/04b-battle-helper.js?v=2026-11-23-coord"></script>
+<script src="js/04c-format.js?v=2026-11-23-coord"></script>
+<script src="js/05-pokedex-contests.js?v=2026-11-23-coord"></script>
+<script src="js/05b-stage.js?v=2026-11-23-coord"></script>
+<script src="js/05c-shows.js?v=2026-11-23-coord"></script>
+<script src="js/06-world.js?v=2026-11-23-coord"></script>
+<script src="js/07-npc.js?v=2026-11-23-coord"></script>
+<script src="js/07b-quick-npc.js?v=2026-11-23-coord"></script>
+<script src="js/08-battlemap.js?v=2026-11-23-coord"></script>
+<script src="js/09-sheets.js?v=2026-11-23-coord"></script>
+<script src="js/09b-road.js?v=2026-11-23-coord"></script>
+<script src="js/09c-growth.js?v=2026-11-23-coord"></script>
+<script src="js/09d-dash.js?v=2026-11-23-coord"></script>
+<script src="js/09e-badge.js?v=2026-11-23-coord"></script>
+<script src="js/10-calendar-main.js?v=2026-11-23-coord"></script>
 </body></html>

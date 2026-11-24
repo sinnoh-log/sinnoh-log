@@ -63,11 +63,17 @@ function csMonMoves(E,i){
   return list.map(x=>{const c=ctOfRow({name:x.n,ct:x.ct});return c?Object.assign(x,{t:c.t,k:c.k}):null;}).filter(Boolean);
 }
 const csMonName=(E,i)=>{const mo=(E.mons||[])[i];if(!mo)return '';if(E.k==='pc'){const m=getLocal('p',E.u+'/'+mo.pid);return m?mName(Object.assign({id:mo.pid},m)):(mo.name||'Pokémon');}return mo.name||mo.sp||'Pokémon';};
-function csStatLeft(E,type){
-  if(E.k!=='pc'||!type)return 0;
-  let best=0;
-  (E.mons||[]).forEach(mo=>{const m=getLocal('p',E.u+'/'+mo.pid);if(m)best=Math.max(best,num(ctStatsOf(m)[type]));});
-  return Math.max(0,best-num((E.spent||{})[type]));
+/* a contestant's Pokémon's contest stats: a player's from its sheet; an NPC's from the GM's own copy (gm/contest.ncs, Update 68) */
+function csMonStats(E,eid,G){
+  if(!E)return [];
+  if(E.k==='pc')return (E.mons||[]).map(mo=>ctStatsOf(getLocal('p',E.u+'/'+mo.pid)));
+  const L=(((G||CSG()).ncs||{})[eid])||[];
+  return (E.mons||[]).map((mo,i)=>ctStatsOf({cs:L[i]||mo.cs||{}}));
+}
+const csTopStat=(E,eid,type,G)=>Math.max(0,...csMonStats(E,eid,G).map(c=>num(c[type])));
+function csStatLeft(E,type,eid){
+  if(!E||!type)return 0;
+  return Math.max(0,csTopStat(E,eid,type)-num((E.spent||{})[type]));
 }
 /* ----- one appeal: the sums, shared by the form's preview and the GM's scoring ----- */
 function csWork(C,eid,ap){
@@ -96,7 +102,7 @@ function csWork(C,eid,ap){
   const used=[m0.n].concat(m1?[m1.n]:[]),prev=E.lastMv||[];
   const same=used.some(n=>prev.indexOf(n)>=0);
   const hv=!!(C.var&&C.var.hv);
-  const stLeft=csStatLeft(E,type),stat=clamp(Math.round(num(ap.st)),0,stLeft);
+  const stLeft=csStatLeft(E,type,eid),stat=clamp(Math.round(num(ap.st)),0,stLeft);
   const c=ctCalc({kw,type,ctype,volt:num(J.v),elec:hv?false:!!J.el,first:before===0,last:before===ents.length-1,fin:R===5,low,both,maxed,before,alone,allBig,lastHp,
     ready:!!(C.ready||{})[eid],same,stat,noRaise:!!J.hold,noLower:!!J.exc});
   /* the judge's Voltage afterwards, with the keyword's effects and the round's locks */
@@ -237,7 +243,7 @@ function csScores(C,G){
           case 'up':sc[e]=A.filter(x=>num(x.v1)>num(x.v0)).length;break;
           case 'fin':sc[e]=L.filter(x=>num(x.r)===5).reduce((a,x)=>a+num(x.tot),0);break;
           case 'var':sc[e]=new Set(A.map(x=>x.mv)).size;break;
-          case 'stat':{const E=C.ents[e];sc[e]=E.k==='pc'?Math.max(0,...(E.mons||[]).map(mo=>{const m=getLocal('p',E.u+'/'+mo.pid);return m?num(ctStatsOf(m)[g.t]):0;})):0;break;}
+          case 'stat':sc[e]=csTopStat(C.ents[e],e,g.t,G);break;
           default:break;
         }
       });
@@ -310,7 +316,7 @@ function csDraft(){
   const halls=ribHalls();
   S.ui.cs={hall:halls[0]?halls[0].k:'',type:'Beauty',var:{dbl:false,sup:false,fest:false,hv:false,ta:false,rs:false,ap:false,vis:false,dan:false},xs:{},tw:{},tdc:15,theme:'',note:'',
     sk:{vis:'perform',dan:'perform',cook:'nature',fashion:'perform',athlon:'athletics',heroes:'perform',talent:'sleight',tasting:'nature'},pairs:{},
-    judges:CS_JUDGES.map(n=>({n,goals:[]})),pcs:{},npcs:[],nn:'',nsp:'',nnt:''};
+    judges:CS_JUDGES.map(n=>({n,goals:[]})),pcs:{},npcs:[],nn:'',nsp:'',nnt:'',nm1:'',nm2:''};
   csApplyPreset(S.ui.cs,S.ui.cs.hall);
   S.ui.cs.judges.forEach((J,j)=>csRollGoals(J,S.ui.cs.type,j===0));
   return S.ui.cs;
@@ -322,13 +328,25 @@ function csRollGoals(J,type,first){
   while(out.length<3){const g=csRnd(pool);if(out.some(x=>x.k===g[0]))continue;out.push({k:g[0],t:g[2]==='ct'?csRnd(CT_TYPES):g[2]==='ty'?csRnd(TYPES):''});}
   J.goals=out;
 }
+/* Update 68: an NPC's check bonus starts from their Quick NPC rank (Novice +2, Skilled or Specialist +3, Experienced +4, Ace +5) */
+const csQnCb=nt=>{const q=qnOf(nt),r=q&&q.r;return r==='4'?5:r==='3'?4:r==='2'||r==='2s'?3:r==='1'?2:3;};
+const csCsLow=m=>{const c=ctStatsOf(m),o={};CT_TYPES.forEach(t=>{o[t.toLowerCase()]=num(c[t]);});return o;};
+/* one of an NPC sheet's Pokémon as it enters a contest: moves, types and contest stats */
+const csNpcMon=m=>({mid:m.id,sp:m.sp,name:m.nick||m.sp,ty:(m.ty||[]).filter(Boolean),mv:(m.mv||[]).map(x=>({n:x.name,t:x.type||''})).filter(x=>x.n),cs:csCsLow(m),spd:num((m.base||{}).spe)});
+/* the Pokémon the GM picked from an NPC sheet (the first ones when nothing is picked) */
+function csNpcPicks(nt,ids,dbl){
+  const team=ntTeam(nt),out=[];
+  (ids||[]).forEach(id=>{const m=team.find(x=>x.id===id);if(m&&out.indexOf(m)<0)out.push(m);});
+  team.forEach(m=>{if(out.length<(dbl?2:1)&&out.indexOf(m)<0)out.push(m);});
+  return out.slice(0,dbl?2:1);
+}
 async function csNpcMons(D){
-  /* an NPC coordinator: from an NPC sheet (its first one or two Pokémon), or a name and species (natural moves) */
+  /* an NPC coordinator: from an NPC sheet (the Pokémon picked, Update 68), or a name and species (natural moves) */
   const dbl=!!D.var.dbl,out=[];
   if(D.nnt&&NTS()[D.nnt]){
     const nt=NTS()[D.nnt];
-    ntTeam(nt).slice(0,dbl?2:1).forEach(m=>out.push({sp:m.sp,name:m.nick||m.sp,ty:(m.ty||[]).filter(Boolean),mv:(m.mv||[]).map(x=>({n:x.name,t:x.type||''})).filter(x=>x.n)}));
-    return {id:'n_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),name:ntName(nt),nt:D.nnt,mons:out,spd:num(((ntTeam(nt)[0]||{}).base||{}).spe),cb:3};
+    csNpcPicks(nt,[D.nm1,dbl?D.nm2:''],dbl).forEach(m=>out.push(csNpcMon(m)));
+    return {id:'n_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),name:ntName(nt),nt:D.nnt,mons:out,spd:num((out[0]||{}).spd),cb:csQnCb(nt)};
   }
   const sps=String(D.nsp||'').split(/[,+&]/).map(x=>x.trim()).filter(Boolean).slice(0,dbl?2:1);
   for(const sp of sps){
@@ -336,9 +354,21 @@ async function csNpcMons(D){
     let rec=null;
     if(pr)rec=ptaRec(pr)||await ptaChunk(ptaLetter(ptaKey(pr))).then(()=>ptaRec(pr));
     const base=foeFromRec(rec,rec?null:speciesInfo(sp),sp);
-    out.push({sp:base.sp||sp,name:base.sp||sp,ty:(base.ty||[]).filter(Boolean),mv:(base.mv||[]).map(x=>({n:x.name,t:x.type||''})).filter(x=>x.n)});
+    out.push({sp:base.sp||sp,name:base.sp||sp,ty:(base.ty||[]).filter(Boolean),mv:(base.mv||[]).map(x=>({n:x.name,t:x.type||''})).filter(x=>x.n),cs:csCsLow(null)});
   }
   return {id:'n_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),name:String(D.nn||'').trim()||'Coordinator',nt:'',mons:out,spd:0,cb:3};
+}
+/* contest stats changed at setup are saved on the NPC's sheet when the contest opens (Update 68) */
+function csNpcSaveStats(D){
+  (D.npcs||[]).forEach(n=>{
+    const nt=n.nt&&NTS()[n.nt];if(!nt)return;
+    const team=ntTeam(nt);
+    (n.mons||[]).forEach(mo=>{
+      const i=team.findIndex(x=>x.id===mo.mid);if(i<0||!mo.cs)return;
+      const cur=csCsLow(team[i]);
+      if(CT_TYPES.some(t=>num(cur[t.toLowerCase()])!==num(mo.cs[t.toLowerCase()])))edit('gt',n.nt,'team.'+i+'.cs',Object.assign({},mo.cs));
+    });
+  });
 }
 function csOpen(){
   if(!S.me.admin)return;
@@ -351,7 +381,10 @@ function csOpen(){
     if(!mons.length||(dbl&&mons.length<2))return;
     const e='p_'+uid;ents[e]={k:'pc',u:uid,name:tName(S.trainers[uid]),mons,hp:0,spent:{},lastMv:[]};eord.push(e);
   });
-  D.npcs.forEach((n,i)=>{const e=n.id||('n_'+i+'_'+Date.now().toString(36));ents[e]=Object.assign({k:'npc',hp:0,sh:0,spent:{},lastMv:[]},n);eord.push(e);});
+  const ncs={};
+  D.npcs.forEach((n,i)=>{const e=n.id||('n_'+i+'_'+Date.now().toString(36));
+    ents[e]=Object.assign({k:'npc',hp:0,sh:0,spent:{},lastMv:[]},n,{mons:(n.mons||[]).map(mo=>{const o=Object.assign({},mo);delete o.cs;delete o.spd;return o;})});eord.push(e);
+    ncs[e]=(n.mons||[]).map(mo=>Object.assign({},mo.cs||{}));});
   if(eord.length<2){toast('A contest needs at least two contestants'+(dbl?' with two Pokémon each':'')+'.');return;}
   const hall=ribHalls().find(x=>x.k===D.hall);
   const hv=!!D.var.hv;
@@ -364,6 +397,8 @@ function csOpen(){
     pre:csPreList(D),pi:0,pr:{},sk:Object.assign({},D.sk),theme:String(D.theme||''),tdc:clamp(Math.round(num(D.tdc))||15,5,40),tw:Object.assign({},D.tw),
     pairs,rsd:{},crowd:0,cfav:vr.ap?csRnd(CT_TYPES):''};
   Object.keys(C).forEach(k=>edit('cs','contest',k,C[k]));
+  edit('cg','contest','ncs',ncs);
+  csNpcSaveStats(D);
   edit('cg','contest','goals',D.judges.map(J=>J.goals.map(g=>({k:g.k,t:g.t||'',x:g.x||''}))));
   edit('cg','contest','ov',{});
   S.csUndo=[];S.ui.cs=null;
@@ -438,6 +473,24 @@ function csFormHtml(C,eid,gm){
     <div class="row"><button class="btn primary sm" data-act="cs_go" data-e="${eid}" ${w.err||sent?raw('disabled'):''}>${sent?'Sent: waiting for the GM’s screen':'Make the appeal'}</button>${gm&&E.k==='pc'?h`<span class="sub">${E.name} can send this from their own screen too.</span>`:''}</div>
   </div>`;
 }
+/* Update 68: which of an NPC sheet's Pokémon enter, picked before adding */
+function csNpcPickSel(D,dbl){
+  const nt=NTS()[D.nnt],team=ntTeam(nt),cur=csNpcPicks(nt,[D.nm1,dbl?D.nm2:''],dbl);
+  const opt=(k,sel)=>h`<label class="fld"><span class="fl">${k==='nm2'?'Second Pokémon':'Pokémon'}</span><select data-u="cs.${k}">${team.map(m=>h`<option value="${m.id}" ${sel&&sel.id===m.id?raw('selected'):''}>${ntMonName(m)}${m.nick&&m.sp?' ('+m.sp+')':''}${ctStatTotal(ctStatsOf(m))?' · '+CT_TYPES.filter(t=>ctStatsOf(m)[t]).map(t=>CT_ICON[t]+ctStatsOf(m)[t]).join(' '):''}</option>`)}</select></label>`;
+  return h`${opt('nm1',cur[0])}${dbl?opt('nm2',cur[1]):''}`;
+}
+/* an NPC coordinator in the setup: their Pokémon (swappable when they come from a sheet), each one's contest stats, and the check bonus */
+function csNpcRow(n,i,dbl){
+  const nt=n.nt&&NTS()[n.nt],team=nt?ntTeam(nt):[];
+  return h`<div class="csnpcb">
+    <div class="brl csnpc"><b>${n.name}</b><span class="sub">${nt?'NPC sheet'+(qnOf(nt)&&nt.q.r?' · '+qnRankName(nt.q.r):''):'by species'}</span><label class="fld csncb"><span class="fl">Check bonus</span><input type="number" inputmode="numeric" data-csx="ncb" data-i="${i}" value="${num(n.cb)}"></label><button class="btn sm ghost" data-act="cs_npcdel" data-i="${i}">Remove</button></div>
+    ${(n.mons||[]).map((mo,mi)=>h`<div class="csnm">
+      ${nt&&team.length>1?h`<select data-csx="nmon" data-i="${i}" data-m="${mi}" aria-label="${n.name}’s ${mi?'second ':''}Pokémon">${team.map(m=>h`<option value="${m.id}" ${m.id===mo.mid?raw('selected'):''} ${(n.mons||[]).some((o,oi)=>oi!==mi&&o.mid===m.id)?raw('disabled'):''}>${ntMonName(m)}${m.nick&&m.sp?' ('+m.sp+')':''}</option>`)}</select>`:h`<b class="csnmn">${mo.name}</b>`}
+      <span class="sub">${(mo.mv||[]).length} moves</span>
+      <div class="csmini" role="group" aria-label="${mo.name}’s contest stats">${CT_TYPES.map(t=>h`<label class="fld cs"><span class="fl"><span class="ct ${t.toLowerCase()}" title="${t}"><span aria-hidden="true">${CT_ICON[t]}</span><span class="cts">${t}</span></span></span><input type="number" inputmode="numeric" min="0" max="30" data-csx="ncs" data-i="${i}" data-m="${mi}" data-t="${t.toLowerCase()}" aria-label="${t} contest stat" value="${num((mo.cs||{})[t.toLowerCase()])}"></label>`)}</div>
+    </div>`)}
+  </div>`;
+}
 function csSetupHtml(){
   const D=csDraft(),halls=ribHalls(),ids=tids(),nts=ntIds().filter(id=>ntTeam(NTS()[id]).length);
   const dbl=!!D.var.dbl;
@@ -462,12 +515,13 @@ function csSetupHtml(){
       return h`<div class="brl"><label class="chip chkc"><input type="checkbox" data-act="cs_pc" data-uid="${uid}" ${p.on?raw('checked'):''}><span>${tName(S.trainers[uid])}</span></label>
         ${p.on?h`<select data-csx="pm" data-uid="${uid}" data-k="m1" aria-label="Pokémon">${[h`<option value="">Pokémon…</option>`].concat(pt.map(m=>h`<option value="${m.id}" ${p.m1===m.id?raw('selected'):''}>${mName(m)}</option>`))}</select>
         ${dbl?h`<select data-csx="pm" data-uid="${uid}" data-k="m2" aria-label="Second Pokémon">${[h`<option value="">Second Pokémon…</option>`].concat(pt.map(m=>h`<option value="${m.id}" ${p.m2===m.id?raw('selected'):''}>${mName(m)}</option>`))}</select>`:''}`:''}</div>`;})}
-      ${D.npcs.map((n,i)=>h`<div class="brl csnpc"><b>${n.name}</b><span class="sub">${n.mons.map(m=>m.name+' ('+m.mv.length+' moves)').join(' & ')}</span><label class="fld csncb"><span class="fl">Check bonus</span><input type="number" inputmode="numeric" data-csx="ncb" data-i="${i}" value="${num(n.cb)}"></label><button class="btn sm ghost" data-act="cs_npcdel" data-i="${i}">Remove</button></div>`)}
+      ${D.npcs.map((n,i)=>csNpcRow(n,i,dbl))}
     </div>
     <div class="mgd"><b>Add an NPC coordinator</b><div class="fgrid">
       <label class="fld"><span class="fl">From an NPC sheet</span><select data-u="cs.nnt"><option value="">None (type a name)</option>${nts.map(id=>h`<option value="${id}" ${D.nnt===id?raw('selected'):''}>${ntName(NTS()[id])}</option>`)}</select></label>
+      ${D.nnt&&NTS()[D.nnt]?csNpcPickSel(D,dbl):''}
       ${D.nnt?'':h`<label class="fld"><span class="fl">Name</span><input type="text" data-u="cs.nn" data-nr value="${D.nn}"></label><label class="fld"><span class="fl">Species${dbl?' (two, with a comma)':''}</span><input type="text" list="dl-species" data-u="cs.nsp" data-nr value="${D.nsp}"></label>`}</div>
-      <div class="row"><button class="btn sm" data-act="cs_npcadd">Add coordinator</button><span class="sub">An NPC sheet brings its first ${dbl?'two Pokémon':'Pokémon'} and their moves; a species brings its natural moves.</span></div></div>
+      <div class="row"><button class="btn sm" data-act="cs_npcadd">Add coordinator</button><span class="sub">An NPC sheet brings the ${dbl?'two Pokémon':'Pokémon'} you pick, with their moves and contest stats, and a check bonus from their Quick NPC rank; a species brings its natural moves.</span></div></div>
     <div class="row"><button class="btn primary sm" data-act="cs_open">Open the contest</button><button class="btn sm ghost" data-act="cs_cancel">Cancel</button></div>
   </div>`;
 }
@@ -566,7 +620,7 @@ function csAct(b){
     case 'cs_pc':if(D){const p=D.pcs[d.uid]||(D.pcs[d.uid]={on:false,m1:'',m2:''});p.on=!!b.checked;const pt=partyOf(d.uid);if(p.on&&!p.m1&&pt[0])p.m1=pt[0].id;if(p.on&&!p.m2&&pt[1])p.m2=pt[1].id;render();}break;
     case 'cs_npcadd':if(D){
       if(!D.nnt&&!String(D.nsp||'').trim()){toast('Choose an NPC sheet, or type a name and species.');break;}
-      csNpcMons(D).then(n=>{if(!n.mons.length){toast('No Pokémon found for that coordinator.');return;}if(D.var.dbl&&n.mons.length<2){toast('Double Performance needs two Pokémon.');return;}D.npcs.push(n);D.nn='';D.nsp='';D.nnt='';render();});break;}
+      csNpcMons(D).then(n=>{if(!n.mons.length){toast('No Pokémon found for that coordinator.');return;}if(D.var.dbl&&n.mons.length<2){toast('Double Performance needs two Pokémon.');return;}D.npcs.push(n);D.nn='';D.nsp='';D.nnt='';D.nm1='';D.nm2='';render();});break;}
     case 'cs_npcdel':if(D){const gone=(D.npcs[num(d.i)]||{}).id;D.npcs.splice(num(d.i),1);Object.keys(D.pairs).forEach(k=>{if(k===gone||D.pairs[k]===gone)delete D.pairs[k];});render();}break;
     case 'cs_open':csOpen();break;
     case 'cs_rev':{const g=((CSG().goals||[])[num(d.j)]||[])[num(d.g)];if(!g)break;const by=S.ui.csrb||'';edit('cs','contest','gl',Object.assign({},C.gl||{},{[d.j+'-'+d.g]:{t:csGoalTxt(g),by}}));render();break;}
@@ -611,6 +665,10 @@ function csInput(t){
     case 'theme':if(D)D.theme=t.value;return;
     case 'dsk':if(D)D.sk[d.k]=t.value;break;
     case 'ncb':if(D&&D.npcs[num(d.i)])D.npcs[num(d.i)].cb=Math.round(num(t.value));return;
+    /* Update 68: an NPC's contest stats at setup (saved to their sheet when the contest opens), and swapping their Pokémon */
+    case 'ncs':{const n=D&&D.npcs[num(d.i)],mo=n&&n.mons[num(d.m)];if(mo&&CT_TYPES.some(x=>x.toLowerCase()===d.t)){mo.cs=Object.assign({},mo.cs||{},{[d.t]:clamp(Math.round(num(t.value)),0,30)});}return;}
+    case 'nmon':{const n=D&&D.npcs[num(d.i)],nt=n&&n.nt&&NTS()[n.nt],m=nt&&ntTeam(nt).find(x=>x.id===t.value);
+      if(m&&!n.mons.some((o,oi)=>oi!==num(d.m)&&o.mid===m.id)){n.mons[num(d.m)]=csNpcMon(m);if(num(d.m)===0)n.spd=csNpcMon(m).spd;}break;}
     case 'pair':if(D){const e=d.e,old=D.pairs[e];if(old&&D.pairs[old]===e)delete D.pairs[old];delete D.pairs[e];
       if(t.value){const o=t.value,oo=D.pairs[o];if(oo)delete D.pairs[oo];D.pairs[e]=o;D.pairs[o]=e;}}break;
     case 'psk':{const C=CSC(),k=String(d.k||''),key=k.indexOf('x:')===0?k.slice(2):k;edit('cs','contest','sk',Object.assign({},C.sk||{},{[key]:t.value}));break;}
