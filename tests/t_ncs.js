@@ -88,8 +88,23 @@ const seedFn=S=>{
   const DIR=process.env.PACKS,F=DIR&&path.join(DIR,'sinnoh-contest-rivals.json');
   if(F&&fs.existsSync(F)){
     const txt=fs.readFileSync(F,'utf8'),pk=JSON.parse(txt);
-    ok(pk.npcs.length===30&&pk.npcs.every(r=>r.board==='con'&&r.cat==='coord'&&r.q&&r.q.cls==='performer'&&r.team.every(m=>m.cs&&m.mv.length===4)),'the pack: 30 coordinators on the Contest board, Quick NPC Performers, every Pokémon with four moves and contest stats');
+    const allMons=r=>r.team.concat(...(r.stages||[]).map(s=>s.team));
+    ok(pk.npcs.length===30&&pk.npcs.every(r=>r.board==='con'&&r.cat==='coord'&&r.q&&r.q.cls==='performer'&&allMons(r).every(m=>m.cs&&m.mv.length===6&&new Set(m.mv).size===6)),'the pack: 30 coordinators on the Contest board, Quick NPC Performers, every Pokémon (later teams too) with six moves and contest stats');
+    /* first the four-move release, as a table that imported it before would have it */
+    const four=JSON.parse(txt);four.npcs.forEach(r=>allMons(r).forEach(m=>{m.mv=m.mv.slice(0,4);}));
+    await p.evaluate(t=>ntImportPack({text:async()=>t}),JSON.stringify(four));await W(p,3000);
+    const mvs=()=>p.evaluate(()=>{const o={};Object.keys(S.gmNt).forEach(id=>{const x=S.gmNt[id];o[x.name]={team:ntTeam(x).map(m=>(m.mv||[]).map(v=>v.name)),st:ntStages(x).map(s=>({l:s.label,mv:(s.team||[]).map(m=>(m.mv||[]).map(v=>v.name))}))};});return o;});
+    let M=await mvs();
+    ok(M['Valentin Roux'].team.every(a=>a.length===4),'the four-move release imported (Valentin’s Pokémon know four moves each)');
+    /* the GM changes one move on Valentin's Gallade, then imports the six-move pack */
+    await p.evaluate(()=>{const id=Object.keys(S.gmNt).find(k=>S.gmNt[k].name==='Valentin Roux');edit('gt',id,'team.0.mv.0.name','Tackle');});
     await p.evaluate(t=>ntImportPack({text:async()=>t}),txt);await W(p,3000);
+    M=await mvs();
+    const pv=pk.npcs.find(r=>r.name==='Valentin Roux'),pr=pk.npcs.find(r=>r.name==='Rory Pendleton');
+    ok(M['Valentin Roux'].team[1].join()===pv.team[1].mv.join()&&M['Valentin Roux'].team.slice(1).every(a=>a.length===6),'importing the six-move pack again tops up their Pokémon to six moves, in the pack’s order');
+    ok(M['Valentin Roux'].team[0].length===4&&M['Valentin Roux'].team[0][0]==='Tackle','a Pokémon whose moves the GM changed is left alone');
+    ok(M['Rory Pendleton'].st.length===2&&M['Rory Pendleton'].st.every(s=>s.mv.every(a=>a.length===6))&&M['Rory Pendleton'].st[1].mv[0].join()===pr.stages[0].team[0].mv.join(),'Rory’s saved teams (starting and later) get six moves too');
+    ok(M['Celeste Arnaud'].team[0].length===3,'Celeste’s own moves, not from the pack, are left alone');
     const N=await p.evaluate(()=>{const o={};Object.keys(S.gmNt).forEach(id=>{const x=S.gmNt[id];o[x.name]={id,n:ntTeam(x).length,cs:ntTeam(x).map(m=>ctStatTotal(ctStatsOf(m))),q:x.q||null,st:(x.stages||[]).length,cat:x.cat};});return o;});
     ok(Object.keys(N).length===30,'importing adds the 28 coordinators not already here ('+Object.keys(N).length+' NPCs now)');
     ok(N['Valentin Roux']&&N['Valentin Roux'].q.r==='4'&&N['Valentin Roux'].cs.every(x=>x>=9)&&N['Valentin Roux'].n===5,'Valentin Roux: an Ace with five Pokémon, each with contest stats');

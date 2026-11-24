@@ -419,6 +419,40 @@ async function ntPackTeam(list,L,miss,cnt){
   }
   return team;
 }
+/* the pack's moves for Pokémon already on an NPC sheet, matched by species in order: a Pokémon gets the pack's longer move list
+   only when every move it knows is in that list, so nothing the GM chose is replaced. Saved teams with the pack stage's label too. */
+function ntTopUpMons(have,packMons){
+  const used=new Set();let n=0;
+  const out=have.map(m=>{
+    const pm=packMons.find((x,j)=>!used.has(j)&&dexKey(x.sp)===dexKey(m.sp)&&(used.add(j)||true));
+    if(!pm)return m;
+    const mine=(m.mv||[]).filter(x=>x&&String(x.name||'').trim()),keys=new Set((pm.mv||[]).map(x=>dexKey(x.name)));
+    if(!mine.length||mine.length>=(pm.mv||[]).length||!mine.every(x=>keys.has(dexKey(x.name))))return m;
+    n++;
+    return Object.assign({},m,{mv:pm.mv.map(x=>mine.find(y=>dexKey(y.name)===dexKey(x.name))||x)});
+  });
+  return {team:out,n};
+}
+async function ntPackTopUp(id,p,L,miss,cnt){
+  const nt=NTS()[id];if(!nt)return false;
+  let did=false;
+  if(Array.isArray(p.team)&&p.team.length){
+    const r=ntTopUpMons(ntTeam(nt),await ntPackTeam(p.team,L,miss,cnt));
+    if(r.n){edit('gt',id,'team',r.team);did=true;}
+  }
+  const st=Array.isArray(nt.stages)?nt.stages:[];
+  if(st.length&&Array.isArray(p.stages)&&p.stages.length){
+    let ch=0;const out=[];
+    for(const s of st){
+      const g=s.label==='Starting team'?{team:p.team}:s.label&&p.stages.find(x=>String(x.label||'')===s.label);
+      if(!g){out.push(s);continue;}
+      const r=ntTopUpMons(s.team||[],await ntPackTeam(g.team,L,miss,cnt));
+      ch+=r.n;out.push(r.n?Object.assign({},s,{team:r.team}):s);
+    }
+    if(ch){edit('gt',id,'stages',out);did=true;}
+  }
+  return did;
+}
 async function ntImportPack(file){
   if(!S.me.admin||!file)return;
   let d=null;
@@ -473,6 +507,8 @@ async function ntImportPack(file){
         const tm=ntTeam(NTS()[ex]),byKey={};(Array.isArray(p.team)?p.team:[]).forEach(m=>{const c=ntCsNorm(m&&m.cs);if(c&&m.sp&&!byKey[dexKey(m.sp)])byKey[dexKey(m.sp)]=c;});
         tm.forEach((m,i)=>{const c=byKey[dexKey(m.sp)];if(c&&!ctStatTotal(ctStatsOf(m))){edit('gt',ex,'team.'+i+'.cs',c);did=true;}});
       }
+      /* a newer pack with more moves tops up Pokémon whose moves are still all from the pack (2026-11-24): moves the GM changed are left alone */
+      if(ex&&await ntPackTopUp(ex,p,L,miss,cnt))did=true;
       if(ex&&onBoard(p,name,ex,true))did=true;
       if(!did)skip++;
       continue;
@@ -582,6 +618,79 @@ async function ntFillMon(id,mid){
   render();
 }
 const ntConfSp=(nt,i)=>String((ntTeam(nt)[i]||{}).sp||'');
+/* ----- Fill to six moves (Update 70): every move a Pokémon has is kept. The empty slots take its natural moves first, then
+   moves it can be taught (the Who-can-learn rules), leaning to its own types and a type it doesn't cover yet, one effect move
+   if it has none, no second Style move, and nothing much stronger than what it already hits with. ----- */
+const ntSixShort=nt=>ntTeam(nt).concat(...(Array.isArray(nt.stages)?nt.stages:[]).map(s=>s.team||[])).some(m=>m&&m.sp&&(m.mv||[]).filter(x=>x&&String(x.name||'').trim()).length<6);
+const ntHash=t=>{let h=2166136261;for(const c of String(t)){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return ((h>>>0)%1000)/1000;};
+const ntMvPow=d=>{const g=/^(\d+)d(\d+|M)/.exec(String(d||''));return g?num(g[1])*((g[2]==='M'?10:num(g[2]))+1)/2:0;};
+const ntMvFromDef=d=>({name:d.n,freq:d.f||'At-Will',kind:d.k||'Physical',range:d.r||'',type:d.t||'Normal',dice:d.d||'',text:d.x||'',used:0});
+async function ntSixMoves(sp,types,mv){
+  const have=(Array.isArray(mv)?mv:[]).filter(x=>x&&String(x.name||'').trim());
+  if(have.length>=6||!String(sp||'').trim())return null;
+  const pr=ptaResolve(sp);let rec=null;
+  if(pr)rec=ptaRec(pr)||await ptaChunk(ptaLetter(ptaKey(pr))).then(()=>ptaRec(pr));
+  if(PTA.idx&&!(PTA.lists&&PTA.lists.moveMap))await ptaLists();
+  const L=PTA.lists;
+  const base=rec?foeFromRec(rec,null,sp):null;
+  const ty=((types||[]).filter(Boolean).length?types:(base?base.ty:[])).filter(Boolean);
+  const keys=new Set(have.map(x=>dexKey(x.name))),out=have.slice();
+  ((base&&base.mv)||[]).forEach(x=>{if(out.length<6&&x&&x.name&&!keys.has(dexKey(x.name))){out.push(Object.assign({},x,{used:0}));keys.add(dexKey(x.name));}});
+  if(out.length<6&&L&&L.moveMap){
+    await pxLoad();
+    const learn=pxReady()?(pxLearnable(sp,ty)||new Map()):new Map();
+    const defs=[...learn.keys()].map(k=>L.moveMap.get(k)).filter(d=>d&&!keys.has(dexKey(d.n)));
+    while(out.length<6&&defs.length){
+      const hit=out.filter(x=>x.dice),cov=new Set(hit.map(x=>x.type)),top=Math.max(0,...hit.map(x=>ntMvPow(x.dice)));
+      const fx=out.some(x=>x.kind==='Effect'),sty=out.some(x=>x.kind==='Style'),atw=hit.some(x=>/at-will/i.test(x.freq||''));
+      const score=d=>{
+        let v=ntHash(sp+'|'+d.n)*1.2;
+        /* a move every Pokémon can be taught is a weaker fit than one from its own proficiencies */
+        const via=((learn.get(dexKey(d.n))||{}).via)||[];if(via.length&&via.every(g=>g==='Any'||g==='Anyone'))v-=1.5;
+        if(d.d){v+=(ty.includes(d.t)?3:d.t==='Normal'?0.5:-0.5)+(cov.has(d.t)?-1.5:1)+(!atw&&/at-will/i.test(d.f||'')?1.5:0);if(top&&ntMvPow(d.d)>top+4)v-=2.5;if(hit.length>=4)v-=2;}
+        else v+=fx?-0.5:2;
+        if(d.k==='Style')v-=sty?50:1;
+        return v;
+      };
+      let bi=0;defs.forEach((d,i)=>{if(score(d)>score(defs[bi]))bi=i;});
+      const d=defs.splice(bi,1)[0];out.push(ntMvFromDef(d));keys.add(dexKey(d.n));
+    }
+  }
+  return out.length>have.length?out:null;
+}
+/* one NPC: their team and saved teams; returns how many Pokémon gained moves */
+async function ntSixNpc(id,only){
+  const nt=NTS()[id];if(!nt)return 0;
+  let n=0;
+  const team=ntTeam(nt).slice();
+  for(let i=0;i<team.length;i++){
+    const m=team[i];if(only&&m.id!==only)continue;
+    const mv=await ntSixMoves(m.sp,m.ty,m.mv);
+    if(mv){team[i]=Object.assign({},m,{mv});n++;}
+  }
+  if(n)edit('gt',id,'team',team);
+  if(!only&&Array.isArray(nt.stages)&&nt.stages.length){
+    let k=0;const st=[];
+    for(const s of nt.stages){
+      const t2=(s.team||[]).slice();
+      for(let i=0;i<t2.length;i++){const mv=await ntSixMoves(t2[i].sp,t2[i].ty,t2[i].mv);if(mv){t2[i]=Object.assign({},t2[i],{mv});k++;}}
+      st.push(Object.assign({},s,{team:t2}));
+    }
+    if(k){edit('gt',id,'stages',st);n+=k;}
+  }
+  return n;
+}
+async function ntSixAct(d){
+  if(!S.me.admin)return;
+  if(!PTA.idx){toast('Import the handbook data first (GM Desk, Handbook data).');return;}
+  if(d.act==='nt_six'){const n=await ntSixNpc(d.id,d.mid);toast(n?'Filled to six moves.':'Nothing to add: it already has six, or nothing more it can learn was found.',true);render();return;}
+  if(d.act==='nt_sixnpc'){const n=await ntSixNpc(d.id);toast(n?n+' Pokémon filled to six moves (saved teams too).':'Every Pokémon already has six moves.',true);render();return;}
+  if(d.act==='nt_sixall'){
+    let n=0,w=0;toast('Filling every NPC’s Pokémon to six moves…',true);
+    for(const id of ntIds()){const k=await ntSixNpc(id);n+=k;if(k)w++;}
+    toast(n?n+' Pokémon across '+w+' NPC'+(w===1?'':'s')+' filled to six moves.':'Every NPC’s Pokémon already has six moves.',true);render();
+  }
+}
 
 /* typing a move's name in a roster Pokémon's sheet fills in the rest of the row from the handbook, when the row is still empty */
 const NT_MV_RE=/^gt\|([^|]+)\|team\.(\d+)\.mv\.(\d+)\.name$/;
@@ -721,6 +830,7 @@ function ntMonBody(id,nt,m,i,len){
     ${fArea('Notes about this Pokémon (only you see these)','gt',id,P+'notes',nt,{rows:2})}
     <div class="row">
       <button class="btn sm ${ask?'danger armed':''}" data-act="nt_fill" data-id="${id}" data-mid="${m.id}">${ask?'Tap again to replace its stats, passives and moves':'Fill from the handbook'}</button>
+      ${mvs.filter(x=>x&&String(x.name||'').trim()).length<6?h`<button class="btn sm" data-act="nt_six" data-id="${id}" data-mid="${m.id}" title="Keeps its moves and adds natural, then teachable ones">Fill to six moves</button>`:''}
       <button class="btn sm danger ${askRm?'armed':''}" data-act="nt_monrm" data-id="${id}" data-mid="${m.id}">${askRm?'Tap again to remove it':'Remove Pokémon'}</button>
       <span class="ibtns"><button class="btn sm ghost" data-act="mv" ${bp('gt',id,'team')} data-i="${i}" data-d="-1" ${i===0?raw('disabled'):''} aria-label="Move earlier">↑</button><button class="btn sm ghost" data-act="mv" ${bp('gt',id,'team')} data-i="${i}" data-d="1" ${i===len-1?raw('disabled'):''} aria-label="Move later">↓</button></span></div>
   </div>`;
@@ -1019,7 +1129,7 @@ function ntBody(id,nt){
       ${fArea('Secret (only you see this)','gt',id,'secret',nt,{rows:3,cls:'wide'})}
     </div></div>`}
     ${ntSheet(id,nt,ed)}
-    <div class="ph"><h3>Pokémon</h3><button class="btn sm primary" data-act="nt_team" data-id="${id}" ${left?'':raw('disabled')}>Add the whole team to the battle</button></div>
+    <div class="ph"><h3>Pokémon</h3><span class="row">${ed&&ntSixShort(nt)?h`<button class="btn sm" data-act="nt_sixnpc" data-id="${id}" title="Every Pokémon here and in saved teams keeps its moves and fills the empty slots">Fill all to six moves</button>`:''}<button class="btn sm primary" data-act="nt_team" data-id="${id}" ${left?'':raw('disabled')}>Add the whole team to the battle</button></span></div>
     ${team.length?h`<div class="ntteam">${team.map((m,i)=>ntMonRow(id,nt,m,i,team.length))}</div>`:h`<p class="sub">No Pokémon yet. ${ed?'Add one below':'Use Edit details to add one'}: its stats, passives and moves fill in from the handbook.</p>`}
     ${!ed?'':h`<div class="mgd"><b>Give this NPC a Pokémon</b>
       <div class="fgrid">
@@ -1059,7 +1169,7 @@ function npcTab(){
   }[sort];
   const ids=all.filter(id=>{const t=NTS()[id];return cfPass(cat,ntCat(t))&&(!q||[ntName(t),t.role,t.place,t.notes].some(x=>String(x||'').toLowerCase().includes(q)));}).sort(cmp);
   const groups=cfGroups(ids,id=>ntCat(NTS()[id]),grp,true);
-  return h`<section class="panel"><div class="ph"><h2>NPC trainers</h2><span class="pill gm">GM only</span><div class="acts">${glTodo().length?h`<button class="btn sm" data-act="nt_glq">Set up ${glTodo().length} Gym Leader${glTodo().length===1?'':'s'} as Quick NPCs</button>`:''}<button class="btn sm" data-act="nt_pack">Import NPC pack</button><button class="btn primary sm" data-act="nt_new">New NPC trainer</button></div></div>
+  return h`<section class="panel"><div class="ph"><h2>NPC trainers</h2><span class="pill gm">GM only</span><div class="acts">${glTodo().length?h`<button class="btn sm" data-act="nt_glq">Set up ${glTodo().length} Gym Leader${glTodo().length===1?'':'s'} as Quick NPCs</button>`:''}<button class="btn sm" data-act="nt_pack">Import NPC pack</button>${ntIds().some(id=>ntSixShort(NTS()[id]))?h`<button class="btn sm ${S.ui.confirm==='nt|sixall'?'danger armed':''}" data-act="nt_sixall">${S.ui.confirm==='nt|sixall'?'Tap again: fill every NPC’s Pokémon to six moves':'Fill every NPC to six moves'}</button>`:''}<button class="btn primary sm" data-act="nt_new">New NPC trainer</button></div></div>
     <p class="sub">Create a trainer, give them Pokémon, and add them to a battle. Everything here stays in a document only you can read. The players see an NPC only after you tick <b>Show this NPC to the table</b>, and then only what you ticked, including for each Pokémon. In a battle the Pokémon start hidden as “Foe A”, “Foe B”. Each NPC has a <b>Category</b> (auto-guessed from the role until you pick one). Villain faction is a category only you can see; the table never learns it.</p>
     ${all.length?h`${cfTools('n',all.map(id=>ntCat(NTS()[id])))}
       <div class="tools"><label class="fld"><span class="fl">Search</span><input type="search" data-u="q.npc" value="${S.ui.q.npc||''}" placeholder="Name, role, place, notes"></label></div>`:''}</section>
@@ -1141,6 +1251,8 @@ function ntAct(b){
       edit('gt',d.id,'team.'+i+'.sh',{name:on,pic:on,types:on,item:on});
       ntPublish(d.id);render();break;}
     case 'nt_fill':ntTwice('ntf|'+d.mid,()=>ntFillMon(d.id,d.mid));break;
+    case 'nt_six':case 'nt_sixnpc':ntSixAct(d);break;
+    case 'nt_sixall':ntTwice('nt|sixall',()=>ntSixAct(d));break;
     case 'nt_monrm':ntTwice('ntr|'+d.mid,()=>{
       const nt=NTS()[d.id];
       edit('gt',d.id,'team',ntTeam(nt).filter(x=>x.id!==d.mid));
