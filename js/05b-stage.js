@@ -316,16 +316,27 @@ function csDraft(){
   const halls=ribHalls();
   S.ui.cs={hall:halls[0]?halls[0].k:'',type:'Beauty',var:{dbl:false,sup:false,fest:false,hv:false,ta:false,rs:false,ap:false,vis:false,dan:false},xs:{},tw:{},tdc:15,theme:'',note:'',
     sk:{vis:'perform',dan:'perform',cook:'nature',fashion:'perform',athlon:'athletics',heroes:'perform',talent:'sleight',tasting:'nature'},pairs:{},
-    judges:CS_JUDGES.map(n=>({n,goals:[]})),pcs:{},npcs:[],nn:'',nsp:'',nnt:'',nm1:'',nm2:''};
+    judges:CS_JUDGES.map(n=>({k:'',n,r:'',goals:[]})),panel:'',pcs:{},npcs:[],nn:'',nsp:'',nnt:'',nm1:'',nm2:''};
   csApplyPreset(S.ui.cs,S.ui.cs.hall);
-  S.ui.cs.judges.forEach((J,j)=>csRollGoals(J,S.ui.cs.type,j===0));
+  /* Update 72: with a judge pack, the hall's own panel (which rolls their goals from what they lean toward) */
+  if(!csLoadPanel(S.ui.cs,S.ui.cs.hall))S.ui.cs.judges.forEach((J,j)=>csRollGoals(J,S.ui.cs.type,j===0));
   return S.ui.cs;
 }
 /* the announced type decides one Star Point, so only the first judge's first goal is fixed to it */
 function csRollGoals(J,type,first){
   const pool=CS_GOALS.filter(g=>!CS_MANUAL.has(g[0])&&(!first||g[0]!=='ct'));
   const out=first?[{k:'ct',t:type||csRnd(CT_TYPES)}]:[];
-  while(out.length<3){const g=csRnd(pool);if(out.some(x=>x.k===g[0]))continue;out.push({k:g[0],t:g[2]==='ct'?csRnd(CT_TYPES):g[2]==='ty'?csRnd(TYPES):''});}
+  /* Update 72: a judge from the judge pack takes most goals from the ones they lean toward */
+  const lean=csjLeans(J).filter(l=>!(first&&l.k==='ct'));
+  let n=0;
+  while(out.length<3&&n++<300){
+    if(lean.length&&Math.random()<0.75){
+      const l=lean.shift(),d=csGoal(l.k);
+      if((first&&l.k==='ct')||out.some(x=>x.k===l.k))continue;
+      out.push({k:l.k,t:l.t||(d[2]==='ct'?csRnd(CT_TYPES):d[2]==='ty'?csRnd(TYPES):''),x:l.x||''});continue;
+    }
+    const g=csRnd(pool);if(out.some(x=>x.k===g[0]))continue;out.push({k:g[0],t:g[2]==='ct'?csRnd(CT_TYPES):g[2]==='ty'?csRnd(TYPES):''});
+  }
   J.goals=out;
 }
 /* Update 68: an NPC's check bonus starts from their Quick NPC rank (Novice +2, Skilled or Specialist +3, Experienced +4, Ace +5) */
@@ -392,7 +403,7 @@ function csOpen(){
   if(D.var.rs)Object.keys(D.pairs||{}).forEach(a=>{const z=D.pairs[a];if(!z||!ents[a]||!ents[z]||seen.has(a)||seen.has(z))return;seen.add(a);seen.add(z);pairs.push([a,z]);});
   const vr={};CS_VARK.forEach(k=>{vr[k]=!!D.var[k];});
   const C={v:2,on:true,id:'c'+Date.now().toString(36),hall:D.hall,name:hall?hall.n+' Contest':'Contest',type:D.var.sup?'':D.type,var:vr,
-    stage:'intro',round:0,rt:'',judges:D.judges.map(J=>({n:String(J.n||'Judge').trim()||'Judge',fav:D.type,v:hv?1:0,el:false,hold:false,exc:false})),
+    stage:'intro',round:0,rt:'',judges:D.judges.map(J=>({n:String(J.n||'Judge').trim()||'Judge',k:String(J.k||''),r:String(J.r||''),fav:D.type,v:hv?1:0,el:false,hold:false,exc:false})),
     ents,eord,order:[],done:[],cur:'',log:[],ready:{},scr:0,gl:{},aw:null,rec:0,at:Date.now(),
     pre:csPreList(D),pi:0,pr:{},sk:Object.assign({},D.sk),theme:String(D.theme||''),tdc:clamp(Math.round(num(D.tdc))||15,5,40),tw:Object.assign({},D.tw),
     pairs,rsd:{},crowd:0,cfav:vr.ap?csRnd(CT_TYPES):''};
@@ -417,7 +428,10 @@ function csJudgesHtml(C,gm){
   const G=CSG().goals||[];
   return h`<div class="judges">${(C.judges||[]).map((J,j)=>{
     const ct=csCType(C,j);
+    const R=gm&&csJudge(J.k);
     return h`<div class="judge ${J.el?'elec':''}"><div class="row sp"><b>${J.n}</b>${J.el?h`<span class="pill good">Electrified${C.var&&C.var.hv?' +5d4':' ×2'}</span>`:''}</div>
+      ${J.r?h`<p class="sub csjrole">${J.r}</p>`:''}
+      ${R&&R.tell?h`<p class="csjt"><b>Tell</b> ${R.tell} <span class="pill gm">GM</span></p>`:''}
       <div class="row"><span class="sub">Favours</span> ${ct?ctChip(ct):h`<span class="sub">—</span>`}${J.hold?h`<span class="pill">Voltage held</span>`:''}${J.exc?h`<span class="pill">Can’t go down</span>`:''}</div>
       <div class="row"><span class="sub">Voltage</span> ${csVolt(num(J.v))}</div>
       <div class="goals">${[0,1,2].map(gi=>{const rv=(C.gl||{})[j+'-'+gi];const g=(G[j]||[])[gi];
@@ -504,12 +518,13 @@ function csSetupHtml(){
     <div class="row evchips">${tog('dbl','Double Performance','two Pokémon each')}${tog('sup','Super Contest','a random type each round')}${tog('fest','Festival','each judge a type each round')}${tog('hv','High Voltage','judges start at 1')}</div>
     ${csSetupMore(D)}
     <h3 class="refg">Judges and their hidden goals <span class="pill gm">GM only</span></h3>
-    <div class="judges">${D.judges.map((J,j)=>h`<div class="judge"><label class="fld"><span class="fl">Judge ${j+1}</span><input type="text" data-csx="jn" data-j="${j}" value="${J.n}"></label>
+    <div class="judges">${D.judges.map((J,j)=>h`<div class="judge">${csjPicker(D,J,j)}
       ${J.goals.map((g,gi)=>{const d=csGoal(g.k);return h`<div class="cgoal"><select data-csx="gk" data-j="${j}" data-g="${gi}" aria-label="Goal ${gi+1}">${CS_GOALS.map(x=>h`<option value="${x[0]}" ${g.k===x[0]?raw('selected'):''}>${x[1].replace('{t}','…')}</option>`)}</select>
         ${d[2]?h`<select data-csx="gt" data-j="${j}" data-g="${gi}" aria-label="Type">${(d[2]==='ty'?TYPES:CT_TYPES).map(t=>h`<option ${g.t===t?raw('selected'):''}>${t}</option>`)}</select>`:''}
         ${g.k==='gm'?h`<input type="text" data-csx="gx" data-j="${j}" data-g="${gi}" value="${g.x||''}" placeholder="What earns it">`:''}</div>`;})}
       <button class="btn sm" data-act="cs_roll" data-j="${j}">Roll goals</button></div>`)}</div>
-    <p class="sub">The announced contest type decides one Star Point, so Roll goals gives the first judge that goal and the others something else. Players never receive these until you reveal one (an Insight check) or the awards.</p>
+    <p class="sub">The announced contest type decides one Star Point, so Roll goals gives the first judge that goal and the others something else.${csRoster()?' Judges from your judge pack take most of their goals from what they lean toward.':''} Players never receive these until you reveal one (an Insight check) or the awards.</p>
+    ${csjRosterHtml(D)}
     <h3 class="refg">Contestants</h3>
     <div class="bench">${ids.map(uid=>{const p=D.pcs[uid]||{},pt=monsOf(uid);
       return h`<div class="brl"><label class="chip chkc"><input type="checkbox" data-act="cs_pc" data-uid="${uid}" ${p.on?raw('checked'):''}><span>${tName(S.trainers[uid])}</span></label>
@@ -623,6 +638,8 @@ function csAct(b){
       csNpcMons(D).then(n=>{if(!n.mons.length){toast('No Pokémon found for that coordinator.');return;}if(D.var.dbl&&n.mons.length<2){toast('Double Performance needs two Pokémon.');return;}D.npcs.push(n);D.nn='';D.nsp='';D.nnt='';D.nm1='';D.nm2='';render();});break;}
     case 'cs_npcdel':if(D){const gone=(D.npcs[num(d.i)]||{}).id;D.npcs.splice(num(d.i),1);Object.keys(D.pairs).forEach(k=>{if(k===gone||D.pairs[k]===gone)delete D.pairs[k];});render();}break;
     case 'cs_open':csOpen();break;
+    case 'cs_jpack':{const fp=$('#jpackfile');if(fp)fp.click();break;}
+    case 'cs_jro':if(D){D.jro=!D.jro;render();}break;
     case 'cs_rev':{const g=((CSG().goals||[])[num(d.j)]||[])[num(d.g)];if(!g)break;const by=S.ui.csrb||'';edit('cs','contest','gl',Object.assign({},C.gl||{},{[d.j+'-'+d.g]:{t:csGoalTxt(g),by}}));render();break;}
     case 'cs_bonus':{const E=C.ents[d.e];if(!E)break;const r=rnd(4);edit('cs','contest','ents',Object.assign({},C.ents,{[d.e]:Object.assign({},E,{hp:num(E.hp)+r,ihp:num(E.ihp)+r})}));toast(E.name+': +'+r+' Heart Points for the introduction.',true);render();break;}
     case 'cs_start':csStartRound(1);edit('cs','contest','stage','appeal');render();break;
@@ -660,7 +677,10 @@ function csInput(t){
     case 'gt':if(D)D.judges[num(d.j)].goals[num(d.g)].t=t.value;break;
     case 'pm':if(D&&D.pcs[d.uid])D.pcs[d.uid][d.k]=t.value;break;
     case 'ov':edit('cg','contest','ov',Object.assign({},CSG().ov||{},{[d.j+'-'+d.g]:t.value}));break;
-    case 'hall':if(D){D.hall=t.value;if(!csApplyPreset(D,D.hall))D.note='';}break;
+    case 'hall':if(D){D.hall=t.value;if(!csApplyPreset(D,D.hall))D.note='';if(!csLoadPanel(D,D.hall))D.panel='';}break;
+    /* Update 72: pick a judge from the roster (or type a name), or load another hall's panel */
+    case 'jk':if(D&&D.judges[num(d.j)]){const J=D.judges[num(d.j)],R=csJudge(t.value);if(R){J.k=t.value;J.n=R.n;J.r=String(R.r||'');}else{J.k='';J.r='';}csRollGoals(J,D.var.sup?'':D.type,num(d.j)===0);}break;
+    case 'jp':if(D)csLoadPanel(D,t.value);break;
     case 'tdc':if(D)D.tdc=t.value;return;
     case 'theme':if(D)D.theme=t.value;return;
     case 'dsk':if(D)D.sk[d.k]=t.value;break;

@@ -762,6 +762,15 @@ input[type=search]{appearance:none}
 .goals{display:flex;flex-direction:column;gap:3px;font:600 12.5px var(--f-body)}
 .cgoal{display:flex;flex-wrap:wrap;gap:6px}
 .cgoal select,.cgoal input{max-width:100%}
+.csj{display:flex;flex-direction:column;gap:4px}
+.csj p,.csjt,.csjrole{margin:0}
+.csjl,.csjt{font-size:13px;line-height:1.4}
+.csjt{padding:4px 8px;border-left:3px solid var(--accent);background:var(--panel);border-radius:0 8px 8px 0}
+.csjr{margin:10px 0;border:2px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--raised)}
+.csjr h4{margin:12px 0 6px}
+.csjg{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:8px}
+.csjr .row{align-items:flex-end}
+.csjr>.row.sp{flex-wrap:wrap;gap:8px}
 .score{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .score li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:center;border:2px solid var(--line-soft);border-radius:10px;padding:6px 8px}
 .score li.now{border-color:var(--gold)}
@@ -1707,6 +1716,7 @@ input,select,textarea{border-radius:9px}
 <input type="file" id="ptafile" class="sr" accept=".json,application/json" tabindex="-1" aria-hidden="true">
 <input type="file" id="ntpackfile" class="sr" accept=".json,application/json" tabindex="-1" aria-hidden="true">
 <input type="file" id="encfile" class="sr" accept=".json,application/json" tabindex="-1" aria-hidden="true">
+<input type="file" id="jpackfile" class="sr" accept=".json,application/json" tabindex="-1" aria-hidden="true">
 <a id="ptip" class="ptip" href="#place" data-act="place" hidden></a>
 <div id="rollbox" class="rollbox lcd" hidden aria-live="polite"></div>
 <div id="lbx" class="lbx" data-act="lbxx" hidden></div>
@@ -1727,23 +1737,24 @@ input,select,textarea{border-radius:9px}
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
 <!-- The app, in load order. These files share one scope; keep the order. -->
-<script src="js/01-core.js?v=2026-11-25-dexgm"></script>
-<script src="js/02-species.js?v=2026-11-25-dexgm"></script>
-<script src="js/03-rolls.js?v=2026-11-25-dexgm"></script>
-<script src="js/04-battle.js?v=2026-11-25-dexgm"></script>
-<script src="js/04b-battle-helper.js?v=2026-11-25-dexgm"></script>
-<script src="js/04c-format.js?v=2026-11-25-dexgm"></script>
-<script src="js/05-pokedex-contests.js?v=2026-11-25-dexgm"></script>
-<script src="js/05b-stage.js?v=2026-11-25-dexgm"></script>
-<script src="js/05c-shows.js?v=2026-11-25-dexgm"></script>
-<script src="js/06-world.js?v=2026-11-25-dexgm"></script>
-<script src="js/07-npc.js?v=2026-11-25-dexgm"></script>
-<script src="js/07b-quick-npc.js?v=2026-11-25-dexgm"></script>
-<script src="js/08-battlemap.js?v=2026-11-25-dexgm"></script>
-<script src="js/09-sheets.js?v=2026-11-25-dexgm"></script>
-<script src="js/09b-road.js?v=2026-11-25-dexgm"></script>
-<script src="js/09c-growth.js?v=2026-11-25-dexgm"></script>
-<script src="js/09d-dash.js?v=2026-11-25-dexgm"></script>
-<script src="js/09e-badge.js?v=2026-11-25-dexgm"></script>
-<script src="js/10-calendar-main.js?v=2026-11-25-dexgm"></script>
+<script src="js/01-core.js?v=2026-11-25-judges"></script>
+<script src="js/02-species.js?v=2026-11-25-judges"></script>
+<script src="js/03-rolls.js?v=2026-11-25-judges"></script>
+<script src="js/04-battle.js?v=2026-11-25-judges"></script>
+<script src="js/04b-battle-helper.js?v=2026-11-25-judges"></script>
+<script src="js/04c-format.js?v=2026-11-25-judges"></script>
+<script src="js/05-pokedex-contests.js?v=2026-11-25-judges"></script>
+<script src="js/05b-stage.js?v=2026-11-25-judges"></script>
+<script src="js/05c-shows.js?v=2026-11-25-judges"></script>
+<script src="js/05d-judges.js?v=2026-11-25-judges"></script>
+<script src="js/06-world.js?v=2026-11-25-judges"></script>
+<script src="js/07-npc.js?v=2026-11-25-judges"></script>
+<script src="js/07b-quick-npc.js?v=2026-11-25-judges"></script>
+<script src="js/08-battlemap.js?v=2026-11-25-judges"></script>
+<script src="js/09-sheets.js?v=2026-11-25-judges"></script>
+<script src="js/09b-road.js?v=2026-11-25-judges"></script>
+<script src="js/09c-growth.js?v=2026-11-25-judges"></script>
+<script src="js/09d-dash.js?v=2026-11-25-judges"></script>
+<script src="js/09e-badge.js?v=2026-11-25-judges"></script>
+<script src="js/10-calendar-main.js?v=2026-11-25-judges"></script>
 </body></html>

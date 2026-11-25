@@ -1132,3 +1132,14 @@ A GM-only **GM Dashboard** page (first item under Game Master in the menu, with 
 - Like the lock, this is a page rule, not database security: no new database rules are needed.
 - `tests/t_dexgm.js` checks it.
 
+## Contest judges (Update 72)
+
+- **A judge pack gives every hall its own panel.** On the Contests page, Live stage → Set up a contest → **Judge roster → Import a judge pack**, and choose `sinnoh-contest-judges.json` (a GM file: **do not upload it to GitHub**). It holds 30 judges: a head judge for each hall, five Contest Committee judges, the festival judges (Mr. Contesta, Mr. Sukizo, Tobias Renaud and Wallace) and guest judges (Nurse Joy, Fantina, Candice, Dawn, Kess Ferreira and Simone Terano).
+- **Each contest starts with its hall's panel:** the hall's head judge; a Contest Committee judge, who rotates by the in-game month (the picker marks this month's); and the hall's first guest. The Wallace Cup and the Grand Festival have fixed panels. **Load the panel for** loads any hall's panel, or the Grand Festival's.
+- **Swap any judge** with the picker on each seat: this panel first, then the Committee, festival judges, guests and the other halls' head judges. **Type a name…** is for someone not in the roster.
+- **Leanings.** Each judge leans toward two or three hidden goals (Mireille Voss: best introduction, the final round, one contest type). **Roll goals** takes about three goals in four from those, and the rest at random. A leaning can be a goal you judge, with its own words ("Best woven costume", "Most composed performance").
+- **Tells.** Each judge has a tell you can read out when a player passes an Insight check on them. It shows on the judge's card on the live stage, for you only. Players see each judge's name and role ("Director and head judge, Super Contest Hall").
+- **Show the roster** lists every judge by seat, with their role, leanings, tell and notes.
+- The roster is kept in `gm/contest`, which only you can read, so no new database rules are needed. Without a judge pack, contests start with Mr. Contesta, Mr. Sukizo and Nurse Joy as before. Importing a pack again replaces the roster; a contest already open keeps its judges.
+- `tests/t_judges.js` checks it (with the real pack if `JUDGES=<folder with the pack>` is set).
+

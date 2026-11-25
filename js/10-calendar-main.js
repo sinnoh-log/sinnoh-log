@@ -2287,6 +2287,12 @@ document.addEventListener('change',async e=>{
     if(f&&S.me.admin)ntImportPack(f);
     return;
   }
+  if(t&&t.id==='jpackfile'){
+    const f=t.files&&t.files[0];
+    try{t.value='';}catch(err){}
+    if(f&&S.me.admin)csjImport(f);
+    return;
+  }
   if(t&&t.id==='ptafile'){
     const f=t.files&&t.files[0];
     try{t.value='';}catch(err){}
