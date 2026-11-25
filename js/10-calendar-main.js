@@ -1640,7 +1640,7 @@ function rollOnce(){
 /* ---------- page chrome ---------- */
 const navGroups=()=>{const g=S.me.admin?NAV.concat([GM_NAV]):NAV;return CFG?g.concat([['You',[['account','Account']]]]):g;};
 function tabCount(k){
-  if(k==='people')return Object.keys(S.people).length;
+  if(k==='people')return pplItems().length;
   if(k==='battle')return S.battle&&S.battle.on?'LIVE':0;
   if(k==='contest')return S.contest&&S.contest.on?'LIVE':0;
   if(k==='dex')return S.me.admin?dxSuggest().length:0;
@@ -1917,6 +1917,7 @@ function act(b,e){
   if(d.act&&d.act.indexOf('rb_')===0){ribAct(b);return;}
   if(d.act&&d.act.indexOf('nt_')===0){ntAct(b,e);return;}
   if(d.act&&d.act.indexOf('cf_')===0){cfAct(b);return;}
+  if(d.act&&d.act.indexOf('ppl_')===0){pplAct(b);return;}
   if(d.act==='idflip'){S.ui.flip[d.uid]=!S.ui.flip[d.uid];render();return;}
   if(d.act==='bmw_open'){bmWinOpen();return;}
   if(d.act==='fc_add'){fcAdd(S.ui.bt.fck||'sunny',S.ui.bt.fcc||'');return;}
@@ -2272,6 +2273,7 @@ document.addEventListener('change',async e=>{
   if(t&&t.dataset&&t.dataset.clcat&&S.me.admin){edit('cd','conditions','ev',clEvents().map(x=>x.k===t.dataset.clcat?Object.assign({},x,{c:t.value}):x));render();return;}
   if(t&&t.dataset&&t.dataset.b&&onSpeciesChange(t))return;
   if(t&&t.dataset&&t.dataset.evot!=null){evoTarget(t.dataset.pid,t.value);return;}
+  if(t&&t.dataset&&t.dataset.pplnk!=null){pplLink(t.dataset.pplnk,t.value);return;}
   if(t&&t.classList&&t.classList.contains('ptz')){ntFrameZoom(t,true);return;}
   if(t&&t.dataset&&t.dataset.encfx!=null){if(S.me.admin)encFxEdit(t);return;}
   if(t&&t.dataset&&t.dataset.encl!=null){if(S.me.admin)encListEdit(t);return;}

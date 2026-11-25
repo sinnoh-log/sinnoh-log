@@ -1115,7 +1115,7 @@ function ntBody(id,nt){
       <label class="row"><input type="checkbox" ${bd('gt',id,'rev.on')} ${on?raw('checked'):''}><span><b>Show this NPC to the table</b></span></label>
       <div class="row evchips" role="group" aria-label="Also show">
         ${[['role','Role'],['place','Where you met'],['notes','Your notes'],['pic','Picture'],['cls','Level and class'],['stats','Stats'],['items','Items']].map(([k,l])=>h`<label class="chip chkc"><input type="checkbox" ${bd('gt',id,'rev.'+k)} ${num(r[k])?raw('checked'):''} ${on?'':raw('disabled')}><span>${l}</span></label>`)}</div>
-      <p class="sub">Players now see: ${ntPreview(nt)}. It appears under <b>People</b>, in <b>Trainers you have met</b>. Their Pokémon appear there once you tick what to show for each one below.</p></div>`}
+      <p class="sub">Players now see: ${ntPreview(nt)}. It appears under <b>People</b>, on one card with the party’s entry of the same name (or its own card). Their Pokémon appear there once you tick what to show for each one below.</p></div>`}
     ${ed?ntRankPanel(id,nt):''}
     ${ed?ntGrowPanel(id,nt):''}
     ${!ed?'':h`<div class="idrow"><div class="idimg">${ntImgOk(nt.img)?ntPortrait(nt.img,nt.imgc,'edit',h`data-id="${id}" tabindex="0" role="group" aria-label="Picture frame. Drag to move the picture, or use the arrow keys."`):pimg('',ntName(nt),'tall')}${imgPicker('gt',id,'img',nt,0,0,160000,false,900)}${galPanel('gt',id,nt,false)}${ntImgOk(nt.img)?ntFramePanel(id,nt):''}<span class="sub">${ntImgOk(nt.img)?(num(r.pic)&&on?'The table sees this picture.':'Only you see this picture. Tick Picture above to show it.'):'A portrait for this NPC. It stays hidden until you tick Picture.'}</span></div>
@@ -1181,26 +1181,6 @@ function ntPubMon(m){
   const id=m.sp?dexId(m.sp):0;
   const srcs=id?spriteSrcs(id):[];
   return h`<span class="ntpm">${srcs.length?h`<img class="sp mi" src="${srcs[0]}" data-fb="${srcs.slice(1).join('|')}" alt="" width="40" height="40" loading="lazy" decoding="async">`:h`<span class="mi-ph" aria-hidden="true"></span>`}<span class="ntpn"><b>${m.n}</b>${m.ty&&m.ty.length?h`<span class="types">${chipsOf(m.ty)}</span>`:''}${m.it?h`<span class="sub">${itemMini(m.it)}holding ${m.it}</span>`:''}</span></span>`;
-}
-function ntPublicPanel(o){
-  o=o||{};
-  const n=(S.npcPub&&S.npcPub.n)||{};
-  const q=o.q||'';
-  const cOf=o.pubCat||(id=>'');
-  const nm=id=>String(n[id].n);
-  let ids=Object.keys(n).filter(id=>cfPass(o.cat||'',cOf(id))&&(!q||[n[id].n,n[id].r,n[id].pl,n[id].b].some(x=>String(x||'').toLowerCase().includes(q))));
-  ids.sort(o.sort==='cat'?(a,b)=>cfCatIdx(cOf(a),false)-cfCatIdx(cOf(b),false)||cfName(nm(a),nm(b)):(a,b)=>cfName(nm(a),nm(b)));
-  if(!ids.length)return '';
-  const groups=cfGroups(ids,cOf,!!o.grp,false);
-  return h`<section class="panel ntpub"><div class="ph"><h2>Trainers you have met</h2>${S.me.admin?h`<span class="pill gm">What the players see</span>`:''}</div>
-    ${groups.map(([k,its])=>h`${o.grp?cfHead(k,its.length):''}    <div class="grid cards">${its.map(id=>{const p=n[id],pic=ntPicOf(id);return h`<article class="entry pcard">${pic?h`<div class="ptrcol"><button class="ptrbtn" data-act="lbx" data-k="${'npc|'+id}" aria-label="${'View the full picture of '+p.n}" title="View the full picture">${ntPortrait(pic,ntPicCrop(id),'')}</button><span class="ptrh">Tap to enlarge</span></div>`:''}<div class="pc-body">
-      <h3>${p.n}</h3>
-      <div class="meta">${npcCatName(p.c)&&NPC_CATS.some(x=>x[0]===p.c)?h`<span class="pill cat">${npcCatName(p.c)}</span>`:''}${p.r?h`<span>${p.r}</span>`:''}${p.pl?h`<span>Met at ${p.pl}</span>`:''}${p.lv!=null?h`<span>Level ${p.lv}</span>`:''}${p.cl?h`<span>${p.cl}</span>`:''}</div>
-      ${p.st?h`<div class="ntst lcd">${[['HP',p.st.hp],['Atk',p.st.atk],['Def',p.st.def],['SpA',p.st.spa],['SpD',p.st.spd],['Spd',p.st.spe]].map(([l,v])=>h`<span><i>${l}</i><b>${v}</b></span>`)}</div>`:''}
-      ${p.it&&p.it.length?h`<div class="ntits">${p.it.map(x=>h`<span class="ntit">${itemMini(x.n)}${x.n}${x.q>1?' ×'+x.q:''}</span>`)}</div>`:''}
-      ${p.b?h`<p class="prewrap">${p.b}</p>`:''}
-      ${(p.m||[]).length?h`<div class="ntpms">${p.m.map(ntPubMon)}</div>`:''}
-    </div></article>`;})}</div>`)}</section>`;
 }
 /* in the battle's "Who is fighting" panel */
 function ntBattlePanel(){

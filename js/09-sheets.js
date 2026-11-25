@@ -668,15 +668,58 @@ function cfAct(b){
   const d=b.dataset;
   if(d.act==='cf_cat'){S.ui.f[d.sc+'cat']=d.v;render();}
 }
-function personCard(p){
-  const open=!!S.ui.open['ppl'+p.id];
+/* ---------- People (Update 73): one list ----------
+   An NPC the GM shows (meta/npcs, from NPC trainers) and the party's entry for that person (people/…) are one card: what
+   the GM revealed on top (read-only), the party's notes below (anyone can edit). An entry links to a shown NPC through its
+   nt field, or by having the same name unless its nolink list says not to. A shown NPC no one has written about yet is a
+   card of its own, with Add party notes. Nothing is moved: the two documents stay where they were. */
+const pplKey=s=>String(s||'').trim().toLowerCase();
+function pplItems(){
+  const pubN=(S.npcPub&&S.npcPub.n)||{};
+  const ppl=entriesOf(S.people).sort((a,b)=>num(a.createdAt)-num(b.createdAt));
+  const taken={},out=[];
+  ppl.forEach(p=>{if(p.nt&&pubN[p.nt]&&!taken[p.nt])taken[p.nt]=p.id;});
+  const byName={};
+  Object.keys(pubN).forEach(id=>{if(taken[id])return;const k=pplKey(pubN[id].n);if(k&&!byName[k])byName[k]=id;});
+  ppl.forEach(p=>{
+    let pid=p.nt&&taken[p.nt]===p.id?p.nt:'';
+    if(!pid&&!p.nt){
+      const id=byName[pplKey(p.name)],no=Array.isArray(p.nolink)?p.nolink:[];
+      if(id&&!taken[id]&&no.indexOf(id)<0){taken[id]=p.id;pid=id;}
+    }
+    out.push({k:'p'+p.id,p,pid,pub:pid?pubN[pid]:null});
+  });
+  Object.keys(pubN).forEach(id=>{if(!taken[id])out.push({k:'n'+id,p:null,pid:id,pub:pubN[id]});});
+  return out;
+}
+const pplName=it=>it.pub?String(it.pub.n||''):String(it.p.name||'');
+const pplCat=it=>it.pub&&NPC_CATS.some(x=>x[0]===it.pub.c)?it.pub.c:it.p?npcCatOf(it.p.cat,(it.p.role||'')+' '+(it.p.name||''),false):'';
+const pplText=it=>[pplName(it)].concat(it.p?[it.p.name,it.p.role,it.p.place,it.p.notes]:[],it.pub?[it.pub.r,it.pub.pl,it.pub.b,it.pub.cl]:[]).join(' ').toLowerCase();
+/* the GM's "same person as" menu on an entry */
+function pplLinkSel(p){
+  const pubN=(S.npcPub&&S.npcPub.n)||{};
+  const it=pplItems().find(x=>x.p&&x.p.id===p.id),cur=it?it.pid:'';
+  const ids=Object.keys(pubN).sort((a,b)=>cfName(pubN[a].n,pubN[b].n));
+  return h`<label class="fld"><span class="fl">Same person as (an NPC you show)</span><select data-pplnk="${p.id}"><option value="">No one: keep it separate</option>${ids.map(id=>h`<option value="${id}" ${cur===id?raw('selected'):''}>${pubN[id].n}</option>`)}</select></label>`;
+}
+function pplLink(pid,nt){
+  const p=S.people[pid];if(!p||!S.me.admin)return;
+  const it=pplItems().find(x=>x.p&&x.p.id===pid);
+  const no=(Array.isArray(p.nolink)?p.nolink:[]).filter(x=>x!==nt);
+  if(nt){edit('ppl',pid,'nt',nt);edit('ppl',pid,'nolink',no);}
+  else{
+    if(it&&it.pid&&no.indexOf(it.pid)<0)no.push(it.pid);
+    edit('ppl',pid,'nt','');edit('ppl',pid,'nolink',no);
+  }
+  render();
+}
+function personEdit(p,it){
   const gn=S.gmNpc[p.id]||{};
-  const canE=canShared();
-  if(open&&canE){
-    return h`<article class="entry">
+  return h`<article class="entry">
+      ${it&&it.pub?h`<p class="sub">This is the party’s entry for <b>${it.pub.n}</b>, whom the GM has shown: the GM’s picture, role and team stay on the card, and these are the party’s own notes.</p>`:''}
       <div class="idrow"><div class="idimg">${picEditor('ppl',p.id,p,false)}${imgPicker('ppl',p.id,'img',p,0,0,90000,false,640)}${picFrame('ppl',p.id,p,false)}${galPanel('ppl',p.id,p,false)}</div>
       <div class="fgrid">
-        ${fText('Name','ppl',p.id,'name',p,{cls:'wide'})}
+        ${fText(it&&it.pub?'What the party calls them':'Name','ppl',p.id,'name',p,{cls:'wide'})}
         ${fText('Role or title','ppl',p.id,'role',p)}
         ${fText('Where you met','ppl',p.id,'place',p,{list:'dl-places'})}
         ${fNum('Session met','ppl',p.id,'met',p,{min:0})}
@@ -685,18 +728,36 @@ function personCard(p){
         ${fArea('What you know','ppl',p.id,'notes',p,{rows:3,cls:'wide'})}
       </div></div>
       ${fCheck('Pin to top','ppl',p.id,'pinned',p,false)}
-      ${S.me.admin?h`<div class="secret"><span class="fl">GM only · Secret</span>${fArea('Hidden from players','gn',p.id,'secret',gn,{rows:3})}</div>`:''}
+      ${S.me.admin?h`<div class="secret"><span class="fl">GM only</span>${pplLinkSel(p)}${fArea('Secret, hidden from players','gn',p.id,'secret',gn,{rows:3})}</div>`:''}
       <div class="row sp"><button class="btn sm" data-act="toggle" data-key="ppl${p.id}">Done</button>${canOwn(p)?delBtn('ppl',p.id,'Delete'):''}</div>
     </article>`;
-  }
-  return h`<article class="entry pcard">
-    ${galOpen('ppl',p.id,p,'tall')}
+}
+function personCard(it){
+  const p=it.p,pub=it.pub,id=it.pid;
+  if(p&&S.ui.open['ppl'+p.id]&&canShared())return personEdit(p,it);
+  const name=pplName(it)||'Unnamed person',cat=pplCat(it);
+  const pic=pub?ntPicOf(id):'';
+  const aka=p&&pub&&String(p.name||'').trim()&&pplKey(p.name)!==pplKey(pub.n)?p.name:'';
+  const role=pub&&pub.r?pub.r:p?p.role:'';
+  const place=p&&p.place?p.place:pub?pub.pl:'';
+  const gn=p?(S.gmNpc[p.id]||{}):{};
+  const nm=pub?(pub.m||[]).length:0,team=pub&&(nm||pub.st||(pub.it||[]).length);
+  const tk='pt'+it.k,topen=!!S.ui.open[tk];
+  return h`<article class="entry pcard ${pub?'pshown':''}">
+    ${pic?h`<div class="ptrcol"><button class="ptrbtn" data-act="lbx" data-k="${'npc|'+id}" aria-label="${'View the full picture of '+name}" title="View the full picture">${ntPortrait(pic,ntPicCrop(id),'')}</button></div>`:p&&galList(p).length?galOpen('ppl',p.id,p,'tall'):pimg('',name,'tall')}
     <div class="pc-body">
-    <div class="row sp"><h3>${p.pinned?'★ ':''}${p.name||'Unnamed person'}</h3><span class="pill ${p.att||'unknown'}">${attLabel(p.att)}</span></div>
-    <div class="meta">${npcCatOf(p.cat,(p.role||'')+' '+(p.name||''),false)?h`<span class="pill cat">${npcCatName(npcCatOf(p.cat,(p.role||'')+' '+(p.name||''),false))}</span>`:''}${p.role?h`<span>${p.role}</span>`:''}${p.place?h`<span>Met at ${p.place}</span>`:''}${p.met?h`<span>Session ${p.met}</span>`:''}</div>
-    ${p.notes?h`<p class="prewrap">${p.notes}</p>`:h`<p class="sub">Nothing written down yet.</p>`}
+    <div class="row sp"><h3>${p&&p.pinned?'★ ':''}${name}</h3>${p?h`<span class="pill ${p.att||'unknown'}">${attLabel(p.att)}</span>`:''}</div>
+    ${aka?h`<p class="sub">The party’s entry: ${aka}</p>`:''}
+    <div class="meta">${cat?h`<span class="pill cat">${npcCatName(cat)}</span>`:''}${role?h`<span>${role}</span>`:''}${place?h`<span>Met at ${place}</span>`:''}${p&&p.met?h`<span>Session ${p.met}</span>`:''}${pub&&pub.lv!=null?h`<span>Level ${pub.lv}</span>`:''}${pub&&pub.cl?h`<span>${pub.cl}</span>`:''}</div>
+    ${pub&&pub.b?h`<div class="pshow"><span class="fl">Shown by the GM</span><p class="prewrap">${pub.b}</p></div>`:''}
+    ${team?h`<div><button class="btn sm ghost" data-act="toggle" data-key="${tk}" aria-expanded="${String(topen)}">${topen?(nm?'Hide the team':'Hide'):nm?'Team ('+nm+')':'Stats and items'}</button></div>`:''}
+    ${team&&topen?h`<div class="pteam">${pub.st?h`<div class="ntst lcd">${[['HP',pub.st.hp],['Atk',pub.st.atk],['Def',pub.st.def],['SpA',pub.st.spa],['SpD',pub.st.spd],['Spd',pub.st.spe]].map(([l,v])=>h`<span><i>${l}</i><b>${v}</b></span>`)}</div>`:''}
+      ${pub.it&&pub.it.length?h`<div class="ntits">${pub.it.map(x=>h`<span class="ntit">${itemMini(x.n)}${x.n}${x.q>1?' ×'+x.q:''}</span>`)}</div>`:''}
+      ${nm?h`<div class="ntpms">${pub.m.map(ntPubMon)}</div>`:''}</div>`:''}
+    ${p?(p.notes?h`<p class="prewrap">${p.notes}</p>`:h`<p class="sub">${pub?'No party notes yet.':'Nothing written down yet.'}</p>`):''}
     ${S.me.admin&&gn.secret?h`<div class="secret"><span class="fl">GM only · Secret</span><p class="prewrap">${gn.secret}</p></div>`:''}
-    ${canE?h`<div><button class="btn sm" data-act="toggle" data-key="ppl${p.id}">Edit</button></div>`:''}
+    <div class="row">${p&&canShared()?h`<button class="btn sm" data-act="toggle" data-key="ppl${p.id}">Edit</button>`:''}${!p&&canShared()?h`<button class="btn sm" data-act="ppl_notes" data-id="${id}">Add party notes</button>`:''}
+      ${S.me.admin&&pub?h`<button class="btn sm ghost" data-act="ppl_sheet" data-id="${id}">Open NPC sheet</button>`:''}${S.me.admin&&p&&pub?h`<button class="btn sm ghost" data-act="ppl_unlink" data-id="${p.id}">Unlink</button>`:''}</div>
     </div>
   </article>`;
 }
@@ -704,32 +765,44 @@ function peopleTab(){
   const q=String(S.ui.q.people||'').toLowerCase();
   const af=S.ui.f.att||'';
   const cat=S.ui.f.pcat||'';
+  const tr=!!S.ui.f.ptr;
   const sorts=CF_SORTS.p;
   const sort=sorts.some(x=>x[0]===S.ui.f.psort)?S.ui.f.psort:'name';
   const grp=!!S.ui.f.pgrp;
-  const catOf=p=>npcCatOf(p.cat,(p.role||'')+' '+(p.name||''),false);
-  const pubN=(S.npcPub&&S.npcPub.n)||{};
-  const pubCat=id=>NPC_CATS.some(x=>x[0]===pubN[id].c)?pubN[id].c:'';
-  const cats=Object.keys(S.people).map(id=>catOf(S.people[id])).concat(Object.keys(pubN).map(pubCat));
-  const ord=(a,b)=>(b.pinned?1:0)-(a.pinned?1:0);
+  const all=pplItems();
+  const att=it=>it.p&&it.p.att||'unknown';
+  const ord=(a,b)=>(b.p&&b.p.pinned?1:0)-(a.p&&a.p.pinned?1:0);
+  const nmc=(a,b)=>cfName(pplName(a),pplName(b));
   const cmp={
-    name:(a,b)=>cfName(a.name,b.name),
-    recent:(a,b)=>num(b.createdAt)-num(a.createdAt)||cfName(a.name,b.name),
-    met:(a,b)=>num(b.met)-num(a.met)||cfName(a.name,b.name),
-    cat:(a,b)=>cfCatIdx(catOf(a),false)-cfCatIdx(catOf(b),false)||cfName(a.name,b.name),
-    att:(a,b)=>CF_ATT.indexOf(a.att||'unknown')-CF_ATT.indexOf(b.att||'unknown')||cfName(a.name,b.name)
+    name:nmc,
+    recent:(a,b)=>num(b.p&&b.p.createdAt)-num(a.p&&a.p.createdAt)||nmc(a,b),
+    met:(a,b)=>num(b.p&&b.p.met)-num(a.p&&a.p.met)||nmc(a,b),
+    cat:(a,b)=>cfCatIdx(pplCat(a),false)-cfCatIdx(pplCat(b),false)||nmc(a,b),
+    att:(a,b)=>CF_ATT.indexOf(att(a))-CF_ATT.indexOf(att(b))||nmc(a,b)
   }[sort];
-  const list=entriesOf(S.people)
-    .filter(p=>(!af||p.att===af)&&cfPass(cat,catOf(p))&&(!q||[p.name,p.role,p.place,p.notes].some(x=>String(x||'').toLowerCase().includes(q))))
-    .sort((a,b)=>ord(a,b)||cmp(a,b));
-  const total=Object.keys(S.people).length;
-  const groups=cfGroups(list,catOf,grp,false);
-  return h`${ntPublicPanel({cat,q,sort,grp,pubCat})}<section class="panel"><div class="ph"><h2>People you have met</h2>${canShared()?h`<button class="btn primary sm" data-act="newDoc" data-kind="ppl">Add person</button>`:''}</div>
-    <p class="sub">Shared by the whole party. Anyone can add or edit; only the author or the GM can delete. Each person is sorted into a kind (gym leader, ranger, shopkeeper and so on); open one with Edit to change it.</p>
-    ${cfTools('p',cats)}
+  const list=all.filter(it=>(!af||att(it)===af)&&(!tr||it.pub)&&cfPass(cat,pplCat(it))&&(!q||pplText(it).includes(q))).sort((a,b)=>ord(a,b)||cmp(a,b));
+  const nTr=all.filter(it=>it.pub).length;
+  const groups=cfGroups(list,pplCat,grp,false);
+  return h`<section class="panel"><div class="ph"><h2>People you have met</h2>${canShared()?h`<button class="btn primary sm" data-act="newDoc" data-kind="ppl">Add person</button>`:''}</div>
+    <p class="sub">Everyone the party has met, in one list. ${nTr?'Trainers the GM has shown you have the GM’s picture, role and team on their card. ':''}Anyone can add a person or write the party’s notes on any card; only the author or the GM can delete an entry.</p>
+    ${cfTools('p',all.map(pplCat))}
     <div class="tools"><label class="fld"><span class="fl">Search</span><input type="search" data-u="q.people" value="${S.ui.q.people||''}" placeholder="Name, place, notes"></label>
-      <label class="fld"><span class="fl">Attitude</span><select data-u="f.att"><option value="">Everyone</option>${ATTITUDES.map(([v,l])=>h`<option value="${v}" ${af===v?raw('selected'):''}>${l}</option>`)}</select></label></div></section>
-    ${list.length?groups.map(([k,items])=>h`${grp?cfHead(k,items.length):''}<div class="grid cards">${items.map(personCard)}</div>`):emptyState(total?'No matches':'No one met yet',total?'Try a different search or filter.':'Add the people your trainers meet: gym leaders, rivals, shopkeepers, strangers who seemed off.')}`;
+      <label class="fld"><span class="fl">Attitude</span><select data-u="f.att"><option value="">Everyone</option>${ATTITUDES.map(([v,l])=>h`<option value="${v}" ${af===v?raw('selected'):''}>${l}</option>`)}</select></label>
+      ${nTr?h`<label class="chip chkc"><input type="checkbox" data-u="f.ptr" ${tr?raw('checked'):''}><span>Trainers only</span> <span class="cfn">${nTr}</span></label>`:''}</div></section>
+    ${list.length?groups.map(([k,items])=>h`${grp?cfHead(k,items.length):''}<div class="grid cards">${items.map(personCard)}</div>`):emptyState(all.length?'No matches':'No one met yet',all.length?'Try a different search or filter.':'Add the people your trainers meet: gym leaders, rivals, shopkeepers, strangers who seemed off.')}`;
+}
+/* Add party notes on a shown NPC no one has written about, Open NPC sheet, Unlink */
+function pplAct(b){
+  const d=b.dataset;
+  switch(d.act){
+    case 'ppl_notes':{
+      const pub=((S.npcPub&&S.npcPub.n)||{})[d.id];if(!pub||!canShared())break;
+      const id=S.db.collection('people').doc().id;
+      newDoc('ppl',id,{name:String(pub.n||''),role:'',place:'',met:num(S.meta.session)||1,att:'unknown',notes:'',pinned:false,nt:d.id,addedBy:S.me.id,createdAt:Date.now()});
+      S.ui.open['ppl'+id]=true;render();break;}
+    case 'ppl_sheet':if(S.me.admin&&NTS()[d.id]){S.ui.nt.open[d.id]=true;ntEnsure(d.id);S.ui.q.npc=ntName(NTS()[d.id]);setTab('npc');}break;
+    case 'ppl_unlink':pplLink(d.id,'');break;
+  }
 }
 
 /* ---------- journal tab ---------- */

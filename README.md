@@ -490,7 +490,7 @@ Every person on **People** and every NPC on **NPC Trainers** now belongs to a **
 
 **Where it is kept.** Each NPC is one document, `gm/nt_…`, that Firestore's rules let only you read. A player's browser never receives it, so the secret, the notes and every sheet are not hidden "behind" the page: they are simply not there. What the table may see is a separate, small document, `meta/npcs`, that holds only the NPCs you have shown and, for each one, only what you ticked.
 
-**Showing an NPC.** In **GM only · what the players see**, tick **Show this NPC to the table**. That alone shows just the name. Then tick any of **Role**, **Where you met**, **Your notes**, **Picture**, **Level and class**, **Stats** and **Items** to add those. The line below spells out what the players see right now. Players find them on the **People** page, under **Trainers you have met** (you see the same panel there, marked as what the players see). Untick **Show this NPC** and she disappears from their screens again; what you ticked is remembered for next time.
+**Showing an NPC.** In **GM only · what the players see**, tick **Show this NPC to the table**. That alone shows just the name. Then tick any of **Role**, **Where you met**, **Your notes**, **Picture**, **Level and class**, **Stats** and **Items** to add those. The line below spells out what the players see right now. Players find them on the **People** page, on one card with the party’s entry of the same name, or on a card of their own (since Update 73). Untick **Show this NPC** and she disappears from their screens again; what you ticked is remembered for next time.
 
 **Showing a Pokémon.** Every Pokémon starts fully hidden. On its sheet, tick **Name**, **Picture** and **Types** to show those on the NPC's card (**Show all** and **Hide all** do the lot). Tick **Held item** to show what it is holding ("holding Garchompite"). With the name hidden the card says "Unknown Pokémon" and the picture does not give the name away; the moves, stats, nature, passives and your notes are never shown. A Pokémon only appears on the card once the NPC herself is shown. A Pokémon with its picture shown on a card is suggested as **seen** in the Pokédex, for you to confirm.
 
@@ -502,7 +502,7 @@ Every person on **People** and every NPC on **NPC Trainers** now belongs to a **
 
 **The full picture.** **View full picture** (under the picture on her page) opens all of it, uncropped, in front of the page. Players can do the same: on the NPC's card the picture has a "Tap to enlarge" label, and tapping it opens the whole picture. Tap anywhere, press **Escape** or use **Close** to put it away. Pictures saved by Update 9 keep working: they open at the size they were saved at, and you can add a new one to get a larger one.
 
-**Showing it to the players.** The table sees nothing until she is shown **and** you tick **Picture**; then the portrait, in the frame you chose, appears beside her name under **People → Trainers you have met**. Unticking **Picture**, hiding the NPC, removing the picture or deleting her takes the table's copy away at once (an open full picture closes by itself). Moving or zooming while it is shared updates the table's frame within a second. The line under the picture says which state it is in.
+**Showing it to the players.** The table sees nothing until she is shown **and** you tick **Picture**; then the portrait, in the frame you chose, appears on her card under **People**. Unticking **Picture**, hiding the NPC, removing the picture or deleting her takes the table's copy away at once (an open full picture closes by itself). Moving or zooming while it is shared updates the table's frame within a second. The line under the picture says which state it is in.
 
 *Where the picture is kept:* her own copy (the whole picture and its frame) sits on her private sheet (`gm/nt_…`), which only you can read. While it is shared, the table's copy is one small document, `mapimg/npc_…`, in the collection the map picture already uses (the existing rules let members read it and only you write it, so nothing needs republishing). The public NPC document, `meta/npcs`, never holds picture data.
 
@@ -1142,4 +1142,15 @@ A GM-only **GM Dashboard** page (first item under Game Master in the menu, with 
 - **Show the roster** lists every judge by seat, with their role, leanings, tell and notes.
 - The roster is kept in `gm/contest`, which only you can read, so no new database rules are needed. Without a judge pack, contests start with Mr. Contesta, Mr. Sukizo and Nurse Joy as before. Importing a pack again replaces the roster; a contest already open keeps its judges.
 - `tests/t_judges.js` checks it (with the real pack if `JUDGES=<folder with the pack>` is set).
+
+## People: one list (Update 73)
+
+- **One card per person.** The People page no longer has a separate "Trainers you have met" section. An NPC you show from **NPC trainers** and the party's entry for the same person are one card: what you revealed on top (picture, role, level and class, your shown note under **Shown by the GM**), the party's notes below (attitude, where and when they met, what they know, pin).
+- **Linking.** An entry with the same name as an NPC you show joins that NPC's card by itself. To join two that don't share a name (a nickname, a disguise), open the entry with **Edit** and choose the NPC in **Same person as** (GM only). **Unlink** on a card, or "No one: keep it separate" in that menu, splits them again, and they stay split. If you rename or hide an NPC, the entry simply stands on its own again.
+- **Party notes on shown NPCs.** A shown NPC no one has written about yet has its own card with **Add party notes**, which anyone at the table can use; it makes a People entry linked to that NPC. What you revealed stays read-only.
+- **The team folds away.** A shown trainer's Pokémon, stats and items are under **Team (3)** (or **Stats and items**) on the card.
+- **One set of filters.** Search, the category chips, attitude, sort and group-by-category cover everyone, and **Trainers only** shows just the NPCs you have shown. The People count in the menu counts cards.
+- **For you:** the secret field and the **Same person as** menu are on each entry's Edit, and a card linked to an NPC has **Open NPC sheet**.
+- Nothing is moved or deleted in the database: the NPC's shown copy stays in `meta/npcs`, and the party's entry in `people`, with two new fields (`nt`, the NPC it is linked to, and `nolink`, NPCs it must not join by name). No new database rules.
+- `tests/t_people.js` checks it.
 
