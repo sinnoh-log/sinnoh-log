@@ -4,7 +4,9 @@
    Names, types, evolution links and the Sinnoh regional order are bundled with the page (dexinfo.js, dexref.js).
    The handbook entry (stats, passives, moves, evolutions) comes from the table's own database once the GM has imported it (pta.js).
    The in-game description is read from PokeAPI's public data on GitHub when an entry is opened, and is not stored anywhere.
-   What a trainer has seen or caught is kept on the trainer sheet (field dx). The GM can lock the book so species fill in as they are met. */
+   What a trainer has seen or caught is kept on the trainer sheet (field dx). The GM can lock the book so species fill in as they are met.
+   Update 71: only the GM's marks count. A Pokémon in a trainer's party or box, or a foe the GM shows, becomes a suggestion the GM
+   approves or dismisses (dismissals in gm/dash, field dxd). Players see their marks but do not set them. */
 S.ui.dx=S.ui.dx||{q:'',reg:'nat',gen:'',type:'',show:'all',page:1,sel:0,y:0};
 if(S.ui.dx.sy===undefined){S.ui.dx.sy=false;S.ui.dx.fm=null;}
 
@@ -55,11 +57,63 @@ function dxCtx(){
   const t=uid&&S.trainers[uid]?S.trainers[uid]:null;
   return {uid:t?uid:null,t,own:t?dxOwned(uid):new Set(),bat:dxBattle(),reg:(t&&t.dx)||{}};
 }
-/* 0 not met, 1 seen, 2 caught */
-const dxStat=(c,id)=>Math.max(num(c.reg['n'+id]),c.own.has(id)?2:0,c.bat.has(id)?1:0);
+/* 0 not met, 1 seen, 2 caught: the GM's marks only (Update 71) */
+const dxStat=(c,id)=>num(c.reg['n'+id]);
 /* what this viewer may read: 0 nothing, 1 the basics, 2 everything. The GM always reads everything. */
 const dxVis=(c,id)=>(!dxLocked()||S.me.admin)?2:dxStat(c,id);
-const dxCan=c=>!!(c.uid&&canEditT(c.uid)&&(!dxLocked()||S.me.admin));
+const dxCan=c=>!!(c.uid&&S.me.admin&&S.me.canWrite);
+/* ----- suggestions (Update 71): what would have counted by itself, for the GM to approve ----- */
+const dxDis=()=>(dashG().dxd)||{};
+function dxSuggest(){
+  if(!S.me.admin)return [];
+  const out=[],dis=dxDis(),bat=dxBattle();
+  const mk=(uid,id)=>num(((S.trainers[uid]||{}).dx||{})['n'+id]);
+  tids().forEach(uid=>{
+    if(S.pokemon[uid]===undefined)return;
+    const D=dis[uid]||{},where={};
+    monsOf(uid).forEach(m=>{const si=speciesInfo(m.species);if(si&&!where[si.id])where[si.id]=m.slot==='box'?'box':'party';});
+    Object.keys(where).forEach(k=>{const id=+k;if(mk(uid,id)<2&&!D['c'+id])out.push({k:'c',id,uids:[uid],where:where[k]});});
+  });
+  bat.forEach(id=>{
+    const uids=tids().filter(uid=>mk(uid,id)<1&&!((dis[uid]||{})['s'+id])&&!out.some(o=>o.k==='c'&&o.id===id&&o.uids[0]===uid));
+    if(uids.length)out.push({k:'s',id,uids});
+  });
+  return out;
+}
+function dxSuggestApply(o,yes){
+  o.uids.forEach(uid=>{
+    if(yes)dxMarkSet(uid,o.id,o.k==='c'?2:1);
+    else edit('gd','dash','dxd.'+uid+'.'+o.k+o.id,1);
+  });
+}
+function dxSuggestHtml(){
+  const L=dxSuggest();
+  if(!L.length)return '';
+  const shown=L.slice(0,24);
+  const who=o=>o.uids.map(u=>tName(S.trainers[u])).join(', ');
+  return h`<div class="dxsug" role="region" aria-label="Pokédex marks to confirm">
+    <div class="row sp"><h3>To confirm <span class="pill">${L.length}</span></h3><span class="row"><button class="btn sm" data-act="dx_sgall" data-v="1">Approve all</button><button class="btn sm ghost" data-act="dx_sgall" data-v="0">Dismiss all</button></span></div>
+    <ul class="dxsl">${shown.map((o,i)=>h`<li><span class="dxsn">${spriteSrcs(o.id).length?h`<img class="sp mi" src="${spriteSrcs(o.id)[0]}" data-fb="${spriteSrcs(o.id).slice(1).join('|')}" alt="" width="32" height="32" loading="lazy" decoding="async">`:''}<b>${DEXA[o.id-1]}</b>
+      <span class="sub">${o.k==='c'?'in '+who(o)+'’s '+o.where:'shown to '+who(o)}</span></span>
+      <span class="row"><button class="btn sm" data-act="dx_sg" data-i="${i}" data-v="1">${o.k==='c'?'Mark caught':'Mark seen'}</button><button class="btn sm ghost" data-act="dx_sg" data-i="${i}" data-v="0">Not now</button></span></li>`)}</ul>
+    ${L.length>shown.length?h`<p class="sub">And ${L.length-shown.length} more.</p>`:''}
+    <p class="sub">Nothing here counts until you approve it. "Not now" hides a suggestion for good; you can still mark it on the entry.</p>
+  </div>`;
+}
+/* the first time the GM's page sees a trainer after Update 71, what the old rules showed is saved as the GM's marks, so nothing disappears */
+function dxMigrate(){
+  if(!S.me.admin||!S.me.canWrite)return;
+  const bat=dxBattle();
+  tids().forEach(uid=>{
+    const t=S.trainers[uid];
+    if(!t||num(t.dxv)>=2||S.pokemon[uid]===undefined)return;
+    const dx=Object.assign({},t.dx||{});let ch=false;
+    dxOwned(uid).forEach(id=>{if(num(dx['n'+id])<2){dx['n'+id]=2;ch=true;}});
+    bat.forEach(id=>{if(num(dx['n'+id])<1){dx['n'+id]=1;ch=true;}});
+    if(ch)edit('t',uid,'dx',dx);
+    edit('t',uid,'dxv',2);
+  });
+}
 
 /* ----- the list ----- */
 const dxIds=()=>S.ui.dx.reg==='sin'?DXSINL:Array.from({length:DXN},(_,i)=>i+1);
@@ -118,13 +172,10 @@ function dxRefresh(){
 }
 
 function dxSyncRow(c){
-  if(!c.uid||!dxCan(c))return '';
-  const miss=[...c.own].filter(id=>num(c.reg['n'+id])<2).length;
+  if(!c.uid||!canEditT(c.uid))return '';
   const tl=dxTally(c);
-  const dexNow=num(c.t.dex);
-  const need=dexNow!==tl.got;
-  if(!miss&&!need)return '';
-  return h`<div class="row">${miss?h`<button class="btn sm" data-act="dx_rec">Record ${miss} owned species as caught</button>`:''}${need?h`<button class="btn sm" data-act="dx_sync">Set “Pokédex owned” on the trainer sheet to ${tl.got}</button>`:''}</div>`;
+  if(num(c.t.dex)===tl.got)return '';
+  return h`<div class="row"><button class="btn sm" data-act="dx_sync">Set “Pokédex owned” on the trainer sheet to ${tl.got}</button></div>`;
 }
 
 /* ---------- Breeding and move learning: egg groups, proficiencies, TMs ----------
@@ -362,8 +413,9 @@ function dexTab(){
     ${!c.uid&&!S.me.admin&&S.me.id&&S.me.canWrite?h`<div class="banner">You have no trainer sheet yet, so nothing is marked. ${createCta()}</div>`:''}
     ${!c.uid&&S.me.admin?h`<p class="sub">No trainer is selected, so nothing is marked.</p>`:''}
     ${c.uid?h`<div class="dxprog" role="img" aria-label="${tl.got} caught and ${tl.seen} seen out of ${tl.total}"><i class="s" ${raw('style="width:'+sp+'%"')}></i><i class="c" ${raw('style="width:'+pct+'%"')}></i></div>`:''}
-    <p class="sub">${locked&&!S.me.admin?'The GM keeps the Pokédex locked: a species fills in when you catch one or meet it in battle. ':''}${c.uid?(S.me.admin?'Showing '+tName(c.t)+'. ':'')+'A Pokémon in your party or box counts as caught, and a foe the GM shows you in battle counts as seen.':'Names, types and handbook entries for every species.'}</p>
+    <p class="sub">${locked&&!S.me.admin?'The GM keeps the Pokédex locked: a species fills in when the GM marks it. ':''}${c.uid?(S.me.admin?'Showing '+tName(c.t)+'. Only your marks count: a Pokémon in a party or box, or a foe you show, waits under To confirm until you approve it.':'The GM marks what you have seen and caught.'):'Names, types and handbook entries for every species.'}</p>
     ${S.me.admin?h`<label class="row"><input type="checkbox" data-act="dx_lock" ${locked?raw('checked'):''}><span>Lock the Pokédex for players (unmet species show as ???)</span></label>`:''}
+    ${S.me.admin?dxSuggestHtml():''}
     ${dxSyncRow(c)}
     <div class="dxf">
       <label class="fld dxq"><span class="fl">Search</span><input type="search" data-u="dx.q" data-nr value="${d.q||''}" placeholder="Name or number" autocomplete="off"></label>
@@ -490,13 +542,18 @@ function dxHandbook(c,id){
 }
 
 function dxMarks(c,id,s){
+  if(S.me.admin&&S.me.canWrite){
+    const ids=tids();
+    if(!ids.length)return '';
+    const bat=dxBattle();
+    return h`<div class="dxwho" role="group" aria-label="Pokédex marks for ${DEXA[id-1]}">${ids.map(uid=>{
+      const t=S.trainers[uid],reg=num(((t||{}).dx||{})['n'+id]),own=S.pokemon[uid]!==undefined&&dxOwned(uid).has(id);
+      return h`<div class="dxwr"><b>${tName(t)}</b><div class="seg">${[[0,'Not met'],[1,'Seen'],[2,'Caught']].map(([n,l])=>h`<button data-act="dx_mark" data-uid="${uid}" data-id="${id}" data-v="${n}" aria-pressed="${String(reg===n)}">${l}</button>`)}</div>
+        ${own&&reg<2?h`<span class="pill">in their party or box</span>`:bat.has(id)&&reg<1?h`<span class="pill">shown to the table</span>`:''}</div>`;})}</div>`;
+  }
   if(!c.uid)return '';
-  if(c.own.has(id))return h`<span class="pill good">Caught · it is in ${S.me.admin?tName(c.t)+'’s':'your'} party or box</span>`;
-  const can=dxCan(c);
-  const reg=num(c.reg['n'+id]);
-  const note=c.bat.has(id)&&reg<1?h`<span class="pill">Seen in the current battle</span>`:'';
-  if(!can)return h`${s?h`<span class="pill ${s>=2?'good':''}">${s>=2?'Caught':'Seen'}</span>`:h`<span class="pill">Not met</span>`}${note}`;
-  return h`<div class="seg" role="group" aria-label="Pokédex mark for ${DEXA[id-1]}">${[[0,'Not met'],[1,'Seen'],[2,'Caught']].map(([n,l])=>h`<button data-act="dx_mark" data-id="${id}" data-v="${n}" aria-pressed="${String(reg===n)}">${l}</button>`)}</div>${note}`;
+  const waiting=c.own.has(id)&&s<2;
+  return h`${s?h`<span class="pill ${s>=2?'good':''}">${s>=2?'Caught':'Seen'}</span>`:h`<span class="pill">Not met</span>`}${waiting?h`<span class="pill">In your party or box · waiting for the GM</span>`:''}`;
 }
 function dxStepIds(c,id){
   const l=dxList(c);
@@ -541,7 +598,7 @@ function dxDetail(c){
       <div class="acts"><button class="btn sm" data-act="dx_step" data-d="-1" ${st.prev?'':raw('disabled')} aria-label="Previous entry">←</button><button class="btn sm" data-act="dx_step" data-d="1" ${st.next?'':raw('disabled')} aria-label="Next entry">→</button></div></div>`;
   if(!v){
     return h`${top}<div class="dxhead"><div class="dxartw" aria-hidden="true"></div><div class="dxinfo"><p class="dxno">No. ${dxNo(id)}${DXSINNO.has(id)?' · Sinnoh '+dxNo(DXSINNO.get(id)):''}</p><h2 class="dxname">???</h2>
-      <p class="sub">Nobody at the table has met this Pokémon yet. It fills in when you catch one or the GM shows you one in battle.</p></div></div></section>`;
+      <p class="sub">Not met yet. It fills in when the GM marks it as seen or caught.</p></div></div></section>`;
   }
   if(v>=2){dxLoad(id);if(PTA.idx)ptaWarm(nm);}
   const fl=dxFormList(id),cf=dxCurForm(id,fl),sy=!!S.ui.dx.sy;
@@ -559,10 +616,10 @@ function dxDetail(c){
         ${fl.length>1?h`<p class="sub dxfc">${cf.k==='b'?'Showing the base form':cf.label+' · '+cf.sub}${cf.noart?' · no official art for this form, showing the base form':''}</p>`:''}
         ${dxFormPick(id,fl,cf)}
         <div class="row dxmk">${dxMarks(c,id,s)}</div>
-        ${S.me.admin&&c.uid?h`<div class="row"><button class="btn sm" data-act="dx_all" data-id="${id}">Mark seen for every trainer</button></div>`:''}
+        ${S.me.admin&&tids().length?h`<div class="row"><button class="btn sm" data-act="dx_all" data-id="${id}">Mark seen for every trainer</button></div>`:''}
       </div></div>`;
   if(v<2){
-    return h`${top}${head}<p class="sub">You have seen it. Catch one to read the full entry.</p></section>
+    return h`${top}${head}<p class="sub">You have seen it. The full entry opens once the GM marks it caught.</p></section>
       <section class="panel"><div class="ph"><h2>Evolution family</h2></div>${dxFamily(c,id)}</section>`;
   }
   return h`${top}${head}</section>
@@ -599,9 +656,22 @@ function dxAct(b){
     case 'dx_clear':x.q='';x.gen='';x.type='';x.show='all';x.page=1;render();break;
     case 'dx_retry':dxLoad(num(d.id),true);render();break;
     case 'dx_mark':{
-      const c=dxCtx();
-      if(!dxCan(c))break;
-      dxMarkSet(c.uid,num(d.id),clamp(num(d.v),0,2));
+      if(!S.me.admin||!S.me.canWrite)break;
+      const uid=d.uid||dxCtx().uid;
+      if(!uid||!S.trainers[uid])break;
+      dxMarkSet(uid,num(d.id),clamp(num(d.v),0,2));
+      render();break;}
+    case 'dx_sg':{
+      if(!S.me.admin)break;
+      const o=dxSuggest()[num(d.i)];if(!o)break;
+      dxSuggestApply(o,d.v==='1');
+      if(d.v==='1')toast(DEXA[o.id-1]+': marked '+(o.k==='c'?'caught':'seen')+'.',true);
+      render();break;}
+    case 'dx_sgall':{
+      if(!S.me.admin)break;
+      const L=dxSuggest();
+      L.forEach(o=>dxSuggestApply(o,d.v==='1'));
+      toast(d.v==='1'?'Approved '+L.length+' suggestion'+(L.length===1?'':'s')+'.':'Dismissed '+L.length+'.',true);
       render();break;}
     case 'dx_all':{
       if(!S.me.admin)break;
@@ -610,16 +680,9 @@ function dxAct(b){
       tids().forEach(u=>{const t=S.trainers[u];if(t&&num(t.dx&&t.dx['n'+id])<1){dxMarkSet(u,id,1);k++;}});
       toast(k?'Marked '+DEXA[id-1]+' as seen for '+k+' trainer'+(k===1?'':'s')+'.':'Every trainer has already met '+DEXA[id-1]+'.',true);
       render();break;}
-    case 'dx_rec':{
-      const c=dxCtx();
-      if(!dxCan(c))break;
-      let k=0;
-      c.own.forEach(id=>{if(num(c.reg['n'+id])<2){dxMarkSet(c.uid,id,2);k++;}});
-      toast('Recorded '+k+' species as caught.',true);
-      render();break;}
     case 'dx_sync':{
       const c=dxCtx();
-      if(!dxCan(c))break;
+      if(!c.uid||!canEditT(c.uid))break;
       const tl=dxTally(c);
       edit('t',c.uid,'dex',tl.got);
       toast('Pokédex owned is now '+tl.got+'.',true);

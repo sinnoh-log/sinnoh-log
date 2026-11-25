@@ -37,7 +37,7 @@ A shared campaign tracker for your table. Everyone creates an account, signs in,
 | Giving a Pokémon to a trainer | no | yes (GM Desk, or from a foe in a battle) |
 | NPC trainers: making them, their picture, stats, items and Pokémon, putting them in a battle, Mega Evolving their Pokémon | no | yes (NPC Trainers page and Battle page) |
 | Seeing an NPC trainer (picture, level, class, stats, items, held items, Mega form) | only after the GM shows it, and only what the GM ticked | everything |
-| Pokédex: seen and caught marks | their own (while the Pokédex is not locked) | anyone's, and the lock |
+| Pokédex: seen and caught marks | none (they see their own marks) | anyone's, the suggestions to confirm, and the lock |
 | Private notes | only they can read them | only they can read theirs |
 | Table code and player list | no access | change code, remove players |
 
@@ -492,7 +492,7 @@ Every person on **People** and every NPC on **NPC Trainers** now belongs to a **
 
 **Showing an NPC.** In **GM only · what the players see**, tick **Show this NPC to the table**. That alone shows just the name. Then tick any of **Role**, **Where you met**, **Your notes**, **Picture**, **Level and class**, **Stats** and **Items** to add those. The line below spells out what the players see right now. Players find them on the **People** page, under **Trainers you have met** (you see the same panel there, marked as what the players see). Untick **Show this NPC** and she disappears from their screens again; what you ticked is remembered for next time.
 
-**Showing a Pokémon.** Every Pokémon starts fully hidden. On its sheet, tick **Name**, **Picture** and **Types** to show those on the NPC's card (**Show all** and **Hide all** do the lot). Tick **Held item** to show what it is holding ("holding Garchompite"). With the name hidden the card says "Unknown Pokémon" and the picture does not give the name away; the moves, stats, nature, passives and your notes are never shown. A Pokémon only appears on the card once the NPC herself is shown. A Pokémon with its picture shown on a card counts as **seen** in the Pokédex.
+**Showing a Pokémon.** Every Pokémon starts fully hidden. On its sheet, tick **Name**, **Picture** and **Types** to show those on the NPC's card (**Show all** and **Hide all** do the lot). Tick **Held item** to show what it is holding ("holding Garchompite"). With the name hidden the card says "Unknown Pokémon" and the picture does not give the name away; the moves, stats, nature, passives and your notes are never shown. A Pokémon only appears on the card once the NPC herself is shown. A Pokémon with its picture shown on a card is suggested as **seen** in the Pokédex, for you to confirm.
 
 **In a battle.** On the NPC's page, **Add to battle** puts one Pokémon in and **Add the whole team to the battle** puts them all in. (The Battle page has the same buttons under **Who is fighting → NPC trainers**.) They join as **foes**, with the full sheet in `gm/battle`, so everything in **Foes the players cannot see** applies: they start as "Foe A", "Foe B" with no picture, types or health, and you show what you like. A foe remembers whose it is: you see "Foe · Cynthia" on its row and "Belongs to Cynthia" on its sheet. The players see her name on it only once you have shown her.
 
@@ -592,13 +592,15 @@ Renaming a ribbon keeps everything trainers have already ticked. Removing a ribb
 - **Other forms:** regional forms and Mega Evolutions, when there are any.
 - **← →** step to the previous or next entry in whatever list you were looking at.
 
-**Seen and caught.** Marks are kept per trainer, on the trainer sheet. A Pokémon in your party or box counts as **caught** automatically, and a foe the GM has shown you in battle (its picture is visible) counts as **seen**. Two buttons appear when they would help: **Record … owned species as caught** (saves your current Pokémon as caught, so they stay caught if you release them) and **Set “Pokédex owned” … ** (copies the caught count onto the Trainer sheet's *Pokédex owned* box, which drives the certificate every 30). Neither runs by itself.
+**Seen and caught.** Marks are kept per trainer, on the trainer sheet, and since Update 71 **only the GM sets them**. Nothing counts by itself: a Pokémon in a trainer's party or box, a foe you show in battle, or a Pokémon whose picture you show on an NPC's card becomes a suggestion under **To confirm** (see below). Players see their own marks as a pill on each entry; a Pokémon they own that you have not marked caught yet says *In your party or box · waiting for the GM*. One button appears when it would help: **Set “Pokédex owned” … ** copies the caught count onto the Trainer sheet's *Pokédex owned* box, which drives the certificate every 30. It does not run by itself.
 
 **For the GM.**
 
-- Use the trainer buttons at the top to view and mark any trainer's book.
+- Use the trainer buttons at the top to view any trainer's book (which species show as seen or caught in the list).
+- **On an entry**, every trainer has a row with **Not met / Seen / Caught**. Tap to set it. A row also notes *in their party or box* or *shown to the table* when that is why it could change.
+- **To confirm** (at the top of the Pokédex, with a count on the Pokédex tab) lists what would have counted by itself: *Rookidee · in Impala's party* (**Mark caught**), *Shinx · shown to Impala, Iris, Victor* (**Mark seen**, for every trainer listed). **Not now** hides that suggestion for good for those trainers; you can still mark it by hand on the entry. **Approve all** and **Dismiss all** do the whole list. Dismissed suggestions are kept in `gm/dash`, which only you can read.
 - **Mark seen for every trainer** (on an entry) is for "the whole party saw a Gible".
-- **Lock the Pokédex for players** turns the book into a discovery game. A species the trainer has not met shows as **???**: no name, no picture, no handbook text, and it cannot be found by typing its name (a number still finds the empty slot). A **seen** species shows its name, picture, types and family. A **caught** species shows everything, except that what it evolves into stays **???** until you have met that one too. While it is locked, players cannot change their own marks: the book fills in from their Pokémon and from battles, and you can mark anything by hand. You always see everything.
+- **Lock the Pokédex for players** turns the book into a discovery game. A species the trainer has not met shows as **???**: no name, no picture, no handbook text, and it cannot be found by typing its name (a number still finds the empty slot). A **seen** species shows its name, picture, types and family. A **caught** species shows everything, except that what it evolves into stays **???** until you have met that one too. The book fills in as you mark it. You always see everything.
 - The lock is a **spoiler guard, not security**. It hides things in the page, and a determined player could still look the species up elsewhere. The handbook data itself is readable by every member either way, as before.
 
 **Where it comes from.** Names, types and base stats of all 1025 species, the evolution lines and the Sinnoh order are built into `app.js` (taken from the open-source `@pkmn/dex` data and PokeAPI's Pokédex lists). Pictures come from the PokeAPI sprites repository on GitHub, the same place the Pokémon sprites already come from. Nothing about the Pokédex needs a new import or a new database rule.
@@ -1119,3 +1121,14 @@ A GM-only **GM Dashboard** page (first item under Game Master in the menu, with 
 - **Fill to six moves.** On NPC trainers there are three new buttons: **Fill to six moves** on a Pokémon (under its moves, in Edit), **Fill all to six moves** on an NPC (their team and saved teams, in Edit details), and **Fill every NPC to six moves** at the top of the page (tap twice). Every move a Pokémon already has is kept, uses included. Its empty slots take its natural moves from the handbook first. Any slots still empty take moves it can be taught (the Who-can-learn rules), leaning to its own types and a type it doesn't cover yet. It also gets one effect move if it has none, never a second Style move, nothing much stronger than what it already hits with, and moves from its own proficiencies before ones every Pokémon can learn. It needs the handbook data and `pta-extra.json` imported.
 - **The packs have six moves each.** In `sinnoh-circuit-rivals-quick.json`, every Pokémon keeps its four moves and gains two suited to the rival's style (Aggressor, Defender, Generalist, Trickster, Specialist or Showman); later teams get the same treatment. In `sinnoh-head-trainers.json`, each Pokémon lists its natural moves (what it had before) and fills to six with support moves and moves of the Gym's type. Team Vesper and the Lost Tower packs already had six. Importing a pack again tops up NPCs already on the site (Update 69 rule).
 - `tests/t_six.js` checks it (the pack part runs with `PACKS=<folder with the packs>`).
+
+## The GM decides what is seen and caught (Update 71)
+
+- **Only your marks count.** A Pokémon in a party or box no longer counts as caught by itself, and a foe you show no longer counts as seen by itself. Players cannot change their marks; they see them.
+- **To confirm.** What used to count by itself now waits at the top of the Pokédex as a suggestion: **Mark caught** or **Mark seen**, **Not now**, and **Approve all** / **Dismiss all**. The Pokédex tab shows how many wait. Nothing counts until you approve it.
+- **A row per trainer on every entry**, with **Not met / Seen / Caught**, so you can set anyone's mark without switching trainers. **Mark seen for every trainer** is still there.
+- **Nothing you see now disappears.** The first time your page loads a trainer after this update (once their Pokémon have loaded), whatever the old rules showed (their Pokémon as caught, anything you were showing as seen) is saved as your marks. That happens once per trainer.
+- **Record … owned species as caught** is gone (the suggestions replace it). **Set “Pokédex owned” …** stays.
+- Like the lock, this is a page rule, not database security: no new database rules are needed.
+- `tests/t_dexgm.js` checks it.
+

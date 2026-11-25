@@ -1066,6 +1066,17 @@ input[type=search]{appearance:none}
 .dxno{font:800 12.5px var(--f-body);color:var(--muted);margin:0}
 .dxname{font:600 26px/1.15 var(--f-pix);margin:0}
 .dxmk{align-items:center}
+.dxwho{display:flex;flex-direction:column;gap:6px;flex:1 1 100%;min-width:0}
+.dxwr{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:4px 0;border-bottom:1px solid var(--line-soft)}
+.dxwr:last-child{border-bottom:0}
+.dxwr>b{flex:0 0 130px;min-width:0;overflow-wrap:anywhere}
+.dxsug{display:flex;flex-direction:column;gap:8px;margin:10px 0;padding:10px 12px;border:2px solid var(--accent);border-radius:12px;background:var(--accent-soft)}
+.dxsug h3{margin:0;display:flex;align-items:center;gap:8px}
+.dxsl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.dxsl li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px 10px;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.dxsn{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0}
+.dxsn .mi{width:32px;height:32px;image-rendering:pixelated}
+.dxsug p{margin:0}
 .dxquote{margin:0;padding:10px 14px;border-left:4px solid var(--accent);background:var(--panel);border-radius:0 10px 10px 0;font-size:15px;line-height:1.5}
 .dxrec{display:flex;flex-direction:column;gap:8px}
 .dxrec+.dxrec{border-top:1px solid var(--line-soft);padding-top:12px;margin-top:4px}
@@ -1716,23 +1727,23 @@ input,select,textarea{border-radius:9px}
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
 <!-- The app, in load order. These files share one scope; keep the order. -->
-<script src="js/01-core.js?v=2026-11-24-fill6"></script>
-<script src="js/02-species.js?v=2026-11-24-fill6"></script>
-<script src="js/03-rolls.js?v=2026-11-24-fill6"></script>
-<script src="js/04-battle.js?v=2026-11-24-fill6"></script>
-<script src="js/04b-battle-helper.js?v=2026-11-24-fill6"></script>
-<script src="js/04c-format.js?v=2026-11-24-fill6"></script>
-<script src="js/05-pokedex-contests.js?v=2026-11-24-fill6"></script>
-<script src="js/05b-stage.js?v=2026-11-24-fill6"></script>
-<script src="js/05c-shows.js?v=2026-11-24-fill6"></script>
-<script src="js/06-world.js?v=2026-11-24-fill6"></script>
-<script src="js/07-npc.js?v=2026-11-24-fill6"></script>
-<script src="js/07b-quick-npc.js?v=2026-11-24-fill6"></script>
-<script src="js/08-battlemap.js?v=2026-11-24-fill6"></script>
-<script src="js/09-sheets.js?v=2026-11-24-fill6"></script>
-<script src="js/09b-road.js?v=2026-11-24-fill6"></script>
-<script src="js/09c-growth.js?v=2026-11-24-fill6"></script>
-<script src="js/09d-dash.js?v=2026-11-24-fill6"></script>
-<script src="js/09e-badge.js?v=2026-11-24-fill6"></script>
-<script src="js/10-calendar-main.js?v=2026-11-24-fill6"></script>
+<script src="js/01-core.js?v=2026-11-25-dexgm"></script>
+<script src="js/02-species.js?v=2026-11-25-dexgm"></script>
+<script src="js/03-rolls.js?v=2026-11-25-dexgm"></script>
+<script src="js/04-battle.js?v=2026-11-25-dexgm"></script>
+<script src="js/04b-battle-helper.js?v=2026-11-25-dexgm"></script>
+<script src="js/04c-format.js?v=2026-11-25-dexgm"></script>
+<script src="js/05-pokedex-contests.js?v=2026-11-25-dexgm"></script>
+<script src="js/05b-stage.js?v=2026-11-25-dexgm"></script>
+<script src="js/05c-shows.js?v=2026-11-25-dexgm"></script>
+<script src="js/06-world.js?v=2026-11-25-dexgm"></script>
+<script src="js/07-npc.js?v=2026-11-25-dexgm"></script>
+<script src="js/07b-quick-npc.js?v=2026-11-25-dexgm"></script>
+<script src="js/08-battlemap.js?v=2026-11-25-dexgm"></script>
+<script src="js/09-sheets.js?v=2026-11-25-dexgm"></script>
+<script src="js/09b-road.js?v=2026-11-25-dexgm"></script>
+<script src="js/09c-growth.js?v=2026-11-25-dexgm"></script>
+<script src="js/09d-dash.js?v=2026-11-25-dexgm"></script>
+<script src="js/09e-badge.js?v=2026-11-25-dexgm"></script>
+<script src="js/10-calendar-main.js?v=2026-11-25-dexgm"></script>
 </body></html>

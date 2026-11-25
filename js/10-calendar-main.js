@@ -1643,6 +1643,7 @@ function tabCount(k){
   if(k==='people')return Object.keys(S.people).length;
   if(k==='battle')return S.battle&&S.battle.on?'LIVE':0;
   if(k==='contest')return S.contest&&S.contest.on?'LIVE':0;
+  if(k==='dex')return S.me.admin?dxSuggest().length:0;
   if(k==='dash')return S.me.admin?dashReminders().length:0;
   if(k==='leads')return entriesOf(S.leads).filter(l=>!l.status||l.status==='open'||l.status==='chasing').length;
   return 0;
@@ -1752,7 +1753,8 @@ function render(){
   if(S.tab!=='map')hideTip(true);else syncHl();
   if(S.ui.toTop){S.ui.toTop=false;window.scrollTo(0,0);}else window.scrollTo(0,y);
   ensureNames();
-  try{csPoll();}catch(e){}   /* a player's contest appeal, scored on the GM's page (Update 66) */
+  try{csPoll();}catch(e){}
+  try{dxMigrate();}catch(e){}   /* a player's contest appeal, scored on the GM's page (Update 66) */
 }
 async function ensureNames(){
   if(!S.user)return;
