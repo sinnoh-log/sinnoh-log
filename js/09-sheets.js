@@ -867,43 +867,7 @@ function leadsTab(){
     ${groups.length?groups.map(([s,items])=>h`<div class="list"><div class="ph"><h2>${(LEAD_STATES.find(x=>x[0]===s)||LEAD_STATES[0])[1]}</h2><span class="sub">${items.length}</span></div><div class="grid cards">${items.map(leadCard)}</div></div>`):emptyState('No leads yet','Add anything strange you want to look into next.')}`;
 }
 
-/* ---------- timeline tab ---------- */
-function tlItem(e){
-  const key='tl'+e.id;
-  const open=!!S.ui.open[key];
-  const canE=canOwn(e);
-  if(open&&canE){
-    return h`<article class="entry tl-item">
-      <div class="fgrid">
-        ${fNum('Session','tl',e.id,'session',e,{min:0})}
-        ${fText('In-world date','tl',e.id,'when',e,{ph:'e.g. Late autumn'})}
-        ${fText('Title','tl',e.id,'title',e,{cls:'wide'})}
-        ${fText('Place','tl',e.id,'place',e,{list:'dl-places',cls:'wide'})}
-        ${fArea('What happened','tl',e.id,'body',e,{rows:4,cls:'wide'})}
-      </div>
-      <div class="row sp"><button class="btn sm" data-act="toggle" data-key="${key}">Done</button>${delBtn('tl',e.id,'Delete')}</div>
-    </article>`;
-  }
-  return h`<article class="entry tl-item">
-    <h3>${e.title||'Untitled event'}</h3>
-    <div class="meta">${e.when?h`<span>${e.when}</span>`:''}${e.place?h`<span>${e.place}</span>`:''}${e.addedBy?h`<span>by ${nm(e.addedBy)}</span>`:''}</div>
-    ${e.body?h`<p class="prewrap">${e.body}</p>`:''}
-    ${canE?h`<div><button class="btn sm" data-act="toggle" data-key="${key}">Edit</button></div>`:''}
-  </article>`;
-}
-function timelineTab(){
-  const list=entriesOf(S.timeline).sort((a,b)=>num(a.session)-num(b.session)||num(a.createdAt)-num(b.createdAt));
-  const groups=[];
-  list.forEach(e=>{
-    const s=num(e.session);
-    const g=groups[groups.length-1];
-    if(g&&g.s===s)g.items.push(e);else groups.push({s,items:[e]});
-  });
-  return h`<section class="panel"><div class="ph"><h2>Timeline</h2>${canShared()?h`<button class="btn primary sm" data-act="newDoc" data-kind="tl">Add event</button>`:''}</div>
-    <p class="sub">The big beats of the story in the order they happened, grouped by session. Anyone can add; the author or the GM can edit and delete.</p></section>
-    ${groups.length?groups.map(g=>h`<section class="list"><div class="ph"><h2>${g.s?'Session '+g.s:'Before the campaign'}</h2><span class="sub">${g.items.length} ${g.items.length===1?'event':'events'}</span></div><div class="tl">${g.items.map(tlItem)}</div></section>`)
-      :emptyState('Nothing on the timeline yet','Add the moments that changed things: a gym won, a rival met, a place that was not what it seemed.')}`;
-}
+/* ---------- timeline tab: js/09f-timeline.js (Update 74) ---------- */
 
 /* ---------- map tab ---------- */
 const pinList=()=>entriesOf(S.pins).sort((a,b)=>num(a.createdAt)-num(b.createdAt)).map((p,i)=>Object.assign(p,{n:i+1}));

@@ -568,10 +568,30 @@ input[type=search]{appearance:none}
 /* awards, timeline */
 .award{border:2px solid var(--gold);border-radius:12px;padding:8px 10px;background:var(--panel);display:flex;flex-direction:column;gap:3px}
 .btn.chk[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.tl{position:relative;padding-left:24px;display:flex;flex-direction:column;gap:12px}
-.tl::before{content:'';position:absolute;left:6px;top:6px;bottom:6px;width:3px;background:var(--line)}
-.tl-item{position:relative}
-.tl-item::before{content:'';position:absolute;left:-24px;top:20px;width:14px;height:14px;transform:rotate(45deg);border-radius:3px;background:var(--gold);border:2px solid var(--frame)}
+/* timeline (Update 74): a vertical line, a diamond per event in its kind's colour */
+.tk-story{--tk:var(--gold)}.tk-gym{--tk:#D8433A}.tk-contest{--tk:#C2418F}.tk-battle{--tk:#E07A1F}.tk-catch{--tk:#2C9A5B}.tk-travel{--tk:#2A7FD0}.tk-discovery{--tk:#7B4FD0}.tk-history{--tk:#7A6A55}
+.tlwrap{display:flex;flex-direction:column;gap:14px}
+.tlg>.ph{margin-bottom:6px}
+.tl-line{list-style:none;margin:0;padding:0 0 0 26px;position:relative;display:flex;flex-direction:column;gap:10px}
+.tl-line::before{content:'';position:absolute;left:8px;top:4px;bottom:4px;width:3px;border-radius:2px;background:var(--line)}
+.tl-ev{position:relative}
+.tl-dot{position:absolute;left:-24px;top:16px;width:14px;height:14px;transform:rotate(45deg);border-radius:3px;background:var(--tk,var(--gold));border:2px solid var(--frame)}
+.tl-ev.tlc .tl-dot{top:6px;width:11px;height:11px;left:-22px}
+.tl-ev .tl-body{display:flex;flex-direction:column;gap:4px;min-width:0}
+.tl-ev .tl-body h3{margin:0}
+.tl-ev.tlc .tl-body{padding:2px 0}
+.tl-ev.tlc .tl-body h3{font-size:15px}
+.tl-ev.tlhid>.tl-body{border-style:dashed;border-color:var(--gold)}
+.tl-ev.tlhid .tl-dot{background:var(--raised);border-color:var(--tk,var(--gold));border-style:dashed}
+.pill.tk{background:var(--tk);border-color:var(--tk);color:#fff}
+.tkb[aria-pressed="false"]{box-shadow:inset 4px 0 0 var(--tk)}
+.tl-now{position:relative;margin-left:26px;padding:4px 0;display:flex;gap:8px;align-items:baseline}
+.tl-now .tl-dot{background:var(--accent);top:7px}
+.tlsug{border-color:var(--gold)}
+.tlsl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.tlsl li{position:relative;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px 10px;padding:6px 8px 6px 30px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.tlsl .tl-dot{left:9px;top:12px;width:11px;height:11px}
+.tlsn{display:flex;flex-direction:column;gap:2px;min-width:0}
 
 /* map */
 .maplay{display:grid;gap:14px;grid-template-columns:minmax(0,1fr);align-items:start}
@@ -1740,24 +1760,25 @@ input,select,textarea{border-radius:9px}
 <script src="firebase-config.js"></script>
 <script src="backend.js"></script>
 <!-- The app, in load order. These files share one scope; keep the order. -->
-<script src="js/01-core.js?v=2026-11-25-people"></script>
-<script src="js/02-species.js?v=2026-11-25-people"></script>
-<script src="js/03-rolls.js?v=2026-11-25-people"></script>
-<script src="js/04-battle.js?v=2026-11-25-people"></script>
-<script src="js/04b-battle-helper.js?v=2026-11-25-people"></script>
-<script src="js/04c-format.js?v=2026-11-25-people"></script>
-<script src="js/05-pokedex-contests.js?v=2026-11-25-people"></script>
-<script src="js/05b-stage.js?v=2026-11-25-people"></script>
-<script src="js/05c-shows.js?v=2026-11-25-people"></script>
-<script src="js/05d-judges.js?v=2026-11-25-people"></script>
-<script src="js/06-world.js?v=2026-11-25-people"></script>
-<script src="js/07-npc.js?v=2026-11-25-people"></script>
-<script src="js/07b-quick-npc.js?v=2026-11-25-people"></script>
-<script src="js/08-battlemap.js?v=2026-11-25-people"></script>
-<script src="js/09-sheets.js?v=2026-11-25-people"></script>
-<script src="js/09b-road.js?v=2026-11-25-people"></script>
-<script src="js/09c-growth.js?v=2026-11-25-people"></script>
-<script src="js/09d-dash.js?v=2026-11-25-people"></script>
-<script src="js/09e-badge.js?v=2026-11-25-people"></script>
-<script src="js/10-calendar-main.js?v=2026-11-25-people"></script>
+<script src="js/01-core.js?v=2026-11-25-timeline"></script>
+<script src="js/02-species.js?v=2026-11-25-timeline"></script>
+<script src="js/03-rolls.js?v=2026-11-25-timeline"></script>
+<script src="js/04-battle.js?v=2026-11-25-timeline"></script>
+<script src="js/04b-battle-helper.js?v=2026-11-25-timeline"></script>
+<script src="js/04c-format.js?v=2026-11-25-timeline"></script>
+<script src="js/05-pokedex-contests.js?v=2026-11-25-timeline"></script>
+<script src="js/05b-stage.js?v=2026-11-25-timeline"></script>
+<script src="js/05c-shows.js?v=2026-11-25-timeline"></script>
+<script src="js/05d-judges.js?v=2026-11-25-timeline"></script>
+<script src="js/06-world.js?v=2026-11-25-timeline"></script>
+<script src="js/07-npc.js?v=2026-11-25-timeline"></script>
+<script src="js/07b-quick-npc.js?v=2026-11-25-timeline"></script>
+<script src="js/08-battlemap.js?v=2026-11-25-timeline"></script>
+<script src="js/09-sheets.js?v=2026-11-25-timeline"></script>
+<script src="js/09b-road.js?v=2026-11-25-timeline"></script>
+<script src="js/09c-growth.js?v=2026-11-25-timeline"></script>
+<script src="js/09d-dash.js?v=2026-11-25-timeline"></script>
+<script src="js/09e-badge.js?v=2026-11-25-timeline"></script>
+<script src="js/09f-timeline.js?v=2026-11-25-timeline"></script>
+<script src="js/10-calendar-main.js?v=2026-11-25-timeline"></script>
 </body></html>

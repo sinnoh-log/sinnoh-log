@@ -1154,3 +1154,13 @@ A GM-only **GM Dashboard** page (first item under Game Master in the menu, with 
 - Nothing is moved or deleted in the database: the NPC's shown copy stays in `meta/npcs`, and the party's entry in `people`, with two new fields (`nt`, the NPC it is linked to, and `nolink`, NPCs it must not join by name). No new database rules.
 - `tests/t_people.js` checks it.
 
+## The timeline (Update 74)
+
+- **A line by session.** Events sit on a vertical line, grouped by session, with **Before the campaign** first and a **Today** marker (from the calendar) at the end. Each kind has its own colour: Story, Gym, Contest, Battle, Catch, Travel, Discovery and History. A session links to its journal entry. **Titles only** gives a compact list.
+- **In-world dates.** An event takes a date from the campaign calendar (new events start on today's date; **Today** sets it again) and sorts by it within its session. **Or a rough time** keeps free text like "Late autumn" (older events keep theirs), and **Years before the campaign** puts an event under Before the campaign ("17 years before the campaign").
+- **Kinds and trainers.** Tag an event with its kind and the trainers in it (none ticked means the whole party). Filter by kind with the chips, by **Whose story** (that trainer's events plus the whole party's), or search.
+- **Your hidden events.** **Add hidden event** keeps an event in `gm/dash`, which only you can read, marked Hidden and dashed. **Reveal to the players** moves it onto the shared timeline; **Hide from the players** moves a shared one back. **Hide my hidden events** takes them off your own view.
+- **Milestones to add.** The site suggests what it has already recorded: awards (badges, ribbons and other honours), badges ticked without an award, rankings entries for the players (placings, upsets, tier changes and so on; badges, ribbons and minor entries are left out), road battles won or lost, and, from now on, eggs hatched and trips finished. Each waits for you: **Add**, **Add hidden** or **Not now** (which hides it for good), or **Add all** / **Dismiss all**. A milestone goes into the session of the latest event dated on or before it (or the current session); you can change it afterwards. The Timeline tab shows how many wait. Awards now also record the in-world date.
+- No new database rules: events stay in `timeline`, with new fields `date`, `ago`, `kind`, `who` and `ms` (the milestone it came from).
+- `tests/t_timeline.js` checks it.
+

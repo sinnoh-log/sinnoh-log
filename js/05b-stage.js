@@ -292,7 +292,7 @@ function csRecord(){
     if(E.k!=='pc'||!S.trainers[E.u])return;
     if(rib){
       const id=S.db.collection('awards').doc().id;
-      newDoc('aw',id,{uid:E.u,type:'Contest Ribbon',title:rib.n+' Ribbon',note:C.name||'',badge:'',ribbon:rib.k,levelUp:false,session:num(S.meta.session)||1,by:S.me.id,createdAt:now});
+      newDoc('aw',id,{uid:E.u,type:'Contest Ribbon',title:rib.n+' Ribbon',note:C.name||'',badge:'',ribbon:rib.k,levelUp:false,session:num(S.meta.session)||1,d:clToday()||'',by:S.me.id,createdAt:now});
       edit('t',E.u,'ribbons.'+rib.k,true);
       msgs.push(E.name+' takes the '+rib.n+' Ribbon');
     }

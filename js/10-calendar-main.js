@@ -199,7 +199,7 @@ function clRollDay(){
       if(carry>0&&t.steps[t.pos]&&!t.steps[t.pos].sea)t.into=carry;
     }else if(!entry.prog||move>0)entry.prog=(entry.prog?entry.prog+' ':'')+'About '+(Math.round(left*2)/2)+(left===1?' day':' days')+' left on this stretch.';
   }
-  if(t.pos>=t.steps.length){t.done=true;entry.prog=entry.prog.replace('Reached '+trName(t.to)+'.','').trim();entry.prog=(entry.prog?entry.prog+' ':'')+'Arrived at '+trName(t.to)+'.';}
+  if(t.pos>=t.steps.length){t.done=true;tlLogTrip(Object.assign({},t,{log:(t.log||[]).concat([{date:date||''}])}));entry.prog=entry.prog.replace('Reached '+trName(t.to)+'.','').trim();entry.prog=(entry.prog?entry.prog+' ':'')+'Arrived at '+trName(t.to)+'.';}
   if(!st.sea&&Math.random()<0.12){const pool=rkRoadPool();if(pool.length){const r=pool[Math.floor(Math.random()*pool.length)];entry.riv={id:r.id,c:r.c,n:r.name,txt:r.name+' ('+(r.c==='con'?'Contest':'Gym')+' circuit #'+r.pos+', '+r.rec+')'};}}
   const [pub,sec]=clSplitDay(entry);
   t.log=t.log.concat([pub]).slice(-120);
@@ -1641,6 +1641,7 @@ function rollOnce(){
 const navGroups=()=>{const g=S.me.admin?NAV.concat([GM_NAV]):NAV;return CFG?g.concat([['You',[['account','Account']]]]):g;};
 function tabCount(k){
   if(k==='people')return pplItems().length;
+  if(k==='timeline')return S.me.admin?tlSuggest().length:0;
   if(k==='battle')return S.battle&&S.battle.on?'LIVE':0;
   if(k==='contest')return S.contest&&S.contest.on?'LIVE':0;
   if(k==='dex')return S.me.admin?dxSuggest().length:0;
@@ -1802,7 +1803,7 @@ function addEntry(kind){
     S.ui.open['l'+id]=true;
   }else if(kind==='tl'){
     const id=S.db.collection('timeline').doc().id;
-    newDoc('tl',id,{session:num(S.meta.session)||1,when:'',title:'',body:'',place:'',addedBy:S.me.id,createdAt:now});
+    newDoc('tl',id,{session:num(S.meta.session)||1,date:clToday()||'',when:'',ago:0,kind:'story',who:[],title:'',body:'',place:'',addedBy:S.me.id,createdAt:now});
     S.ui.open['tl'+id]=true;
   }else if(kind==='n'){
     const id=S.db.doc('data/users/'+S.me.id+'/profile').collection('notes').doc().id;
@@ -1827,7 +1828,7 @@ function giveAwards(){
   const now=Date.now();
   ids.forEach(uid=>{
     const id=S.db.collection('awards').doc().id;
-    newDoc('aw',id,{uid,type:a.type,title,note:a.note||'',badge:a.type==='Gym Badge'?a.badge:'',ribbon:rib?rib.k:'',levelUp:!!a.levelUp,session:num(S.meta.session)||1,by:S.me.id,createdAt:now});
+    newDoc('aw',id,{uid,type:a.type,title,note:a.note||'',badge:a.type==='Gym Badge'?a.badge:'',ribbon:rib?rib.k:'',levelUp:!!a.levelUp,session:num(S.meta.session)||1,d:clToday()||'',by:S.me.id,createdAt:now});
     const t=S.trainers[uid];
     if(a.type==='Gym Badge'&&a.badge){edit('t',uid,'badges.'+a.badge,true);edit('t',uid,'bdate.'+a.badge,clToday());const p={uid,key:a.badge};S.ui.pop=p;setTimeout(()=>{if(S.ui.pop===p)S.ui.pop=null;},1400);}
     if(rib){edit('t',uid,'ribbons.'+rib.k,true);const p={uid,key:'r:'+rib.k};S.ui.pop=p;setTimeout(()=>{if(S.ui.pop===p)S.ui.pop=null;},1400);}
@@ -1918,6 +1919,7 @@ function act(b,e){
   if(d.act&&d.act.indexOf('nt_')===0){ntAct(b,e);return;}
   if(d.act&&d.act.indexOf('cf_')===0){cfAct(b);return;}
   if(d.act&&d.act.indexOf('ppl_')===0){pplAct(b);return;}
+  if(d.act&&d.act.indexOf('tl_')===0){tlAct(b);return;}
   if(d.act==='idflip'){S.ui.flip[d.uid]=!S.ui.flip[d.uid];render();return;}
   if(d.act==='bmw_open'){bmWinOpen();return;}
   if(d.act==='fc_add'){fcAdd(S.ui.bt.fck||'sunny',S.ui.bt.fcc||'');return;}

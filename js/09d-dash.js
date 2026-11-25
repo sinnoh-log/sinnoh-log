@@ -127,6 +127,7 @@ async function dashHatch(k){
   if(!S.trainers[e.uid]){toast('That trainer is gone. Remove the egg instead.');return;}
   S.ui.give=Object.assign(S.ui.give||{},{uid:e.uid,sp:e.sp,nick:'',caught:'Hatched from an egg'+(clToday()?' on '+clNice(clToday()):'')});
   await giveMon();
+  tlLogHatch(e);
   edit('gd','dash','eggs',dashEggs().filter(x=>x.k!==k));
   render();
 }
